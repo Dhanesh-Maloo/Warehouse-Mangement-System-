@@ -1,0 +1,1 @@
+export { DisposalPage } from './DisposalPage';

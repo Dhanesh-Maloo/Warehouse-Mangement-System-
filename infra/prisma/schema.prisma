@@ -1,0 +1,604 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum ClientStatus {
+  active
+  inactive
+}
+
+enum UserRole {
+  operator
+  manager
+  admin
+  client_user
+}
+
+enum UserStatus {
+  active
+  suspended
+}
+
+enum AssetCategory {
+  laptop
+  monitor
+  peripheral
+}
+
+// Lifecycle: receiving → in_inspection → in_storage → deployed → returning → disposed
+enum AssetStatus {
+  receiving
+  in_inspection
+  in_storage
+  deployed
+  returning
+  disposed
+}
+
+enum ConditionGrade {
+  A
+  B
+  C
+  D
+}
+
+enum AssetCondition {
+  new
+  used
+  dead
+  not_working
+}
+
+enum DeliveryStatus {
+  pending
+  partially_received
+  completed
+  cancelled
+}
+
+enum InspectionStatus {
+  in_progress
+  completed
+  failed
+  cancelled
+}
+
+enum InspectionType {
+  inbound
+  outbound
+  periodic
+}
+
+enum RateBasis {
+  per_device
+  per_shipment
+  monthly_per_device
+  per_label
+}
+
+enum RateCategoryApplies {
+  laptop
+  monitor
+  peripheral
+  any
+}
+
+enum DeploymentOrderStatus {
+  pending
+  in_transit
+  delivered
+  cancelled
+}
+
+enum DeploymentBundleType {
+  standard
+  full_prep
+}
+
+enum CourierZone {
+  intra_state
+  inter_state
+  rural
+}
+
+enum RetrievalStatus {
+  pending
+  initiated
+  in_transit
+  received
+  completed
+  cancelled
+}
+
+enum RetrievalBundleType {
+  standard
+  full_cycle
+}
+
+enum DisposalType {
+  non_certified
+  certified_blanco
+  itad_bundled
+}
+
+enum DisposalStatus {
+  pending
+  approved
+  in_progress
+  completed
+  cancelled
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model Client {
+  id                          String       @id @default(uuid()) @map("client_id")
+  name                        String
+  slug                        String       @unique
+  gstin                       String?
+  billingAddress              Json?        @map("billing_address")
+  contactName                 String?      @map("contact_name")
+  contactEmail                String?      @map("contact_email")
+  contactPhone                String?      @map("contact_phone")
+  // Stored in paise (₹1 = 100 paise) as bigint — never float.
+  committedMonthlyAmountPaise BigInt       @default(4275000) @map("committed_monthly_amount_paise")
+  isActive                    Boolean      @default(true) @map("is_active")
+  createdAt                   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                   DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  users              User[]
+  assets             Asset[]
+  expectedDeliveries ExpectedDelivery[]
+  ledgerEntries      EventLedger[]
+  endUsers           EndUser[]
+  deploymentOrders   DeploymentOrder[]
+  retrievalRequests  RetrievalRequest[]
+  disposalRequests   DisposalRequest[]
+  storageAccrualRuns StorageAccrualRun[]
+
+  @@map("clients")
+}
+
+model EndUser {
+  id          String   @id @default(uuid()) @map("end_user_id")
+  clientId    String   @map("client_id")
+  name        String
+  email       String?
+  employeeId  String?  @map("employee_id")
+  phone       String?
+  city        String?
+  country     String   @default("India")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  client           Client            @relation(fields: [clientId], references: [id])
+  deploymentOrders DeploymentOrder[]
+  currentAssets    Asset[]       @relation("CurrentAssets")
+
+  @@map("end_users")
+}
+
+model User {
+  id               String           @id @default(uuid()) @map("user_id")
+  // Stored lowercase — lowercased at application layer on write.
+  email            String           @unique
+  passwordHash     String           @map("password_hash")
+  fullName         String           @map("full_name")
+  phone            String?
+  role             UserRole
+  // Nullable: only set when role = client_user.
+  clientId         String?          @map("client_id")
+  status           UserStatus       @default(active)
+  lastLoginAt      DateTime?        @map("last_login_at") @db.Timestamptz
+  failedLoginCount Int              @default(0) @map("failed_login_count")
+  lockedUntil      DateTime?        @map("locked_until") @db.Timestamptz
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  client       Client?             @relation(fields: [clientId], references: [id])
+  receivedGRNs         GoodsReceivedNote[] @relation("ReceivedBy")
+  inspectionsStarted   Inspection[]        @relation("StartedBy")
+  auditLogs            AuditLog[]
+  createdDeployments   DeploymentOrder[]   @relation("CreatedDeployments")
+  createdRetrievals    RetrievalRequest[]  @relation("CreatedRetrievals")
+  createdDisposals     DisposalRequest[]   @relation("CreatedDisposals")
+  approvedDisposals    DisposalRequest[]   @relation("ApprovedDisposals")
+  uploadedDocuments    AssetDocument[]     @relation("UserDocuments")
+
+  @@map("users")
+}
+
+model Location {
+  id          String   @id @default(uuid()) @map("location_id")
+  name        String   @unique
+  zoneCode    String   @map("zone_code")
+  binCode     String   @map("bin_code")
+  description String?
+  capacity    Int?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  assets Asset[]
+  grns   GoodsReceivedNote[]
+
+  @@unique([zoneCode, binCode])
+  @@map("locations")
+}
+
+model Asset {
+  id                String        @id @default(uuid()) @map("asset_id")
+  serialNumber      String        @unique @map("serial_number")
+  assetTag          String?       @unique @map("asset_tag")
+  model             String
+  manufacturer      String
+  category          AssetCategory
+  clientId          String        @map("client_id")
+  currentStatus     AssetStatus   @default(receiving) @map("current_status")
+  // Null when deployed or in transit.
+  currentLocationId String?       @map("current_location_id")
+  conditionGrade    ConditionGrade?  @map("condition_grade")
+  assetCondition    AssetCondition? @map("asset_condition")
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  currentEndUserId  String?       @map("current_end_user_id")
+  repairHandling    Boolean?      @map("repair_handling")
+  repairServiceName String?       @map("repair_service_name")
+  repairEstimateCost Int?         @map("repair_estimate_cost")
+  awbNumber         String?       @map("awb_number")
+  courierName       String?       @map("courier_name")
+  deliveredAt       DateTime?     @map("delivered_at") @db.Timestamptz
+  disposalType      String?       @map("disposal_type")
+  hasCertification  Boolean?      @map("has_certification")
+
+  client          Client        @relation(fields: [clientId], references: [id])
+  currentLocation Location?     @relation(fields: [currentLocationId], references: [id])
+  grnAssets       GrnAsset[]
+  inspections     Inspection[]
+  ledgerEntries   EventLedger[]
+  deploymentOrders DeploymentOrder[]
+  retrievalRequests RetrievalRequest[]
+  disposalRequests  DisposalRequest[]
+  currentEndUser    EndUser?      @relation("CurrentAssets", fields: [currentEndUserId], references: [id])
+  documents         AssetDocument[] @relation("AssetDocuments")
+
+  @@map("assets")
+}
+
+model ExpectedDelivery {
+  id                  String         @id @default(uuid()) @map("delivery_id")
+  clientId            String         @map("client_id")
+  purchaseOrderRef    String         @map("purchase_order_ref")
+  expectedArrivalDate DateTime       @map("expected_arrival_date") @db.Date
+  status              DeliveryStatus @default(pending)
+  notes               String?
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  client Client                 @relation(fields: [clientId], references: [id])
+  items  ExpectedDeliveryItem[]
+  grns   GoodsReceivedNote[]
+
+  @@map("expected_deliveries")
+}
+
+model ExpectedDeliveryItem {
+  id               String        @id @default(uuid()) @map("item_id")
+  deliveryId       String        @map("delivery_id")
+  category         AssetCategory
+  model            String
+  manufacturer     String
+  quantity         Int
+  receivedQuantity Int           @default(0) @map("received_quantity")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  delivery ExpectedDelivery @relation(fields: [deliveryId], references: [id])
+
+  @@map("expected_delivery_items")
+}
+
+model GoodsReceivedNote {
+  id                  String   @id @default(uuid()) @map("grn_id")
+  grnNumber           String?  @map("grn_number")
+  expectedDeliveryId  String   @map("expected_delivery_id")
+  receivedByUserId    String   @map("received_by_user_id")
+  receivingLocationId String   @map("receiving_location_id")
+  courierRef          String?  @map("courier_ref")
+  receivedAt          DateTime @map("received_at") @db.Timestamptz
+  deviceCount         Int      @map("device_count")
+  notes               String?
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  expectedDelivery  ExpectedDelivery @relation(fields: [expectedDeliveryId], references: [id])
+  receivedByUser    User             @relation("ReceivedBy", fields: [receivedByUserId], references: [id])
+  receivingLocation Location         @relation(fields: [receivingLocationId], references: [id])
+  assets            GrnAsset[]
+
+  @@map("goods_received_notes")
+}
+
+model GrnAsset {
+  grnId             String  @map("grn_id")
+  assetId           String  @map("asset_id")
+  requiresInspection Boolean @default(false) @map("requires_inspection")
+
+  grn   GoodsReceivedNote @relation(fields: [grnId], references: [id])
+  asset Asset             @relation(fields: [assetId], references: [id])
+
+  @@id([grnId, assetId])
+  @@map("grn_assets")
+}
+
+model Inspection {
+  id               String           @id @default(uuid()) @map("inspection_id")
+  assetId          String           @map("asset_id")
+  type             InspectionType
+  status           InspectionStatus @default(in_progress)
+  startedAt        DateTime         @map("started_at") @db.Timestamptz
+  startedByUserId  String           @map("started_by_user_id")
+  assignedToUserId String?          @map("assigned_to_user_id")
+  completedAt      DateTime?        @map("completed_at") @db.Timestamptz
+  completedByUserId String?         @map("completed_by_user_id")
+  conditionGrade   ConditionGrade?  @map("condition_grade")
+  // Checklist booleans — null until inspection is completed
+  // Physical appearance
+  scratchesOnCasing       Boolean? @map("scratches_on_casing")
+  lidClosingOk            Boolean? @map("lid_closing_ok")
+  scratchesOnScreen       Boolean? @map("scratches_on_screen")
+  keyboardIssues          Boolean? @map("keyboard_issues")
+  missingFeet             Boolean? @map("missing_feet")
+  chargerDamage           Boolean? @map("charger_damage")
+  allAccessoriesPresent   Boolean? @map("all_accessories_present")
+  // Functional checks
+  webcamOk                Boolean? @map("webcam_ok")
+  speakersOk              Boolean? @map("speakers_ok")
+  bluetoothOk             Boolean? @map("bluetooth_ok")
+  batteryCharges          Boolean? @map("battery_charges")
+  screenOk                Boolean? @map("screen_ok")
+  keyboardOk              Boolean? @map("keyboard_ok")
+  trackpadOk              Boolean? @map("trackpad_ok")
+  portsOk                 Boolean? @map("ports_ok")
+  powersOnOk              Boolean? @map("powers_on_ok")
+  imagesUploaded          Boolean? @map("images_uploaded")
+  // Process — nullable so null = N/A
+  sanitization            Boolean? @map("sanitization")
+  factoryReset            Boolean? @map("factory_reset")
+  notes            String?
+  // Business-hours minutes from startedAt to completedAt (IST, Mon-Fri 09-18)
+  slaMinutes       Int?             @map("sla_minutes")
+  slaTargetAt      DateTime?        @map("sla_target_at") @db.Timestamptz
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  asset         Asset             @relation(fields: [assetId], references: [id])
+  startedByUser User              @relation("StartedBy", fields: [startedByUserId], references: [id])
+  photos        InspectionPhoto[]
+  documents     AssetDocument[]   @relation("InspectionDocuments")
+
+  @@map("inspections")
+}
+
+model InspectionPhoto {
+  id           String   @id @default(uuid()) @map("photo_id")
+  inspectionId String   @map("inspection_id")
+  s3Key        String   @map("s3_key")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  inspection Inspection @relation(fields: [inspectionId], references: [id])
+
+  @@map("inspection_photos")
+}
+
+model RateCardItem {
+  id                   String              @id @default(uuid()) @map("rate_item_id")
+  code                 String
+  description          String
+  basis                RateBasis
+  categoryApplies      RateCategoryApplies @map("category_applies")
+  // Stored in paise — never float.
+  unitRatePaise        BigInt              @map("unit_rate_paise")
+  effectiveFrom        DateTime            @map("effective_from") @db.Date
+  // Null means this version is current. Set when a new version supersedes it.
+  effectiveTo          DateTime?           @map("effective_to") @db.Date
+  isBundle             Boolean             @default(false) @map("is_bundle")
+  bundleComponentCodes Json               @default("[]") @map("bundle_component_codes")
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("rate_card_items")
+}
+
+// ─── Append-only tables ───────────────────────────────────────────────────────
+// EventLedger and AuditLog are never updated or deleted by application code.
+// A Postgres trigger blocks UPDATE/DELETE on events_ledger at the DB level.
+
+model EventLedger {
+  id            String   @id @default(uuid()) @map("event_id")
+  eventType     String   @map("event_type")
+  assetId       String   @map("asset_id")
+  clientId      String   @map("client_id")
+  locationId    String?  @map("location_id")
+  quantity      Int      @default(1)
+  unitRatePaise BigInt   @map("unit_rate_paise")
+  amountPaise   BigInt   @map("amount_paise")
+  occurredAt    DateTime @map("occurred_at") @db.Timestamptz
+  // String snapshot of user_id — NOT a FK, so cascade deletes can't corrupt the ledger.
+  createdBy     String   @map("created_by")
+  referenceId   String?  @map("reference_id")
+  referenceType String?  @map("reference_type")
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  asset  Asset  @relation(fields: [assetId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@map("events_ledger")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @map("log_id")
+  userId     String   @map("user_id")
+  action     String
+  entity     String
+  entityId   String   @map("entity_id")
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  ipAddress  String?  @map("ip_address")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_log")
+}
+
+model DeploymentOrder {
+  id                     String                @id @default(uuid()) @map("order_id")
+  clientId               String                @map("client_id")
+  assetId                String                @map("asset_id")
+  endUserId              String?               @map("end_user_id")
+  bundleType             DeploymentBundleType  @default(standard) @map("bundle_type")
+  deliveryAddress        Json                  @map("delivery_address")
+  contactName            String                @map("contact_name")
+  contactPhone           String                @map("contact_phone")
+  courierZone            CourierZone           @map("courier_zone")
+  trackingNumber         String?               @map("tracking_number")
+  courierName            String?               @map("courier_name")
+  actualCarrierCostPaise BigInt?               @map("actual_carrier_cost_paise")
+  requiresLabeling       Boolean               @default(false) @map("requires_labeling")
+  requiresRepacking      Boolean               @default(false) @map("requires_repacking")
+  status                 DeploymentOrderStatus @default(pending)
+  requestedAt            DateTime              @default(now()) @map("requested_at") @db.Timestamptz
+  processedAt            DateTime?             @map("processed_at") @db.Timestamptz
+  dispatchedAt           DateTime?             @map("dispatched_at") @db.Timestamptz
+  deliveredAt            DateTime?             @map("delivered_at") @db.Timestamptz
+  createdByUserId        String                @map("created_by_user_id")
+  notes                  String?
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+
+  client        Client   @relation(fields: [clientId], references: [id])
+  asset         Asset    @relation(fields: [assetId], references: [id])
+  endUser       EndUser? @relation(fields: [endUserId], references: [id])
+  createdByUser User     @relation("CreatedDeployments", fields: [createdByUserId], references: [id])
+
+  @@map("deployment_orders")
+}
+
+model RetrievalRequest {
+  id                     String              @id @default(uuid()) @map("retrieval_id")
+  clientId               String              @map("client_id")
+  assetId                String              @map("asset_id")
+  bundleType             RetrievalBundleType @default(standard) @map("bundle_type")
+  pickupAddress          Json                @map("pickup_address")
+  contactName            String              @map("contact_name")
+  contactPhone           String              @map("contact_phone")
+  courierZone            CourierZone         @map("courier_zone")
+  trackingNumber         String?             @map("tracking_number")
+  requiresPostInspection Boolean             @default(false) @map("requires_post_inspection")
+  status                 RetrievalStatus     @default(pending)
+  requestedAt            DateTime            @default(now()) @map("requested_at") @db.Timestamptz
+  initiatedAt            DateTime?           @map("initiated_at") @db.Timestamptz
+  receivedAt             DateTime?           @map("received_at") @db.Timestamptz
+  completedAt            DateTime?           @map("completed_at") @db.Timestamptz
+  createdByUserId        String              @map("created_by_user_id")
+  notes                  String?
+  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  client        Client @relation(fields: [clientId], references: [id])
+  asset         Asset  @relation(fields: [assetId], references: [id])
+  createdByUser User   @relation("CreatedRetrievals", fields: [createdByUserId], references: [id])
+
+  @@map("retrieval_requests")
+}
+
+model DisposalRequest {
+  id               String         @id @default(uuid()) @map("disposal_id")
+  clientId         String         @map("client_id")
+  assetId          String         @map("asset_id")
+  disposalType     DisposalType   @map("disposal_type")
+  status           DisposalStatus @default(pending)
+  approvedAt       DateTime?      @map("approved_at") @db.Timestamptz
+  initiatedAt      DateTime?      @map("initiated_at") @db.Timestamptz
+  completedAt      DateTime?      @map("completed_at") @db.Timestamptz
+  certificateS3Key String?        @map("certificate_s3_key")
+  approvedByUserId String?        @map("approved_by_user_id")
+  createdByUserId  String         @map("created_by_user_id")
+  notes            String?
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  client     Client @relation(fields: [clientId], references: [id])
+  asset      Asset  @relation(fields: [assetId], references: [id])
+  createdBy  User   @relation("CreatedDisposals", fields: [createdByUserId], references: [id])
+  approvedBy User?  @relation("ApprovedDisposals", fields: [approvedByUserId], references: [id])
+
+  @@map("disposal_requests")
+}
+
+model StorageAccrualRun {
+  id                     String   @id @default(uuid()) @map("run_id")
+  clientId               String   @map("client_id")
+  periodStart            DateTime @map("period_start") @db.Date
+  periodEnd              DateTime @map("period_end") @db.Date
+  laptopCount            Int      @map("laptop_count")
+  peripheralCount        Int      @map("peripheral_count")
+  totalDeviceCount       Int      @map("total_device_count")
+  laptopAmountPaise      BigInt   @map("laptop_amount_paise")
+  peripheralAmountPaise  BigInt   @map("peripheral_amount_paise")
+  totalAmountPaise       BigInt   @map("total_amount_paise")
+  minimumCommitmentPaise BigInt   @map("minimum_commitment_paise")
+  minimumCommitmentMet   Boolean  @map("minimum_commitment_met")
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@map("storage_accrual_runs")
+}
+
+model EventSuppression {
+  id                  String   @id @default(uuid()) @map("suppression_id")
+  suppressedEventId   String   @unique @map("suppressed_event_id")
+  suppressedByEventId String   @map("suppressed_by_event_id")
+  assetId             String   @map("asset_id")
+  clientId            String   @map("client_id")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("event_suppressions")
+}
+
+model Holiday {
+  id        String   @id @default(uuid()) @map("holiday_id")
+  date      DateTime @unique @db.Date
+  name      String
+  year      Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("holidays")
+}
+
+model AssetDocument {
+  id               String    @id @default(uuid()) @map("document_id")
+  assetId          String    @map("asset_id")
+  inspectionId     String?   @map("inspection_id")
+  clientId         String    @map("client_id")
+  originalName     String    @map("original_name")
+  storagePath      String    @map("storage_path")
+  mimeType         String    @map("mime_type")
+  sizeBytes        Int       @map("size_bytes")
+  uploadedByUserId String    @map("uploaded_by_user_id")
+  uploadedAt       DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz
+  asset            Asset     @relation("AssetDocuments", fields: [assetId], references: [id])
+  inspection       Inspection? @relation("InspectionDocuments", fields: [inspectionId], references: [id])
+  uploadedBy       User      @relation("UserDocuments", fields: [uploadedByUserId], references: [id])
+
+  @@map("asset_documents")
+}

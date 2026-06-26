@@ -1,0 +1,51 @@
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { DeploymentService } from './deployment.service';
+import { CreateDeploymentOrderDto } from './dto/create-deployment-order.dto';
+import { UpdateDeploymentStatusDto } from './dto/update-deployment-status.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { JwtPayload } from '../common/types/jwt-payload.type';
+
+@Controller('deployment')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class DeploymentController {
+  constructor(private readonly deploymentService: DeploymentService) {}
+
+  @Get()
+  @Roles('admin', 'manager', 'operator', 'client_user')
+  findAll(
+    @Query('clientId') clientId?: string,
+    @CurrentUser() user?: JwtPayload,
+  ): ReturnType<DeploymentService['findAll']> {
+    const effectiveClientId =
+      user?.role === 'client_user' ? (user.clientId ?? undefined) : clientId;
+    return this.deploymentService.findAll(effectiveClientId);
+  }
+
+  @Get(':id')
+  @Roles('admin', 'manager', 'operator', 'client_user')
+  findOne(@Param('id') id: string): ReturnType<DeploymentService['findOne']> {
+    return this.deploymentService.findOne(id);
+  }
+
+  @Post()
+  @Roles('admin', 'manager', 'operator')
+  create(
+    @Body() dto: CreateDeploymentOrderDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DeploymentService['create']> {
+    return this.deploymentService.create(dto, user.sub);
+  }
+
+  @Patch(':id/status')
+  @Roles('admin', 'manager', 'operator')
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateDeploymentStatusDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DeploymentService['updateStatus']> {
+    return this.deploymentService.updateStatus(id, dto, user.sub);
+  }
+}

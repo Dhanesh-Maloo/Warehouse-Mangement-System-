@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* shadcn/ui CSS variables — new-york style, slate base color */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+}
+
+/*
+  Global dark-mode overrides.
+  The app uses hardcoded Tailwind color utilities throughout (bg-white, text-gray-900, etc.).
+  These rules remap the most common ones to dark equivalents when .dark is on <html>,
+  so dark mode works without touching every component individually.
+*/
+@layer utilities {
+  /* Backgrounds */
+  .dark .bg-white         { background-color: rgb(30 41 59); }   /* slate-800 */
+  .dark .bg-gray-50       { background-color: rgb(15 23 42); }   /* slate-950 */
+  .dark .bg-gray-100      { background-color: rgb(30 41 59); }   /* slate-800 */
+  .dark .bg-gray-200      { background-color: rgb(51 65 85); }   /* slate-700 */
+
+  /* Text */
+  .dark .text-gray-900    { color: rgb(248 250 252); }           /* slate-50 */
+  .dark .text-gray-800    { color: rgb(226 232 240); }           /* slate-200 */
+  .dark .text-gray-700    { color: rgb(203 213 225); }           /* slate-300 */
+  .dark .text-gray-600    { color: rgb(148 163 184); }           /* slate-400 */
+  .dark .text-gray-500    { color: rgb(100 116 139); }           /* slate-500 */
+  .dark .text-gray-400    { color: rgb(71 85 105); }             /* slate-600 */
+
+  /* Borders */
+  .dark .border-gray-100  { border-color: rgb(51 65 85); }       /* slate-700 */
+  .dark .border-gray-200  { border-color: rgb(71 85 105); }      /* slate-600 */
+  .dark .border-gray-300  { border-color: rgb(100 116 139); }    /* slate-500 */
+
+  /* Inputs & form elements */
+  .dark input:not([class*="bg-"]),
+  .dark textarea:not([class*="bg-"]),
+  .dark select:not([class*="bg-"]) {
+    background-color: rgb(30 41 59);
+    color: rgb(226 232 240);
+    border-color: rgb(71 85 105);
+  }
+
+  /* Hover backgrounds */
+  .dark .hover\:bg-gray-50:hover  { background-color: rgb(15 23 42); }
+  .dark .hover\:bg-gray-100:hover { background-color: rgb(51 65 85); }
+
+  /* Table rows */
+  .dark .divide-gray-100 > * + * { border-color: rgb(51 65 85); }
+  .dark .divide-gray-200 > * + * { border-color: rgb(71 85 105); }
+
+  /* Shadows — tone down in dark mode */
+  .dark .shadow-sm  { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.4); }
+  .dark .shadow     { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.5); }
+  .dark .shadow-lg  { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5); }
+
+  /* Placeholder */
+  .dark .placeholder-gray-400::placeholder { color: rgb(71 85 105); }
+}

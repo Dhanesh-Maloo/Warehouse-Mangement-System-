@@ -1,0 +1,40 @@
+{
+  "name": "warehouse",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"pnpm --filter @warehouse/api dev\" \"pnpm --filter @warehouse/web dev\"",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "db:generate": "prisma generate --schema infra/prisma/schema.prisma",
+    "db:migrate": "dotenv -e .env -- prisma migrate dev --schema infra/prisma/schema.prisma",
+    "db:seed": "dotenv -e .env -- tsx infra/prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "argon2": "^0.41.1",
+    "concurrently": "^8.2.2",
+    "dotenv-cli": "^7.4.2",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.12",
+    "prettier": "^3.3.3",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0"
+  }
+}
