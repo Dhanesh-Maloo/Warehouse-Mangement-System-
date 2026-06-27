@@ -476,8 +476,8 @@ export function InventoryPage() {
 
   const disposalLabel: Record<string, string> = {
     non_certified: 'Non-Certified',
-    certified_blanco: 'Blanco Cert.',
-    itad_bundled: 'ITAD',
+    certified_blanco: 'Certified',
+    itad_bundled: 'Certified',
   };
   const disposalColors: Record<string, string> = {
     non_certified: 'bg-gray-100 text-gray-600',
@@ -732,10 +732,8 @@ export function InventoryPage() {
                       onChange={(e) => setAddForm((f) => ({ ...f, disposalType: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
                     >
-                      <option value="">None</option>
                       <option value="non_certified">Non-Certified</option>
-                      <option value="certified_blanco">Blanco Certified</option>
-                      <option value="itad_bundled">ITAD Bundled</option>
+                      <option value="certified_blanco">Certified</option>
                     </select>
                   </div>
                   <div className="sm:col-span-2 flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3">
@@ -1001,10 +999,8 @@ export function InventoryPage() {
                             value={a.disposalType ?? ''}
                             saving={savingCells.has(`${a.id}:disposalType`)}
                             options={[
-                              { value: '', label: '— None' },
                               { value: 'non_certified', label: 'Non-Certified' },
-                              { value: 'certified_blanco', label: 'Blanco Certified' },
-                              { value: 'itad_bundled', label: 'ITAD Bundled' },
+                              { value: 'certified_blanco', label: 'Certified' },
                             ]}
                             onSave={handleInlineSave}
                             renderBadge={(v) =>
@@ -1325,10 +1321,8 @@ export function InventoryPage() {
                       onChange={(e) => setEditForm((f) => ({ ...f, disposalType: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
                     >
-                      <option value="">None</option>
                       <option value="non_certified">Non-Certified</option>
-                      <option value="certified_blanco">Blanco Certified</option>
-                      <option value="itad_bundled">ITAD Bundled</option>
+                      <option value="certified_blanco">Certified</option>
                     </select>
                   </div>
                   <div className="col-span-2 flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3">

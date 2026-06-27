@@ -795,10 +795,8 @@ export function AssetDetailPage() {
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                     >
-                      <option value="">None</option>
                       <option value="non_certified">Non-Certified</option>
-                      <option value="certified_blanco">Blanco Certified</option>
-                      <option value="itad_bundled">ITAD Bundled</option>
+                      <option value="certified_blanco">Certified</option>
                     </select>
                   </div>
                   <div className="col-span-2 flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3">
