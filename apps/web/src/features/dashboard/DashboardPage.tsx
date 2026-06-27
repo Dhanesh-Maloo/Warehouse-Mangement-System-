@@ -339,6 +339,66 @@ export function DashboardPage() {
             />
           </div>
 
+          {/* Full asset breakdown */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-700">Full asset breakdown</h2>
+                <p className="text-xs text-gray-400 mt-0.5">All statuses — should sum to {totalAssets}</p>
+              </div>
+              <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+                {totalAssets} total
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { key: 'receiving',     label: 'Receiving',     color: 'bg-blue-50 border-blue-200',     dot: 'bg-blue-400',    text: 'text-blue-700',    href: '/inventory?status=receiving' },
+                { key: 'in_inspection', label: 'In Inspection', color: 'bg-amber-50 border-amber-200',   dot: 'bg-amber-400',   text: 'text-amber-700',   href: '/inspections' },
+                { key: 'in_storage',    label: 'In Storage',    color: 'bg-emerald-50 border-emerald-200', dot: 'bg-emerald-400', text: 'text-emerald-700', href: '/inventory?status=in_storage' },
+                { key: 'deployed',      label: 'Deployed',      color: 'bg-orange-50 border-orange-200', dot: 'bg-[#E86F2C]',   text: 'text-orange-700',  href: '/inventory?status=deployed' },
+                { key: 'returning',     label: 'Returning',     color: 'bg-purple-50 border-purple-200', dot: 'bg-purple-400',  text: 'text-purple-700',  href: '/inventory?status=returning' },
+                { key: 'disposed',      label: 'Disposed',      color: 'bg-gray-50 border-gray-200',     dot: 'bg-gray-400',    text: 'text-gray-600',    href: '/inventory?status=disposed' },
+              ].map(({ key, label, color, dot, text, href }) => {
+                const count = summary?.[key] ?? 0;
+                const pct = totalAssets > 0 ? Math.round((count / totalAssets) * 100) : 0;
+                return (
+                  <Link
+                    key={key}
+                    to={href}
+                    className={`flex flex-col gap-2 p-3 rounded-lg border ${color} hover:shadow-sm transition-all group`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
+                      <span className="text-xs text-gray-500 group-hover:text-gray-700 transition-colors leading-tight">{label}</span>
+                    </div>
+                    <div className={`text-2xl font-bold ${text}`}>{count}</div>
+                    <div className="text-xs text-gray-400">{pct}%</div>
+                    <div className="h-1 bg-white/60 rounded-full overflow-hidden">
+                      <div className={`h-1 rounded-full ${dot} transition-all`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            {/* Sum check */}
+            <div className="mt-4 flex items-center gap-2 text-xs text-gray-400">
+              <span>
+                {[
+                  { key: 'receiving', label: 'Receiving' },
+                  { key: 'in_inspection', label: 'Inspection' },
+                  { key: 'in_storage', label: 'Storage' },
+                  { key: 'deployed', label: 'Deployed' },
+                  { key: 'returning', label: 'Returning' },
+                  { key: 'disposed', label: 'Disposed' },
+                ]
+                  .filter(({ key }) => (summary?.[key] ?? 0) > 0)
+                  .map(({ key, label }) => `${label}: ${summary?.[key] ?? 0}`)
+                  .join(' + ')}{' '}
+                = <span className="font-semibold text-gray-600">{totalAssets}</span>
+              </span>
+            </div>
+          </div>
+
           {/* Bottom panels */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Status breakdown */}
