@@ -344,7 +344,9 @@ export function InboundPage() {
                     <td className="px-5 py-3.5">
                       <select
                         value={d.status === 'completed' ? 'completed' : 'not_received'}
+                        onClick={(e) => e.stopPropagation()}
                         onChange={(e) => {
+                          e.stopPropagation();
                           const newStatus = e.target.value === 'completed' ? 'completed' : 'pending';
                           statusChangeMutation.mutate({ id: d.id, status: newStatus });
                         }}
