@@ -284,6 +284,51 @@ export class DeploymentService {
     return updated;
   }
 
+  /** Update only the courier zone of an order (no ledger correction). */
+  async updateZone(
+    id: string,
+    courierZone: 'intra_state' | 'inter_state' | 'rural',
+    updatedByUserId: string,
+  ): Promise<Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>> {
+    const order = await this.findOne(id);
+    const updated = await this.prisma.deploymentOrder.update({
+      where: { id },
+      data: { courierZone },
+      include: { asset: true, endUser: true },
+    });
+    await this.audit.log({
+      userId: updatedByUserId,
+      action: 'deployment.updateZone',
+      entity: 'DeploymentOrder',
+      entityId: id,
+      oldValue: { courierZone: order.courierZone },
+      newValue: { courierZone },
+    });
+    return updated;
+  }
+
+  /** Update only the tracking number of an order. */
+  async updateTracking(
+    id: string,
+    trackingNumber: string,
+    updatedByUserId: string,
+  ): Promise<Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>> {
+    await this.findOne(id);
+    const updated = await this.prisma.deploymentOrder.update({
+      where: { id },
+      data: { trackingNumber },
+      include: { asset: true, endUser: true },
+    });
+    await this.audit.log({
+      userId: updatedByUserId,
+      action: 'deployment.updateTracking',
+      entity: 'DeploymentOrder',
+      entityId: id,
+      newValue: { trackingNumber },
+    });
+    return updated;
+  }
+
   /**
    * Find all deployment orders for a given asset.
    */

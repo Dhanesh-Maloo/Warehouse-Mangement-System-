@@ -69,18 +69,6 @@ const STATUS_LABELS: Record<DeploymentOrder['status'], string> = {
   cancelled: 'Cancelled',
 };
 
-const ZONE_COLORS: Record<DeploymentOrder['courierZone'], string> = {
-  intra_state: 'bg-sky-100 text-sky-700',
-  inter_state: 'bg-indigo-100 text-indigo-700',
-  rural: 'bg-teal-100 text-teal-700',
-};
-
-const ZONE_LABELS: Record<DeploymentOrder['courierZone'], string> = {
-  intra_state: 'City',
-  inter_state: 'Interstate',
-  rural: 'Rural',
-};
-
 const VALID_NEXT_STATUSES: Record<DeploymentOrder['status'], DeploymentOrder['status'][]> = {
   pending: ['in_transit', 'delivered'],
   in_transit: ['in_transit', 'delivered'],
@@ -138,6 +126,9 @@ export function DeploymentPage() {
     trackingNumber: string;
   } | null>(null);
   const [statusError, setStatusError] = useState('');
+
+  // Inline tracking number editing
+  const [editingTracking, setEditingTracking] = useState<{ orderId: string; value: string } | null>(null);
 
   // Filter / search client (admin view)
   const [filterClientId, setFilterClientId] = useState('');
@@ -243,6 +234,21 @@ export function DeploymentPage() {
       setStatusError('');
     },
     onError: (e: Error) => setStatusError(e.message),
+  });
+
+  const zoneMutation = useMutation({
+    mutationFn: ({ id, courierZone }: { id: string; courierZone: DeploymentOrder['courierZone'] }) =>
+      api.patch(`/deployment/${id}/zone`, { courierZone }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['deployment-orders'] }),
+  });
+
+  const trackingMutation = useMutation({
+    mutationFn: ({ id, trackingNumber }: { id: string; trackingNumber: string }) =>
+      api.patch(`/deployment/${id}/tracking`, { trackingNumber }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['deployment-orders'] });
+      setEditingTracking(null);
+    },
   });
 
   // ---------------------------------------------------------------------------
@@ -747,7 +753,7 @@ export function DeploymentPage() {
                   <th className="text-left px-5 py-3">Delivery Address</th>
                   <th className="text-left px-5 py-3">Courier Zone</th>
                   <th className="text-left px-5 py-3">Status</th>
-                  <th className="text-left px-5 py-3">Tracking #</th>
+                  <th className="text-left px-5 py-3">Tracking No.</th>
                   <th className="text-left px-5 py-3">Requested</th>
                   <th className="px-5 py-3" />
                 </tr>
@@ -790,13 +796,22 @@ export function DeploymentPage() {
                         <p className="text-gray-400">{order.deliveryAddress.state}</p>
                       </td>
 
-                      {/* Courier zone badge */}
+                      {/* Courier zone — inline select */}
                       <td className="px-5 py-3.5">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${ZONE_COLORS[order.courierZone]}`}
+                        <select
+                          value={order.courierZone}
+                          onChange={(e) =>
+                            zoneMutation.mutate({
+                              id: order.id,
+                              courierZone: e.target.value as DeploymentOrder['courierZone'],
+                            })
+                          }
+                          className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
                         >
-                          {ZONE_LABELS[order.courierZone]}
-                        </span>
+                          <option value="intra_state">City</option>
+                          <option value="inter_state">Interstate</option>
+                          <option value="rural">Rural</option>
+                        </select>
                       </td>
 
                       {/* Status — inline select for actionable rows */}
@@ -828,13 +843,43 @@ export function DeploymentPage() {
                         )}
                       </td>
 
-                      {/* Tracking number */}
+                      {/* Tracking number — inline editable */}
                       <td className="px-5 py-3.5 text-xs">
-                        {order.trackingNumber ? (
-                          <span className="font-mono text-gray-700">{order.trackingNumber}</span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
+                        <input
+                          type="text"
+                          value={
+                            editingTracking?.orderId === order.id
+                              ? editingTracking.value
+                              : (order.trackingNumber ?? '')
+                          }
+                          placeholder="Add tracking…"
+                          onFocus={() =>
+                            setEditingTracking({
+                              orderId: order.id,
+                              value: order.trackingNumber ?? '',
+                            })
+                          }
+                          onChange={(e) =>
+                            setEditingTracking((prev) =>
+                              prev?.orderId === order.id ? { ...prev, value: e.target.value } : prev,
+                            )
+                          }
+                          onBlur={() => {
+                            if (editingTracking?.orderId === order.id) {
+                              const val = editingTracking.value.trim();
+                              if (val !== (order.trackingNumber ?? '')) {
+                                trackingMutation.mutate({ id: order.id, trackingNumber: val });
+                              } else {
+                                setEditingTracking(null);
+                              }
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                            if (e.key === 'Escape') setEditingTracking(null);
+                          }}
+                          className="font-mono w-28 px-2 py-1 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-transparent hover:border-gray-400 transition-colors"
+                        />
                       </td>
 
                       {/* Requested date */}

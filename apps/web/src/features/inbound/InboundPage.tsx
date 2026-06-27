@@ -24,12 +24,6 @@ interface Delivery {
   grns: { deviceCount: number }[];
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-700',
-  partially_received: 'bg-amber-100 text-amber-700',
-  completed: 'bg-emerald-100 text-emerald-700',
-  cancelled: 'bg-red-100 text-red-700',
-};
 
 const EMPTY_ITEM: DeliveryItem = { category: 'laptop', model: '', manufacturer: '', quantity: 1 };
 
@@ -38,6 +32,7 @@ export function InboundPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'received' | 'not_received'>('all');
 
   // Form state
   const [selectedClientId, setSelectedClientId] = useState('');
@@ -62,6 +57,18 @@ export function InboundPage() {
     queryKey: ['inbound-deliveries', clientId],
     queryFn: () =>
       api.get<Delivery[]>(`/inbound/deliveries${clientId ? `?clientId=${clientId}` : ''}`),
+  });
+
+  const statusChangeMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api.patch(`/inbound/deliveries/${id}/status`, { status }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['inbound-deliveries'] }),
+  });
+
+  const filteredDeliveries = deliveries.filter((d) => {
+    if (statusFilter === 'received') return d.status === 'completed';
+    if (statusFilter === 'not_received') return d.status !== 'completed';
+    return true;
   });
 
   function addItem() {
@@ -293,6 +300,18 @@ export function InboundPage() {
         <div className="text-sm text-gray-400">Loading…</div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-3">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+            >
+              <option value="all">All</option>
+              <option value="received">Received</option>
+              <option value="not_received">Not Received</option>
+            </select>
+          </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
@@ -303,7 +322,7 @@ export function InboundPage() {
               </tr>
             </thead>
             <tbody>
-              {deliveries.map((d) => {
+              {filteredDeliveries.map((d) => {
                 const totalExpected = d.items.reduce((s, i) => s + i.quantity, 0);
                 const totalReceived = (d.grns ?? []).reduce((s, g) => s + g.deviceCount, 0);
                 return (
@@ -323,21 +342,30 @@ export function InboundPage() {
                       {totalReceived}/{totalExpected}
                     </td>
                     <td className="px-5 py-3.5">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${
-                          STATUS_COLORS[d.status] ?? 'bg-gray-100 text-gray-700'
+                      <select
+                        value={d.status === 'completed' ? 'completed' : 'not_received'}
+                        onChange={(e) => {
+                          const newStatus = e.target.value === 'completed' ? 'completed' : 'pending';
+                          statusChangeMutation.mutate({ id: d.id, status: newStatus });
+                        }}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#E86F2C] appearance-none pr-6 ${
+                          d.status === 'completed'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-gray-100 text-gray-700'
                         }`}
+                        style={{ backgroundImage: 'none' }}
                       >
-                        {d.status.replace(/_/g, ' ')}
-                      </span>
+                        <option value="not_received">Not Received</option>
+                        <option value="completed">Received</option>
+                      </select>
                     </td>
                   </tr>
                 );
               })}
-              {deliveries.length === 0 && (
+              {filteredDeliveries.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-5 py-12 text-center text-gray-400 text-sm">
-                    No deliveries yet. Create one above.
+                    {statusFilter === 'all' ? 'No deliveries yet. Create one above.' : 'No deliveries match the selected filter.'}
                   </td>
                 </tr>
               )}

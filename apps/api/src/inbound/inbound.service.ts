@@ -281,6 +281,30 @@ export class InboundService {
     });
   }
 
+  /** Directly override the status of an expected delivery (admin/manager manual override). */
+  async updateDeliveryStatus(
+    id: string,
+    status: 'pending' | 'partially_received' | 'completed' | 'cancelled',
+    updatedByUserId: string,
+  ): Promise<Prisma.ExpectedDeliveryGetPayload<{ include: { items: true; grns: true } }>> {
+    const delivery = await this.prisma.expectedDelivery.findUnique({ where: { id } });
+    if (!delivery) throw new NotFoundException(`Expected delivery ${id} not found`);
+    const updated = await this.prisma.expectedDelivery.update({
+      where: { id },
+      data: { status },
+      include: { items: true, grns: true },
+    });
+    await this.audit.log({
+      userId: updatedByUserId,
+      action: 'inbound.updateDeliveryStatus',
+      entity: 'ExpectedDelivery',
+      entityId: id,
+      oldValue: { status: delivery.status },
+      newValue: { status },
+    });
+    return updated;
+  }
+
   findAllGrns(clientId?: string): Prisma.PrismaPromise<
     Prisma.GoodsReceivedNoteGetPayload<{
       include: { assets: { include: { asset: true } }; expectedDelivery: true };

@@ -48,4 +48,24 @@ export class DeploymentController {
   ): ReturnType<DeploymentService['updateStatus']> {
     return this.deploymentService.updateStatus(id, dto, user.sub);
   }
+
+  @Patch(':id/zone')
+  @Roles('admin', 'manager', 'operator')
+  updateZone(
+    @Param('id') id: string,
+    @Body('courierZone') courierZone: 'intra_state' | 'inter_state' | 'rural',
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DeploymentService['updateZone']> {
+    return this.deploymentService.updateZone(id, courierZone, user.sub);
+  }
+
+  @Patch(':id/tracking')
+  @Roles('admin', 'manager', 'operator')
+  updateTracking(
+    @Param('id') id: string,
+    @Body('trackingNumber') trackingNumber: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DeploymentService['updateTracking']> {
+    return this.deploymentService.updateTracking(id, trackingNumber, user.sub);
+  }
 }

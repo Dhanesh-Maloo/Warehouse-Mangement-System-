@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { InboundService } from './inbound.service';
 import { CreateExpectedDeliveryDto } from './dto/create-expected-delivery.dto';
@@ -48,6 +48,16 @@ export class InboundController {
     @CurrentUser() user: JwtPayload,
   ): ReturnType<InboundService['receiveDevices']> {
     return this.inboundService.receiveDevices(dto, user.sub);
+  }
+
+  @Patch('deliveries/:id/status')
+  @Roles('admin', 'manager')
+  updateDeliveryStatus(
+    @Param('id') id: string,
+    @Body('status') status: 'pending' | 'partially_received' | 'completed' | 'cancelled',
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<InboundService['updateDeliveryStatus']> {
+    return this.inboundService.updateDeliveryStatus(id, status, user.sub);
   }
 
   @Get('grns')
