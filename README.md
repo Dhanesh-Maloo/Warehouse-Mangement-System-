@@ -7,7 +7,6 @@ A multi-tenant web application for managing the end-to-end IT asset lifecycle (i
 - **Frontend:** React 18 + TypeScript + Vite + Tailwind + shadcn/ui + TanStack Query
 - **Backend:** NestJS (TypeScript) + Prisma ORM
 - **Database:** PostgreSQL 15
-- **Queue:** Redis + BullMQ
 - **Storage:** S3-compatible object storage (LocalStack in dev, AWS S3 in prod)
 - **Hosting target:** AWS Mumbai (ap-south-1)
 
@@ -68,13 +67,13 @@ Leave everything else as-is for local development.
 
 ---
 
-### Step 4 — Start the database and Redis
+### Step 4 — Start the database
 
 ```bash
 docker compose -f infra/docker-compose.yml up -d
 ```
 
-This starts Postgres and Redis in the background. Wait about 10 seconds for them to be ready.
+This starts Postgres in the background. Wait about 10 seconds for it to be ready.
 
 ---
 
