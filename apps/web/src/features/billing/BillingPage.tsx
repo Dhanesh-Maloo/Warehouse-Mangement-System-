@@ -158,8 +158,11 @@ function formatINR(p: string | bigint | null | undefined): string {
 }
 
 function periodLabel(start: string): string {
-  const s = new Date(start);
-  return s.toLocaleString('en-IN', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
+  // @db.Date fields arrive as UTC midnight (e.g. "2026-06-01T00:00:00.000Z").
+  // Parsing via new Date() shifts it to May 31 IST. Extract the date string directly instead.
+  const dateOnly = start.slice(0, 10); // "2026-06-01"
+  const [year, month] = dateOnly.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────

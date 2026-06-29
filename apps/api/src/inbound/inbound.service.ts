@@ -125,13 +125,17 @@ export class InboundService {
     if (!location) throw new NotFoundException(`Location ${dto.receivingLocationId} not found`);
 
     const occurredAt = new Date();
-    const ingestRate = await this.rateCard.findEffectiveAt('INGEST', occurredAt);
-    const unitRate = ingestRate ? ingestRate.unitRatePaise : BigInt(0);
-    const inspectRate = await this.rateCard.findEffectiveAt('INSPECT', occurredAt);
-    const inspectUnitRate = inspectRate ? inspectRate.unitRatePaise : BigInt(0);
+    const [ingestLaptopRate, ingestPeripheralRate, inspectRate] = await Promise.all([
+      this.rateCard.findEffectiveAt('INGEST_LAPTOP', occurredAt),
+      this.rateCard.findEffectiveAt('INGEST_PERIPHERAL', occurredAt),
+      this.rateCard.findEffectiveAt('INSPECT', occurredAt),
+    ]);
+    const laptopIngestRate = ingestLaptopRate?.unitRatePaise ?? BigInt(0);
+    const peripheralIngestRate = ingestPeripheralRate?.unitRatePaise ?? BigInt(0);
+    const inspectUnitRate = inspectRate?.unitRatePaise ?? BigInt(0);
 
     return this.prisma.$transaction(async (tx) => {
-      const assetIds: string[] = [];
+      const assetEntries: { assetId: string; category: string }[] = [];
       const inspectionAssetIds: string[] = [];
 
       for (const device of dto.devices) {
@@ -150,7 +154,7 @@ export class InboundService {
           }
           // forceOverride=true: skip this device (it already exists in the system)
           // Do not create a duplicate asset; skip to next device
-          assetIds.push(existing.id);
+          assetEntries.push({ assetId: existing.id, category: existing.category });
           if (device.requiresInspection) {
             inspectionAssetIds.push(existing.id);
           }
@@ -169,7 +173,7 @@ export class InboundService {
             currentStatus: device.requiresInspection ? 'in_inspection' : 'in_storage',
           },
         });
-        assetIds.push(asset.id);
+        assetEntries.push({ assetId: asset.id, category: device.category });
 
         if (device.requiresInspection) {
           await tx.inspection.create({
@@ -208,8 +212,8 @@ export class InboundService {
           receivedAt: occurredAt,
           deviceCount: dto.devices.length,
           assets: {
-            create: assetIds.map((assetId, idx) => ({
-              assetId,
+            create: assetEntries.map((entry, idx) => ({
+              assetId: entry.assetId,
               requiresInspection: dto.devices[idx].requiresInspection,
             })),
           },
@@ -217,17 +221,18 @@ export class InboundService {
         include: { assets: { include: { asset: true } } },
       });
 
-      // Post one INGEST ledger event per device
+      // Post one INGEST ledger event per device with per-category rate
       // Must use tx (not this.ledger) so assets created above are visible within the transaction
-      for (const assetId of assetIds) {
+      for (const { assetId, category } of assetEntries) {
+        const ingestUnitRate = category === 'peripheral' ? peripheralIngestRate : laptopIngestRate;
         await tx.eventLedger.create({
           data: {
             eventType: 'INGEST',
             asset: { connect: { id: assetId } },
             client: { connect: { id: delivery.clientId } },
             quantity: 1,
-            unitRatePaise: unitRate,
-            amountPaise: unitRate,
+            unitRatePaise: ingestUnitRate,
+            amountPaise: ingestUnitRate,
             occurredAt,
             createdBy: receivedByUserId,
             referenceId: grn.id,
