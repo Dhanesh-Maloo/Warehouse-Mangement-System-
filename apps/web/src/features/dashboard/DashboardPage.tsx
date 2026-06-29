@@ -400,47 +400,7 @@ export function DashboardPage() {
           </div>
 
           {/* Bottom panels */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Status breakdown */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-4">Asset status breakdown</h2>
-              <div className="space-y-3">
-                {[
-                  { key: 'receiving', label: 'Receiving', color: 'bg-blue-400' },
-                  { key: 'in_inspection', label: 'In inspection', color: 'bg-amber-400' },
-                  { key: 'in_storage', label: 'In storage', color: 'bg-emerald-400' },
-                  { key: 'deployed', label: 'Deployed', color: 'bg-[#E86F2C]' },
-                  { key: 'returning', label: 'Returning', color: 'bg-purple-400' },
-                  { key: 'disposed', label: 'Disposed', color: 'bg-gray-400' },
-                ].map(({ key, label, color }) => {
-                  const count = summary?.[key] ?? 0;
-                  const pct = totalAssets > 0 ? (count / totalAssets) * 100 : 0;
-                  const href =
-                    key === 'in_inspection' ? '/inspections' : `/inventory?status=${key}`;
-                  return (
-                    <Link
-                      key={key}
-                      to={href}
-                      className="block group rounded-lg hover:bg-gray-50 -mx-2 px-2 py-1 transition-colors"
-                    >
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
-                        <span className="group-hover:text-[#E86F2C] transition-colors">
-                          {label}
-                        </span>
-                        <span className="font-medium">{count}</span>
-                      </div>
-                      <div className="h-1.5 bg-gray-100 rounded-full">
-                        <div
-                          className={`h-1.5 rounded-full ${color} transition-all`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Pending inspections with SLA */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">

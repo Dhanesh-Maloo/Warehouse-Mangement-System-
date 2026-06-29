@@ -5,6 +5,7 @@
  *   - Postgres trigger that blocks UPDATE/DELETE on events_ledger
  *   - Esevel client record
  *   - Admin user (admin@ivalueindia.com) — password from SEED_ADMIN_PASSWORD env
+ *   - Viewer user (viewer@esevel.com / Viewer@12345) — client_user role, Esevel only
  *   - 3 sample warehouse locations
  *
  * Usage: pnpm db:seed  (loads .env via dotenv-cli)
@@ -97,6 +98,38 @@ async function seedAdminUser(): Promise<void> {
   });
 
   console.log('✓ Created admin user: admin@ivalueindia.com');
+}
+
+async function seedViewerUser(): Promise<void> {
+  const existing = await prisma.user.findUnique({
+    where: { email: 'viewer@esevel.com' },
+  });
+
+  if (existing) {
+    console.log('✓ Viewer user exists: viewer@esevel.com');
+    return;
+  }
+
+  // Look up the Esevel client to link the viewer to it
+  const esevel = await prisma.client.findFirst({ where: { slug: 'esevel' } });
+  if (!esevel) {
+    throw new Error('Esevel client must be seeded before viewer user');
+  }
+
+  const passwordHash = await argon2.hash('Viewer@12345', { type: argon2.argon2id });
+
+  await prisma.user.create({
+    data: {
+      email: 'viewer@esevel.com',
+      passwordHash,
+      fullName: 'Esevel Viewer',
+      role: 'client_user',
+      clientId: esevel.id,
+      status: 'active',
+    },
+  });
+
+  console.log('✓ Created viewer user: viewer@esevel.com (password: Viewer@12345)');
 }
 
 async function seedRateCard(): Promise<void> {
@@ -355,6 +388,7 @@ async function main(): Promise<void> {
   await installLedgerTrigger();
   await seedClient();
   await seedAdminUser();
+  await seedViewerUser();
   await seedLocations();
   await seedRateCard();
   await seedHolidays();
