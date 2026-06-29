@@ -10,7 +10,8 @@ export class StorageScheduler {
 
   /**
    * Runs daily at 02:00 IST (20:30 UTC) to sync current-month storage charges.
-   * Each run overwrites the previous run for the same calendar month, so no duplicates accumulate.
+   * If a run already exists for the current month, its ledger entries are reversed first
+   * and fresh entries are posted with the current device count — keeping charges up to date.
    */
   @Cron('30 20 * * *')
   async runMonthlyAccrual(): Promise<void> {

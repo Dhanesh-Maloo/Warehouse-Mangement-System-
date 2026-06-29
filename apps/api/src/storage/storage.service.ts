@@ -126,7 +126,7 @@ export class StorageService {
     peripheralRatePaise: bigint,
     committedMonthlyAmountPaise: bigint,
   ): Promise<ClientAccrualResult> {
-    // Remove any existing accrual runs for the same calendar month to prevent duplicate charges
+    // Find any existing run for this calendar month so we can reverse its ledger entries before re-posting
     const monthStart = new Date(periodStart.getFullYear(), periodStart.getMonth(), 1);
     const monthEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0, 23, 59, 59);
 
@@ -135,22 +135,52 @@ export class StorageService {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Accrual for this month already completed — skip to preserve append-only ledger integrity.
-    // A re-run would require reversal entries; for now return the recorded result.
+    // If a run already exists for this month, reverse its ledger entries first so we
+    // can post fresh ones with the current device count. This keeps the ledger append-only
+    // while ensuring the month's storage charge always reflects live inventory.
     if (existingRun) {
-      return {
-        clientId,
-        clientName,
-        laptopCount: existingRun.laptopCount,
-        peripheralCount: existingRun.peripheralCount,
-        totalDeviceCount: existingRun.totalDeviceCount,
-        laptopAmountPaise: existingRun.laptopAmountPaise,
-        peripheralAmountPaise: existingRun.peripheralAmountPaise,
-        totalAmountPaise: existingRun.totalAmountPaise,
-        minimumCommitmentMet: existingRun.minimumCommitmentMet,
-        skipped: true,
-        skipReason: `Accrual for ${monthStart.toISOString().slice(0, 7)} already completed`,
-      };
+      if (existingRun.laptopAmountPaise > 0n) {
+        const representativeAsset = await this.prisma.asset.findFirst({
+          where: { clientId, category: { in: ['laptop', 'monitor'] } },
+          select: { id: true },
+        });
+        if (representativeAsset) {
+          await this.ledger.create({
+            eventType: 'STORAGE_LAPTOP',
+            asset: { connect: { id: representativeAsset.id } },
+            client: { connect: { id: clientId } },
+            quantity: -existingRun.laptopCount,
+            unitRatePaise: laptopRatePaise,
+            amountPaise: -existingRun.laptopAmountPaise,
+            occurredAt,
+            createdBy: 'system:storage-accrual',
+            referenceId: existingRun.id,
+            referenceType: 'storage_accrual_reversal',
+            notes: `Reversal of previous June laptop storage charge (${existingRun.laptopCount} devices)`,
+          });
+        }
+      }
+      if (existingRun.peripheralAmountPaise > 0n) {
+        const representativePeripheral = await this.prisma.asset.findFirst({
+          where: { clientId, category: 'peripheral' },
+          select: { id: true },
+        });
+        if (representativePeripheral) {
+          await this.ledger.create({
+            eventType: 'STORAGE_PERIPHERAL',
+            asset: { connect: { id: representativePeripheral.id } },
+            client: { connect: { id: clientId } },
+            quantity: -existingRun.peripheralCount,
+            unitRatePaise: peripheralRatePaise,
+            amountPaise: -existingRun.peripheralAmountPaise,
+            occurredAt,
+            createdBy: 'system:storage-accrual',
+            referenceId: existingRun.id,
+            referenceType: 'storage_accrual_reversal',
+            notes: `Reversal of previous June peripheral storage charge (${existingRun.peripheralCount} devices)`,
+          });
+        }
+      }
     }
 
     // Count laptops and monitors in storage
