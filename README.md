@@ -11,63 +11,146 @@ A multi-tenant web application for managing the end-to-end IT asset lifecycle (i
 - **Storage:** S3-compatible object storage (LocalStack in dev, AWS S3 in prod)
 - **Hosting target:** AWS Mumbai (ap-south-1)
 
-## Documents you need to read first
+---
 
-- `CLAUDE.md` — the project rules. Claude Code reads this automatically on every task.
-- `SPEC.md` — the full technical spec: data model, user stories with IDs, business rules.
+## Getting started
 
-## Prerequisites (set up once)
+### Prerequisites
 
-You need these installed on your machine:
+Install these once before anything else:
 
-1. **Node.js 20+** — [nodejs.org](https://nodejs.org) (pick the LTS version).
-2. **Docker Desktop** — [docker.com](https://docker.com). For running Postgres and Redis locally without installing them.
-3. **Git** — [git-scm.com](https://git-scm.com).
-4. **VS Code** (recommended) — [code.visualstudio.com](https://code.visualstudio.com).
-5. **Claude Code** — already installed in your Claude desktop app, accessible via the "Code" tab.
+| Tool | Version | Download |
+|------|---------|----------|
+| Node.js | 20+ | https://nodejs.org (pick LTS) |
+| pnpm | latest | Run `npm install -g pnpm` after Node |
+| Docker Desktop | latest | https://www.docker.com/products/docker-desktop |
 
-To verify everything is installed, open a terminal and run:
+Make sure Docker Desktop is **open and running** before proceeding.
+
+Verify your installs:
 
 ```bash
-node --version    # Should show v20.x or higher
-docker --version  # Should show something like 24.x
-git --version     # Should show 2.x
+node --version    # v20.x or higher
+pnpm --version    # 8.x or higher
+docker --version  # 24.x or higher
 ```
 
-## Project setup (first time only)
+---
 
-1. **Create a folder** for the project anywhere on your machine. Suggested: `~/Projects/warehouse-app`.
-2. **Open the folder in VS Code.**
-3. **Drop the three markdown files** (`README.md`, `CLAUDE.md`, `SPEC.md`) into that folder.
-4. **Open Claude Code** in the Claude desktop app and point it at this folder.
-5. **Paste the kickoff prompt** (in the chat with me — Divya) into Claude Code to scaffold the project. Claude Code will then create all the project files, set up Docker, install dependencies, and have a running auth flow in one go.
+### Step 1 — Extract and open the project
 
-## Daily workflow with Claude Code
+Extract the zip file to a folder on your machine, then open a terminal inside that folder.
 
-The key principle: **one user story at a time**. Don't ask Claude Code to "build the warehouse app." Ask it to "implement US-INB-02" (or whichever story you're on).
+---
 
-For each story:
+### Step 2 — Install dependencies
 
-1. Tell Claude Code: "Implement story US-XXX-NN from SPEC.md."
-2. It will read the spec, write code, write tests, and run them.
-3. Review the changes carefully (especially around auth, multi-tenancy, and billing).
-4. Test it yourself in the browser.
-5. Commit and move on.
+```bash
+pnpm install
+```
 
-If something looks wrong, push back. Claude Code responds well to specific feedback like "the SLA timer is counting non-business hours; fix per SPEC.md section 8.5."
+---
 
-## Build phases
+### Step 3 — Configure environment
 
-- **Phase 1 (current):** Foundation — auth, clients, master data, rate card, inbound, inspection, inventory, event ledger. Esevel can log in and see their inventory.
-- **Phase 2:** Deployment, retrieval, shipping.
-- **Phase 3:** Billing engine, storage accrual, SLA dashboard, Zoho Books integration.
-- **Phase 4:** Full client portal (request forms), disposal/ITAD with certificates, audit reports.
+```bash
+cp .env.example .env
+```
 
-See `SPEC.md` for the full Phase 1 user story list.
+Open `.env` in a text editor and set these two values:
 
-## Important rules (also enforced in CLAUDE.md)
+```
+JWT_SECRET=any-long-random-string-you-choose
+SEED_ADMIN_PASSWORD=the-admin-password-you-want
+```
+
+Leave everything else as-is for local development.
+
+---
+
+### Step 4 — Start the database and Redis
+
+```bash
+docker compose -f infra/docker-compose.yml up -d
+```
+
+This starts Postgres and Redis in the background. Wait about 10 seconds for them to be ready.
+
+---
+
+### Step 5 — Run database migrations
+
+```bash
+pnpm db:migrate
+```
+
+This creates all the tables in the database.
+
+---
+
+### Step 6 — Seed demo data
+
+```bash
+pnpm db:seed
+```
+
+This loads sample data including locations, rate card, and demo user accounts.
+
+---
+
+### Step 7 — Start the app
+
+```bash
+pnpm dev
+```
+
+Open your browser and go to: **http://localhost:5173**
+
+---
+
+## Demo login credentials
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@ivalueindia.com` | *(the `SEED_ADMIN_PASSWORD` you set in `.env`)* |
+| Viewer | `viewer@esevel.com` | `Viewer@12345` |
+
+---
+
+## Stopping the app
+
+Press `Ctrl+C` in the terminal to stop the app, then stop the database:
+
+```bash
+docker compose -f infra/docker-compose.yml down
+```
+
+---
+
+## Resuming next time
+
+You only need to run Steps 4 and 7 on subsequent starts — dependencies, migrations, and seed only need to run once.
+
+```bash
+docker compose -f infra/docker-compose.yml up -d
+pnpm dev
+```
+
+---
+
+## Project structure
+
+```
+apps/api        NestJS backend (runs on port 3001)
+apps/web        React frontend (runs on port 5173)
+infra/prisma    Database schema, migrations, seed
+packages/       Shared TypeScript types
+```
+
+---
+
+## Important rules
 
 - **Multi-tenancy is non-negotiable.** Every query filters by `client_id`. Esevel must never see another client's data.
 - **The event ledger is append-only.** Corrections are new entries, not edits.
-- **Tests are part of "done", not optional.**
 - **Never commit secrets.** All secrets go in `.env` (which is `.gitignored`).
