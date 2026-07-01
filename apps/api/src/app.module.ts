@@ -21,10 +21,12 @@ import { DeploymentModule } from './deployment/deployment.module';
 import { StorageModule } from './storage/storage.module';
 import { DemoModule } from './demo/demo.module';
 import { DocumentsModule } from './documents/documents.module';
+import { R2Module } from './r2/r2.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../../.env', '.env'] }),
+    R2Module,
     PrismaModule,
     HealthModule,
     LedgerModule,

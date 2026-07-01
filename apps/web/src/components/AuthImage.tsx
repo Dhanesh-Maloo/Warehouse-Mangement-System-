@@ -16,7 +16,8 @@ export function AuthImage({ src, alt = '', className }: AuthImageProps) {
     setObjectUrl(null);
 
     const token = localStorage.getItem('wh_token');
-    fetch(src, {
+    const fullSrc = src.startsWith('http') ? src : `${import.meta.env.VITE_API_URL ?? ''}${src}`;
+    fetch(fullSrc, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((res) => {

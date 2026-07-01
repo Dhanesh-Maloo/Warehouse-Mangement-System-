@@ -1,16 +1,19 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { unlink } from 'fs/promises';
-import { existsSync } from 'fs';
+import { R2Service } from '../r2/r2.service';
 
 @Injectable()
 export class DocumentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly r2: R2Service,
+  ) {}
 
   async createForAsset(
     assetId: string,
     file: Express.Multer.File,
+    r2Key: string,
     clientId: string,
     uploadedByUserId: string,
     inspectionId?: string,
@@ -28,7 +31,7 @@ export class DocumentsService {
         inspectionId: inspectionId ?? null,
         clientId,
         originalName: file.originalname,
-        storagePath: file.path,
+        storagePath: r2Key,
         mimeType: file.mimetype,
         sizeBytes: file.size,
         uploadedByUserId,
@@ -40,6 +43,7 @@ export class DocumentsService {
   async createForInspection(
     inspectionId: string,
     file: Express.Multer.File,
+    r2Key: string,
     uploadedByUserId: string,
   ): Promise<
     Prisma.AssetDocumentGetPayload<{
@@ -57,7 +61,7 @@ export class DocumentsService {
         inspectionId,
         clientId: inspection.asset.clientId,
         originalName: file.originalname,
-        storagePath: file.path,
+        storagePath: r2Key,
         mimeType: file.mimetype,
         sizeBytes: file.size,
         uploadedByUserId,
@@ -101,10 +105,8 @@ export class DocumentsService {
     if (role !== 'admin' && doc.clientId !== requestingClientId) {
       throw new ForbiddenException('Cannot delete document from another client');
     }
-    // Delete file from disk
-    if (existsSync(doc.storagePath)) {
-      await unlink(doc.storagePath);
-    }
+    // Delete from R2 — ignore errors if the object is already gone
+    await this.r2.delete(doc.storagePath).catch(() => undefined);
     await this.prisma.assetDocument.delete({ where: { id } });
   }
 }

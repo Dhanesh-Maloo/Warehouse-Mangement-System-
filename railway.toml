@@ -1,0 +1,9 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "pnpm install --frozen-lockfile && pnpm --filter @warehouse/api build"
+
+[deploy]
+startCommand = "npx prisma migrate deploy --schema infra/prisma/schema.prisma && node apps/api/dist/main.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"

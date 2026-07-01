@@ -14,11 +14,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { mkdirSync, existsSync } from 'fs';
+import { memoryStorage } from 'multer';
+import { extname } from 'path';
 import type { Response } from 'express';
 import { InspectionsService } from './inspections.service';
+import { R2Service } from '../r2/r2.service';
 import { CreateInspectionDto } from './dto/create-inspection.dto';
 import { CompleteInspectionDto } from './dto/complete-inspection.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -27,12 +27,13 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../common/types/jwt-payload.type';
 
-const UPLOADS_DIR = join(process.cwd(), 'uploads', 'inspections');
-
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('inspections')
 export class InspectionsController {
-  constructor(private readonly inspectionsService: InspectionsService) {}
+  constructor(
+    private readonly inspectionsService: InspectionsService,
+    private readonly r2: R2Service,
+  ) {}
 
   @Get()
   @Roles('admin', 'manager', 'operator', 'client_user')
@@ -84,16 +85,7 @@ export class InspectionsController {
   @Roles('admin', 'manager', 'operator')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: (_req, _file, cb) => {
-          mkdirSync(UPLOADS_DIR, { recursive: true });
-          cb(null, UPLOADS_DIR);
-        },
-        filename: (_req, file, cb) => {
-          const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-          cb(null, `${unique}${extname(file.originalname)}`);
-        },
-      }),
+      storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype.startsWith('image/')) {
@@ -104,21 +96,31 @@ export class InspectionsController {
       },
     }),
   )
-  uploadPhoto(@Param('id') id: string, @UploadedFile() file: Express.Multer.File): { key: string } {
+  async uploadPhoto(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<{ key: string }> {
     if (!file) throw new BadRequestException('No file uploaded');
-    // Key format: inspections/{inspectionId}/{filename}
-    return { key: `inspections/${id}/${file.filename}` };
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const key = `inspections/${id}/${unique}${extname(file.originalname)}`;
+    await this.r2.upload(key, file.buffer, file.mimetype);
+    return { key };
   }
 
   @Get('photos/:inspectionId/:filename')
   @Roles('admin', 'manager', 'operator', 'client_user')
-  servePhoto(
+  async servePhoto(
     @Param('inspectionId') inspectionId: string,
     @Param('filename') filename: string,
     @Res() res: Response,
-  ): void {
-    const filePath = join(UPLOADS_DIR, inspectionId, filename);
-    if (!existsSync(filePath)) throw new NotFoundException('Photo not found');
-    res.sendFile(filePath);
+  ): Promise<void> {
+    const key = `inspections/${inspectionId}/${filename}`;
+    try {
+      const stream = await this.r2.getStream(key);
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      stream.pipe(res);
+    } catch {
+      throw new NotFoundException('Photo not found');
+    }
   }
 }

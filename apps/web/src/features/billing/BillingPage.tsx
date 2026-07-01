@@ -91,6 +91,7 @@ interface LedgerEntry {
 
 const EVENT_LABELS: Record<string, string> = {
   INGEST: 'Inbound (Ingest)',
+  CORRECTION_INGEST: 'Correction — Ingest',
   INSPECT: 'Inspection',
   PICK_PACK: 'Deployment (Pick & Pack)',
   FULL_PREP: 'Deployment (Full Prep)',
@@ -106,11 +107,14 @@ const EVENT_LABELS: Record<string, string> = {
   DISPOSAL_ITAD: 'Disposal (ITAD)',
   STORAGE_LAPTOP: 'Storage — Laptop',
   STORAGE_PERIPHERAL: 'Storage — Peripheral',
+  STORAGE_LAPTOP_REVERSAL: 'Storage Reversal — Laptop',
+  STORAGE_PERIPHERAL_REVERSAL: 'Storage Reversal — Peripheral',
   COMMITMENT_ADJUSTMENT: 'Commitment Adjustment',
 };
 
 const EVENT_CATEGORY: Record<string, string> = {
   INGEST: 'Inbound',
+  CORRECTION_INGEST: 'Inbound',
   INSPECT: 'Inspection',
   PICK_PACK: 'Deployment',
   FULL_PREP: 'Deployment',
@@ -126,6 +130,8 @@ const EVENT_CATEGORY: Record<string, string> = {
   DISPOSAL_ITAD: 'Disposal',
   STORAGE_LAPTOP: 'Storage',
   STORAGE_PERIPHERAL: 'Storage',
+  STORAGE_LAPTOP_REVERSAL: 'Storage',
+  STORAGE_PERIPHERAL_REVERSAL: 'Storage',
   COMMITMENT_ADJUSTMENT: 'Storage',
 };
 
@@ -255,7 +261,7 @@ export function BillingPage() {
     enabled: isAdminOrManager,
   });
 
-  const { data: ledgerEntries = [], isLoading: ledgerLoading } = useQuery({
+  const { data: ledgerEntries = [], isLoading: ledgerLoading, refetch: refetchLedger } = useQuery({
     queryKey: ['billing-ledger', effectiveClientId, txFromDate, txToDate],
     queryFn: () => {
       const p = new URLSearchParams();
@@ -266,6 +272,8 @@ export function BillingPage() {
       return api.get<LedgerEntry[]>(`/ledger?${p.toString()}`);
     },
     enabled: !!effectiveClientId,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   // Aggregate by category for the summary chips
@@ -283,6 +291,7 @@ export function BillingPage() {
       setAccrualError('');
       void qc.invalidateQueries({ queryKey: ['storage-summary'] });
       void qc.invalidateQueries({ queryKey: ['accrual-runs'] });
+      void qc.invalidateQueries({ queryKey: ['billing-ledger'] });
     },
     onError: (e: Error) => setAccrualError(e.message),
   });
@@ -323,14 +332,16 @@ export function BillingPage() {
           <button
             onClick={() => {
               void refetchSummary();
+              void refetchLedger();
               void qc.invalidateQueries({ queryKey: ['storage-summary'] });
               void qc.invalidateQueries({ queryKey: ['accrual-runs'] });
+              void qc.invalidateQueries({ queryKey: ['billing-ledger'] });
             }}
-            disabled={summaryLoading}
+            disabled={summaryLoading || ledgerLoading}
             title="Sync with inventory"
             className="flex items-center gap-2 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
-            <RefreshCw size={15} className={summaryLoading ? 'animate-spin' : ''} />
+            <RefreshCw size={15} className={(summaryLoading || ledgerLoading) ? 'animate-spin' : ''} />
             Sync
           </button>
 

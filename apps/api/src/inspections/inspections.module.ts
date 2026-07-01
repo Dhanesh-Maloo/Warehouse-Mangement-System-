@@ -4,9 +4,10 @@ import { InspectionsController } from './inspections.controller';
 import { LedgerModule } from '../ledger/ledger.module';
 import { RateCardModule } from '../rate-card/rate-card.module';
 import { AuditModule } from '../audit/audit.module';
+import { R2Module } from '../r2/r2.module';
 
 @Module({
-  imports: [LedgerModule, RateCardModule, AuditModule],
+  imports: [LedgerModule, RateCardModule, AuditModule, R2Module],
   providers: [InspectionsService],
   controllers: [InspectionsController],
   exports: [InspectionsService],
