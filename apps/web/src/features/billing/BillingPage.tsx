@@ -296,10 +296,6 @@ export function BillingPage() {
     onError: (e: Error) => setAccrualError(e.message),
   });
 
-  const totalPaise = paise(summary?.totalProjectedPaise);
-  const shortfall = paise(summary?.shortfallPaise);
-  const commitmentMet = summary?.minimumCommitmentMet ?? false;
-
   return (
     <div className="space-y-8">
       {/* Header */}
