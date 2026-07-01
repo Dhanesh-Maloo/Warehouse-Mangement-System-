@@ -116,7 +116,7 @@ const CHECKLIST_SECTIONS: { title: string; items: ChecklistItem[] }[] = [
       { key: 'trackpadOk', label: 'Trackpad in working condition', yesIsGood: true },
       { key: 'portsOk', label: 'All ports in working condition', yesIsGood: true },
       { key: 'powersOnOk', label: 'Unit powered on without any hardware errors', yesIsGood: true },
-      { key: 'imagesUploaded', label: 'Uploaded 3 images (top, bottom, front)', yesIsGood: true },
+      { key: 'imagesUploaded', label: 'Uploaded photos (top, bottom, front, etc.)', yesIsGood: true },
     ],
   },
   {
@@ -225,16 +225,18 @@ export function InspectionDetailPage() {
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
-    const compressed = await Promise.all(
-      files.map(async (f) => {
-        const blob = await compressImage(f);
-        return {
-          file: new File([blob], f.name, { type: blob.type }),
-          preview: URL.createObjectURL(blob),
-        };
-      }),
-    );
-    setPhotos((prev) => [...prev, ...compressed]);
+    setPhotos((prev) => {
+      const slots = Math.max(0, 10 - prev.length);
+      const toAdd = files.slice(0, slots);
+      if (!toAdd.length) return prev;
+      Promise.all(
+        toAdd.map(async (f) => {
+          const blob = await compressImage(f);
+          return { file: new File([blob], f.name, { type: blob.type }), preview: URL.createObjectURL(blob) };
+        }),
+      ).then((compressed) => setPhotos((p) => [...p, ...compressed]));
+      return prev;
+    });
     e.target.value = '';
   }
 
@@ -727,7 +729,7 @@ export function InspectionDetailPage() {
                 className="w-full border-2 border-dashed border-gray-200 rounded-lg py-8 text-center text-sm text-gray-400 hover:border-[#E86F2C] hover:text-[#E86F2C] transition-colors"
               >
                 <Camera size={20} className="mx-auto mb-1" />
-                Upload 3 images — top, bottom, front
+                Upload up to 10 images — top, bottom, front, sides, etc.
               </button>
             ) : (
               <div className="flex flex-wrap gap-2">
