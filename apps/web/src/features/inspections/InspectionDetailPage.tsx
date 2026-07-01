@@ -269,7 +269,8 @@ export function InspectionDetailPage() {
         const form = new FormData();
         form.append('file', file);
         const token = localStorage.getItem('wh_token');
-        const res = await fetch(`/api/v1/inspections/${id ?? ''}/photos`, {
+        const base = import.meta.env.VITE_API_URL ?? '';
+        const res = await fetch(`${base}/api/v1/inspections/${id ?? ''}/photos`, {
           method: 'POST',
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           body: form,

@@ -71,7 +71,8 @@ export function DeliveryDetailPage() {
 
   async function downloadGrnPdf(grnId: string, grnNumber: string) {
     const token = localStorage.getItem('wh_token');
-    const res = await fetch(`/api/v1/inbound/grns/${grnId}/pdf`, {
+    const base = import.meta.env.VITE_API_URL ?? '';
+    const res = await fetch(`${base}/api/v1/inbound/grns/${grnId}/pdf`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) return;
