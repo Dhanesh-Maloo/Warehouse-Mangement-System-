@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import { api } from '../api/client';
+import ivalueLogo from '../assets/ivalue-logo.png';
 import {
   LayoutDashboard,
   PackagePlus,
@@ -238,14 +239,15 @@ export function Layout() {
           className={`border-b border-white/10 ${collapsed ? 'px-3 py-5 flex justify-center' : 'px-6 py-5'}`}
         >
           {collapsed ? (
-            <div className="w-8 h-8 rounded-lg bg-[#E86F2C] flex items-center justify-center text-white font-bold text-sm">
-              W
-            </div>
+            <img src={ivalueLogo} alt="iValue" className="w-8 h-8 rounded-lg object-contain bg-white" />
           ) : (
-            <>
-              <div className="text-white font-bold text-lg tracking-tight">IValue WMS</div>
-              <div className="text-[#8AA6BF] text-xs mt-0.5">Warehouse Management</div>
-            </>
+            <div className="flex items-center gap-3">
+              <img src={ivalueLogo} alt="iValue" className="w-10 h-10 rounded-lg object-contain bg-white flex-shrink-0" />
+              <div>
+                <div className="text-white font-bold text-lg tracking-tight">IValue WMS</div>
+                <div className="text-[#8AA6BF] text-xs mt-0.5">Warehouse Management</div>
+              </div>
+            </div>
           )}
         </div>
 

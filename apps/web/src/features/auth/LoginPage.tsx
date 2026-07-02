@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLogin } from '../../api/hooks/useAuth';
+import ivalueLogo from '../../assets/ivalue-logo.png';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -22,6 +23,7 @@ export function LoginPage() {
     <div className="min-h-screen bg-[#1A2B3C] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
+          <img src={ivalueLogo} alt="iValue" className="w-16 h-16 rounded-xl object-contain bg-white mx-auto mb-3" />
           <div className="text-white font-bold text-2xl tracking-tight">IValue WMS</div>
           <div className="text-[#8AA6BF] text-sm mt-1">Warehouse Management System</div>
         </div>
