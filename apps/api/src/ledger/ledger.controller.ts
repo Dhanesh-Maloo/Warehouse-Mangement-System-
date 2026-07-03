@@ -56,13 +56,13 @@ export class LedgerController {
   constructor(private readonly ledgerService: LedgerService) {}
 
   @Get()
-  @Roles('admin', 'manager', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'client_user', 'editor', 'client_admin')
   async findMany(
     @Query() query: LedgerQueryDto,
     @CurrentUser() user: JwtPayload,
   ): Promise<(EventLedger & { asset: { id: string; serialNumber: string; assetTag: string | null; model: string } })[]> {
     const effectiveClientId =
-      user.role === 'client_user' || user.role === 'editor'
+      user.role === 'client_user' || user.role === 'editor' || user.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : query.clientId;
 

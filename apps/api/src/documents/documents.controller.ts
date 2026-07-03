@@ -44,7 +44,7 @@ export class DocumentsController {
   ) {}
 
   @Post('assets/:assetId/documents')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   @UseInterceptors(pdfInterceptor)
   async uploadForAsset(
     @Param('assetId') assetId: string,
@@ -59,13 +59,13 @@ export class DocumentsController {
   }
 
   @Get('assets/:assetId/documents')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   listForAsset(@Param('assetId') assetId: string): ReturnType<DocumentsService['findByAsset']> {
     return this.documentsService.findByAsset(assetId);
   }
 
   @Post('inspections/:inspectionId/documents')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   @UseInterceptors(pdfInterceptor)
   async uploadForInspection(
     @Param('inspectionId') inspectionId: string,
@@ -80,7 +80,7 @@ export class DocumentsController {
   }
 
   @Get('inspections/:inspectionId/documents')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   listForInspection(
     @Param('inspectionId') inspectionId: string,
   ): ReturnType<DocumentsService['findByInspection']> {
@@ -88,7 +88,7 @@ export class DocumentsController {
   }
 
   @Get('documents/:id/download')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   async download(@Param('id') id: string, @Res() res: Response): Promise<void> {
     const doc = await this.documentsService.findOne(id);
     try {
@@ -101,9 +101,9 @@ export class DocumentsController {
     }
   }
 
-  // Delete is intentionally admin/manager/operator only — editors never delete.
+  // Delete is admin/manager/operator, or client_admin scoped to their own client — editors never delete.
   @Delete('documents/:id')
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'client_admin')
   delete(
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,

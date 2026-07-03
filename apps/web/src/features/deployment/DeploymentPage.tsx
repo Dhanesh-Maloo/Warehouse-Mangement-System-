@@ -107,10 +107,15 @@ export function DeploymentPage() {
 
   const isClientUser = user?.role === 'client_user';
   const isEditor = user?.role === 'editor';
+  const isClientAdmin = user?.role === 'client_admin';
   // editors are scoped to their own client like client_users, but can create/edit
-  const isClientScoped = isClientUser || isEditor;
+  const isClientScoped = isClientUser || isEditor || isClientAdmin;
   const canCreate =
-    user?.role === 'admin' || user?.role === 'manager' || user?.role === 'operator' || isEditor;
+    user?.role === 'admin' ||
+    user?.role === 'manager' ||
+    user?.role === 'operator' ||
+    isEditor ||
+    isClientAdmin;
 
   const clientId = isClientScoped ? (user?.clientId ?? undefined) : undefined;
 

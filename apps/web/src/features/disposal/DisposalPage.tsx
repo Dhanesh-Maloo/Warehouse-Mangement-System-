@@ -84,9 +84,11 @@ export function DisposalPage() {
 
   const isClientUser = user?.role === 'client_user';
   const isEditor = user?.role === 'editor';
+  const isClientAdmin = user?.role === 'client_admin';
   // editors are scoped to their own client like client_users, but can create disposal requests
-  const isClientScoped = isClientUser || isEditor;
+  const isClientScoped = isClientUser || isEditor || isClientAdmin;
   const isAdminOrManager = user?.role === 'admin' || user?.role === 'manager';
+  const canApprove = isAdminOrManager || isClientAdmin;
   const clientId = isClientScoped ? (user?.clientId ?? undefined) : undefined;
 
   // ── UI state ──────────────────────────────────────────────────────────────
@@ -418,7 +420,7 @@ export function DisposalPage() {
 
                     {/* Status — inline select for actionable rows */}
                     <td className="px-5 py-3.5">
-                      {isAdminOrManager && d.status === 'pending' ? (
+                      {canApprove && d.status === 'pending' ? (
                         <select
                           defaultValue="pending"
                           onChange={(e) => {

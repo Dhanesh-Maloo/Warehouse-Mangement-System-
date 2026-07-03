@@ -25,7 +25,10 @@ const ROLE_COLORS: Record<string, string> = {
   operator: 'bg-blue-100 text-blue-700',
   client_user: 'bg-gray-100 text-gray-700',
   editor: 'bg-amber-100 text-amber-700',
+  client_admin: 'bg-teal-100 text-teal-700',
 };
+
+const CLIENT_SCOPED_ROLES = new Set(['client_user', 'editor', 'client_admin']);
 
 const EMPTY = { email: '', password: '', fullName: '', phone: '', role: 'operator', clientId: '' };
 
@@ -33,6 +36,9 @@ export function UsersPage() {
   const { user: me } = useAuth();
   const qc = useQueryClient();
   const isAdmin = me?.role === 'admin';
+  const isClientAdmin = me?.role === 'client_admin';
+  // a client_admin manages accounts, but only ones fenced to their own client
+  const canManageUsers = isAdmin || isClientAdmin;
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [formError, setFormError] = useState('');
@@ -48,7 +54,7 @@ export function UsersPage() {
       const r = await api.get<{ data: Client[] }>('/clients');
       return r.data;
     },
-    enabled: showForm,
+    enabled: showForm && isAdmin,
   });
 
   const createMutation = useMutation({
@@ -59,8 +65,11 @@ export function UsersPage() {
         fullName: form.fullName,
         phone: form.phone || undefined,
         role: form.role,
-        clientId:
-          form.role === 'client_user' || form.role === 'editor' ? form.clientId : undefined,
+        clientId: CLIENT_SCOPED_ROLES.has(form.role)
+          ? isClientAdmin
+            ? (me?.clientId ?? undefined)
+            : form.clientId
+          : undefined,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['users'] });
@@ -87,9 +96,10 @@ export function UsersPage() {
           <h1 className="text-2xl font-bold text-gray-900">Users</h1>
           <p className="text-sm text-gray-500 mt-1">Platform user accounts</p>
         </div>
-        {isAdmin && (
+        {canManageUsers && (
           <button
             onClick={() => {
+              setForm(isClientAdmin ? { ...EMPTY, role: 'client_user' } : EMPTY);
               setShowForm(true);
               setFormError('');
             }}
@@ -167,14 +177,17 @@ export function UsersPage() {
                 onChange={(e) => field('role', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
               >
-                <option value="operator">Operator</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
+                {isAdmin && <option value="operator">Operator</option>}
+                {isAdmin && <option value="manager">Manager</option>}
+                {isAdmin && <option value="admin">Admin</option>}
                 <option value="client_user">Client user</option>
                 <option value="editor">Editor (add/edit only, no delete — single client)</option>
+                <option value="client_admin">
+                  Client admin (full control, incl. delete — single client)
+                </option>
               </select>
             </div>
-            {(form.role === 'client_user' || form.role === 'editor') && (
+            {CLIENT_SCOPED_ROLES.has(form.role) && !isClientAdmin && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Client <span className="text-red-500">*</span>
@@ -225,7 +238,7 @@ export function UsersPage() {
                 <th className="text-left px-5 py-3">Role</th>
                 <th className="text-left px-5 py-3">Status</th>
                 <th className="text-left px-5 py-3">Last login</th>
-                {isAdmin && <th className="px-5 py-3" />}
+                {canManageUsers && <th className="px-5 py-3" />}
               </tr>
             </thead>
             <tbody>
@@ -261,9 +274,9 @@ export function UsersPage() {
                         })
                       : 'Never'}
                   </td>
-                  {isAdmin && (
+                  {canManageUsers && (
                     <td className="px-5 py-3 text-right">
-                      {u.id !== me?.id && (
+                      {u.id !== me?.id && (!isClientAdmin || CLIENT_SCOPED_ROLES.has(u.role)) && (
                         <button
                           onClick={() =>
                             statusMutation.mutate({

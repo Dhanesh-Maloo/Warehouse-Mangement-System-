@@ -291,12 +291,14 @@ export function InventoryPage() {
     user?.role === 'admin' ||
     user?.role === 'manager' ||
     user?.role === 'operator' ||
-    user?.role === 'editor';
+    user?.role === 'editor' ||
+    user?.role === 'client_admin';
   const canEdit =
     user?.role === 'admin' ||
     user?.role === 'manager' ||
     user?.role === 'operator' ||
-    user?.role === 'editor';
+    user?.role === 'editor' ||
+    user?.role === 'client_admin';
   const needsClientSelect = user?.role === 'admin' || user?.role === 'manager';
 
   const { data: clientsList = [] } = useQuery({
@@ -468,7 +470,7 @@ export function InventoryPage() {
   };
 
   const clientId =
-    user?.role === 'client_user' || user?.role === 'editor'
+    user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
       ? (user.clientId ?? undefined)
       : undefined;
 

@@ -35,7 +35,7 @@ export function LedgerPage() {
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
   const clientId =
-    user?.role === 'client_user' || user?.role === 'editor'
+    user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
       ? (user.clientId ?? undefined)
       : undefined;
 

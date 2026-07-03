@@ -38,10 +38,12 @@ export function EndUsersPage() {
   const isAdmin = user?.role === 'admin';
   const isManager = user?.role === 'manager';
   const isEditor = user?.role === 'editor';
+  const isClientAdmin = user?.role === 'client_admin';
   const isClientUser = user?.role === 'client_user';
   // editors are scoped to their own client the same way client_users are, but can add/edit
-  const isClientScoped = isClientUser || isEditor;
-  const canEdit = isAdmin || isManager || isEditor;
+  const isClientScoped = isClientUser || isEditor || isClientAdmin;
+  const canEdit = isAdmin || isManager || isEditor || isClientAdmin;
+  const canDeactivate = isAdmin || isClientAdmin;
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<EndUser | null>(null);
@@ -371,7 +373,7 @@ export function EndUsersPage() {
                           >
                             <Pencil size={14} />
                           </button>
-                          {isAdmin && (
+                          {canDeactivate && (
                             <button
                               onClick={() => setConfirmDeactivate(eu)}
                               className="text-xs font-medium px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors whitespace-nowrap"

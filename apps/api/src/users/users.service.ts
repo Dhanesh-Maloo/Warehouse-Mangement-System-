@@ -36,10 +36,21 @@ export class UsersService {
     private readonly audit: AuditService,
   ) {}
 
-  async findAll(skip = 0, take = 50): Promise<{ data: SafeUser[]; total: number }> {
+  async findAll(
+    skip = 0,
+    take = 50,
+    clientId?: string,
+  ): Promise<{ data: SafeUser[]; total: number }> {
+    const where = clientId ? { clientId } : {};
     const [data, total] = await this.prisma.$transaction([
-      this.prisma.user.findMany({ select: SELECT_SAFE, orderBy: { fullName: 'asc' }, skip, take }),
-      this.prisma.user.count(),
+      this.prisma.user.findMany({
+        where,
+        select: SELECT_SAFE,
+        orderBy: { fullName: 'asc' },
+        skip,
+        take,
+      }),
+      this.prisma.user.count({ where }),
     ]);
     return { data, total };
   }

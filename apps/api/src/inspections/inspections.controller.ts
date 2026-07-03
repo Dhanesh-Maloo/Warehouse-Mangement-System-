@@ -36,27 +36,27 @@ export class InspectionsController {
   ) {}
 
   @Get()
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(
     @Query('clientId') clientId?: string,
     @Query('status') status?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<InspectionsService['findAll']> {
     const effectiveClientId =
-      user?.role === 'client_user' || user?.role === 'editor'
+      user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
     return this.inspectionsService.findAll(effectiveClientId, status);
   }
 
   @Get(':id')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findOne(@Param('id') id: string): ReturnType<InspectionsService['findOne']> {
     return this.inspectionsService.findOne(id);
   }
 
   @Post()
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   create(
     @Body() dto: CreateInspectionDto,
     @CurrentUser() user: JwtPayload,
@@ -65,7 +65,7 @@ export class InspectionsController {
   }
 
   @Patch(':id/cancel')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   cancel(
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,
@@ -74,7 +74,7 @@ export class InspectionsController {
   }
 
   @Patch(':id/complete')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   complete(
     @Param('id') id: string,
     @Body() dto: CompleteInspectionDto,
@@ -84,7 +84,7 @@ export class InspectionsController {
   }
 
   @Post(':id/photos')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),

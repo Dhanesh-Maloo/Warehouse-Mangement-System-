@@ -17,13 +17,13 @@ export class StorageController {
    * client_user/editor are forced to their own clientId; admin/manager/operator may pass ?clientId=.
    */
   @Get('summary')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   getSummary(
     @Query('clientId') clientId?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<StorageService['getStorageSummary']> {
     const effectiveClientId =
-      user?.role === 'client_user' || user?.role === 'editor'
+      user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? '')
         : (clientId ?? '');
     return this.storageService.getStorageSummary(effectiveClientId);
@@ -35,12 +35,15 @@ export class StorageController {
    * editor is forced to their own clientId; admin/manager may pass ?clientId=.
    */
   @Get('accrual-runs')
-  @Roles('admin', 'manager', 'editor')
+  @Roles('admin', 'manager', 'editor', 'client_admin')
   getAccrualRuns(
     @Query('clientId') clientId?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<StorageService['getAccrualRuns']> {
-    const effectiveClientId = user?.role === 'editor' ? (user.clientId ?? undefined) : clientId;
+    const effectiveClientId =
+      user?.role === 'editor' || user?.role === 'client_admin'
+        ? (user.clientId ?? undefined)
+        : clientId;
     return this.storageService.getAccrualRuns(effectiveClientId);
   }
 

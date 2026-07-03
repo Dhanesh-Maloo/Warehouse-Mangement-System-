@@ -14,26 +14,26 @@ export class DeploymentController {
   constructor(private readonly deploymentService: DeploymentService) {}
 
   @Get()
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(
     @Query('clientId') clientId?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<DeploymentService['findAll']> {
     const effectiveClientId =
-      user?.role === 'client_user' || user?.role === 'editor'
+      user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
     return this.deploymentService.findAll(effectiveClientId);
   }
 
   @Get(':id')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findOne(@Param('id') id: string): ReturnType<DeploymentService['findOne']> {
     return this.deploymentService.findOne(id);
   }
 
   @Post()
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   create(
     @Body() dto: CreateDeploymentOrderDto,
     @CurrentUser() user: JwtPayload,
@@ -42,7 +42,7 @@ export class DeploymentController {
   }
 
   @Patch(':id/status')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateDeploymentStatusDto,
@@ -52,7 +52,7 @@ export class DeploymentController {
   }
 
   @Patch(':id/zone')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   updateZone(
     @Param('id') id: string,
     @Body('courierZone') courierZone: 'intra_state' | 'inter_state' | 'rural',
@@ -62,7 +62,7 @@ export class DeploymentController {
   }
 
   @Patch(':id/tracking')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   updateTracking(
     @Param('id') id: string,
     @Body('trackingNumber') trackingNumber: string,

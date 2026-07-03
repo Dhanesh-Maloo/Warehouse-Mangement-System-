@@ -30,7 +30,13 @@ import {
   Moon,
 } from 'lucide-react';
 
-type NavItem = { to: string; label: string; icon: React.ElementType; adminOnly?: boolean };
+type NavItem = {
+  to: string;
+  label: string;
+  icon: React.ElementType;
+  adminOnly?: boolean;
+  extraRoles?: string[];
+};
 type NavGroup = { group: string; items: NavItem[] };
 
 const navGroups: NavGroup[] = [
@@ -67,7 +73,7 @@ const navGroups: NavGroup[] = [
     group: 'Admin',
     items: [
       { to: '/clients', label: 'Clients', icon: Building2, adminOnly: true },
-      { to: '/users', label: 'Users', icon: Users, adminOnly: true },
+      { to: '/users', label: 'Users', icon: Users, adminOnly: true, extraRoles: ['client_admin'] },
       { to: '/end-users', label: 'End Users', icon: UserCheck },
       { to: '/audit-log', label: 'Audit Log', icon: ShieldCheck, adminOnly: true },
     ],
@@ -255,7 +261,9 @@ export function Layout() {
         <nav className="flex-1 px-2 py-4 overflow-y-auto">
           {navGroups.map(({ group, items }) => {
             const visibleItems = items.filter((item) => {
-              if (item.adminOnly && !isAdmin) return false;
+              if (item.adminOnly && !isAdmin && !item.extraRoles?.includes(user?.role ?? '')) {
+                return false;
+              }
               // client_user: only show dashboard and inventory-related
               if (isClientUser) {
                 return ['/', 'inventory', '/inspections', '/end-users', '/billing'].some(

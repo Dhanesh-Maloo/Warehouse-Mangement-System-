@@ -21,7 +21,7 @@ export class LocationsController {
   constructor(private readonly locationsService: LocationsService) {}
 
   @Get()
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(): ReturnType<LocationsService['findAll']> {
     return this.locationsService.findAll();
   }

@@ -125,8 +125,9 @@ export function RetrievalPage() {
 
   const isClientUser = user?.role === 'client_user';
   const isEditor = user?.role === 'editor';
+  const isClientAdmin = user?.role === 'client_admin';
   // editors are scoped to their own client like client_users, but can create retrievals
-  const isClientScoped = isClientUser || isEditor;
+  const isClientScoped = isClientUser || isEditor || isClientAdmin;
   const clientId = isClientScoped ? (user?.clientId ?? undefined) : undefined;
 
   // Fetch clients (admin/manager/operator only)

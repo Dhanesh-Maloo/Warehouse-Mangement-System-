@@ -12,7 +12,7 @@ export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
   @Get()
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(
     @Query('clientId') clientId?: string,
     @Query('locationId') locationId?: string,
@@ -22,7 +22,7 @@ export class InventoryController {
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<InventoryService['findAll']> {
     const effectiveClientId =
-      user?.role === 'client_user' || user?.role === 'editor'
+      user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
 
@@ -36,13 +36,13 @@ export class InventoryController {
   }
 
   @Get('summary')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   summary(
     @Query('clientId') clientId?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<InventoryService['summary']> {
     const effectiveClientId =
-      user?.role === 'client_user' || user?.role === 'editor'
+      user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
     return this.inventoryService.summary(effectiveClientId);

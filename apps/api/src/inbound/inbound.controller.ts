@@ -15,37 +15,38 @@ export class InboundController {
   constructor(private readonly inboundService: InboundService) {}
 
   @Get('deliveries')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAllDeliveries(
     @Query('clientId') clientId?: string,
     @Query('expectedDate') expectedDate?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<InboundService['findAllDeliveries']> {
     const effectiveClientId =
-      user?.role === 'client_user' || user?.role === 'editor'
+      user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
     return this.inboundService.findAllDeliveries(effectiveClientId, expectedDate);
   }
 
   @Get('deliveries/:id')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findOneDelivery(@Param('id') id: string): ReturnType<InboundService['findOneDelivery']> {
     return this.inboundService.findOneDelivery(id);
   }
 
   @Post('deliveries')
-  @Roles('admin', 'manager', 'editor')
+  @Roles('admin', 'manager', 'editor', 'client_admin')
   createExpectedDelivery(
     @Body() dto: CreateExpectedDeliveryDto,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<InboundService['createExpectedDelivery']> {
-    if (user.role === 'editor' && user.clientId) dto.clientId = user.clientId;
+    if ((user.role === 'editor' || user.role === 'client_admin') && user.clientId)
+      dto.clientId = user.clientId;
     return this.inboundService.createExpectedDelivery(dto, user.sub);
   }
 
   @Post('receive')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   receiveDevices(
     @Body() dto: ReceiveDevicesDto,
     @CurrentUser() user: JwtPayload,
@@ -54,7 +55,7 @@ export class InboundController {
   }
 
   @Patch('deliveries/:id/status')
-  @Roles('admin', 'manager', 'editor')
+  @Roles('admin', 'manager', 'editor', 'client_admin')
   updateDeliveryStatus(
     @Param('id') id: string,
     @Body('status') status: 'pending' | 'partially_received' | 'completed' | 'cancelled',
@@ -64,20 +65,20 @@ export class InboundController {
   }
 
   @Get('grns')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAllGrns(
     @Query('clientId') clientId?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<InboundService['findAllGrns']> {
     const effectiveClientId =
-      user?.role === 'client_user' || user?.role === 'editor'
+      user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
     return this.inboundService.findAllGrns(effectiveClientId);
   }
 
   @Get('grns/:id/pdf')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   async downloadGrnPdf(@Param('id') id: string, @Res() res: Response): Promise<void> {
     const { stream, filename } = await this.inboundService.generateGrnPdf(id);
     res.setHeader('Content-Type', 'application/pdf');

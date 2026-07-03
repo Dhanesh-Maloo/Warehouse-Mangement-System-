@@ -17,7 +17,7 @@ export class RateCardController {
   }
 
   @Get('current')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   findCurrent(): ReturnType<RateCardService['findCurrent']> {
     return this.rateCardService.findCurrent();
   }

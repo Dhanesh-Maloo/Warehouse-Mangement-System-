@@ -14,32 +14,32 @@ export class RetrievalController {
   constructor(private readonly retrievalService: RetrievalService) {}
 
   @Get()
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(
     @Query('clientId') clientId?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<RetrievalService['findAll']> {
     const effectiveClientId =
-      user?.role === 'client_user' || user?.role === 'editor'
+      user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
     return this.retrievalService.findAll(effectiveClientId);
   }
 
   @Get('asset/:assetId')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findByAsset(@Param('assetId') assetId: string): ReturnType<RetrievalService['findByAsset']> {
     return this.retrievalService.findByAsset(assetId);
   }
 
   @Get(':id')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findOne(@Param('id') id: string): ReturnType<RetrievalService['findOne']> {
     return this.retrievalService.findOne(id);
   }
 
   @Post()
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   create(
     @Body() dto: CreateRetrievalRequestDto,
     @CurrentUser() user: JwtPayload,
@@ -48,7 +48,7 @@ export class RetrievalController {
   }
 
   @Patch(':id/status')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateRetrievalStatusDto,

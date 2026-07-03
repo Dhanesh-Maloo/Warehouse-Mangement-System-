@@ -15,13 +15,16 @@ export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
   @Post()
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   create(
     @Body() dto: CreateAssetDto,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<AssetsService['create']> {
-    // editors can only create assets for their own client
-    const clientId = user.role === 'editor' ? (user.clientId ?? dto.clientId) : dto.clientId;
+    // editors/client_admins can only create assets for their own client
+    const clientId =
+      user.role === 'editor' || user.role === 'client_admin'
+        ? (user.clientId ?? dto.clientId)
+        : dto.clientId;
     return this.assetsService.create({
       serialNumber: dto.serialNumber,
       assetTag: dto.assetTag,
@@ -45,7 +48,7 @@ export class AssetsController {
   }
 
   @Get()
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(
     @Query('clientId') clientId?: string,
     @Query('category') category?: string,
@@ -57,7 +60,7 @@ export class AssetsController {
   ): ReturnType<AssetsService['findAll']> {
     // client_users and editors can only see their own client's assets
     const effectiveClientId =
-      user?.role === 'client_user' || user?.role === 'editor'
+      user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
 
@@ -72,13 +75,13 @@ export class AssetsController {
   }
 
   @Get(':id')
-  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findOne(@Param('id') id: string): ReturnType<AssetsService['findOne']> {
     return this.assetsService.findOne(id);
   }
 
   @Patch(':id')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateAssetStatusDto,
@@ -87,7 +90,7 @@ export class AssetsController {
   }
 
   @Patch(':id/move')
-  @Roles('admin', 'manager', 'operator', 'editor')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   move(
     @Param('id') id: string,
     @Body('locationId') locationId: string,
