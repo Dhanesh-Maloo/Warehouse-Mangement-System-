@@ -24,6 +24,7 @@ import { RetrievalPage } from './features/retrieval';
 import { DisposalPage } from './features/disposal';
 import { BillingPage } from './features/billing';
 import { AuditLogPage } from './features/audit/AuditLogPage';
+import { HelpPage } from './features/help';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,6 +69,7 @@ export function App() {
                 <Route path="disposal" element={<DisposalPage />} />
                 <Route path="billing" element={<BillingPage />} />
                 <Route path="audit-log" element={<AuditLogPage />} />
+                <Route path="help" element={<HelpPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

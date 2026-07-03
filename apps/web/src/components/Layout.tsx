@@ -28,6 +28,7 @@ import {
   X,
   Sun,
   Moon,
+  HelpCircle,
 } from 'lucide-react';
 
 type NavItem = {
@@ -77,6 +78,10 @@ const navGroups: NavGroup[] = [
       { to: '/end-users', label: 'End Users', icon: UserCheck },
       { to: '/audit-log', label: 'Audit Log', icon: ShieldCheck, adminOnly: true },
     ],
+  },
+  {
+    group: 'Help',
+    items: [{ to: '/help', label: 'How to Use', icon: HelpCircle }],
   },
 ];
 
@@ -264,9 +269,9 @@ export function Layout() {
               if (item.adminOnly && !isAdmin && !item.extraRoles?.includes(user?.role ?? '')) {
                 return false;
               }
-              // client_user: only show dashboard and inventory-related
+              // client_user: only show dashboard, inventory-related, and the help guide
               if (isClientUser) {
-                return ['/', 'inventory', '/inspections', '/end-users', '/billing'].some(
+                return ['/', 'inventory', '/inspections', '/end-users', '/billing', '/help'].some(
                   (p) => item.to === p || item.to.startsWith(p + '/'),
                 );
               }
