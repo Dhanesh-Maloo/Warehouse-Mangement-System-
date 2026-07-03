@@ -216,6 +216,9 @@ export function BillingPage() {
   const isAdmin = user?.role === 'admin';
   const isAdminOrManager = isAdmin || user?.role === 'manager';
   const isClientUser = user?.role === 'client_user';
+  const isEditor = user?.role === 'editor';
+  // editors are scoped to their own client like client_users
+  const isClientScoped = isClientUser || isEditor;
 
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [accrualResult, setAccrualResult] = useState<AccrualRunResult | null>(null);
@@ -236,8 +239,8 @@ export function BillingPage() {
     staleTime: 60_000,
   });
 
-  const effectiveClientId = isClientUser
-    ? (user.clientId ?? '')
+  const effectiveClientId = isClientScoped
+    ? (user?.clientId ?? '')
     : selectedClientId || (clients[0]?.id ?? '');
 
   const summaryParams = new URLSearchParams();
@@ -258,7 +261,7 @@ export function BillingPage() {
       if (effectiveClientId) p.set('clientId', effectiveClientId);
       return api.get<AccrualRun[]>(`/storage/accrual-runs?${p.toString()}`);
     },
-    enabled: isAdminOrManager,
+    enabled: isAdminOrManager || isEditor,
   });
 
   const { data: ledgerEntries = [], isLoading: ledgerLoading, refetch: refetchLedger } = useQuery({

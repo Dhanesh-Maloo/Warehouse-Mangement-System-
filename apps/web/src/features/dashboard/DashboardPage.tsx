@@ -234,7 +234,10 @@ function DemoPanel() {
 export function DashboardPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const clientId = user?.role === 'client_user' ? (user.clientId ?? undefined) : undefined;
+  const clientId =
+    user?.role === 'client_user' || user?.role === 'editor'
+      ? (user.clientId ?? undefined)
+      : undefined;
 
   const summaryParams = clientId ? `?clientId=${clientId}` : '';
 

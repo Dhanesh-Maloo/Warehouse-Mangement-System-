@@ -56,13 +56,15 @@ export class LedgerController {
   constructor(private readonly ledgerService: LedgerService) {}
 
   @Get()
-  @Roles('admin', 'manager', 'client_user')
+  @Roles('admin', 'manager', 'client_user', 'editor')
   async findMany(
     @Query() query: LedgerQueryDto,
     @CurrentUser() user: JwtPayload,
   ): Promise<(EventLedger & { asset: { id: string; serialNumber: string; assetTag: string | null; model: string } })[]> {
     const effectiveClientId =
-      user.role === 'client_user' ? (user.clientId ?? undefined) : query.clientId;
+      user.role === 'client_user' || user.role === 'editor'
+        ? (user.clientId ?? undefined)
+        : query.clientId;
 
     // When toDate is a date-only string (YYYY-MM-DD), new Date() parses it as
     // midnight UTC — that's 5:30am IST, so events later that day get cut off.

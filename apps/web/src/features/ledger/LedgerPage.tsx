@@ -34,7 +34,10 @@ export function LedgerPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
-  const clientId = user?.role === 'client_user' ? (user.clientId ?? undefined) : undefined;
+  const clientId =
+    user?.role === 'client_user' || user?.role === 'editor'
+      ? (user.clientId ?? undefined)
+      : undefined;
 
   const now = new Date();
   const [fromDate, setFromDate] = useState(

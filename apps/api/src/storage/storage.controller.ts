@@ -14,30 +14,34 @@ export class StorageController {
   /**
    * GET /storage/summary
    * Returns current in-storage device counts and projected monthly cost.
-   * client_user is forced to their own clientId; admin/manager/operator may pass ?clientId=.
+   * client_user/editor are forced to their own clientId; admin/manager/operator may pass ?clientId=.
    */
   @Get('summary')
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   getSummary(
     @Query('clientId') clientId?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<StorageService['getStorageSummary']> {
     const effectiveClientId =
-      user?.role === 'client_user' ? (user.clientId ?? '') : (clientId ?? '');
+      user?.role === 'client_user' || user?.role === 'editor'
+        ? (user.clientId ?? '')
+        : (clientId ?? '');
     return this.storageService.getStorageSummary(effectiveClientId);
   }
 
   /**
    * GET /storage/accrual-runs
    * Returns recent accrual run history. Optionally filter by ?clientId=.
-   * Restricted to admin and manager.
+   * editor is forced to their own clientId; admin/manager may pass ?clientId=.
    */
   @Get('accrual-runs')
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'editor')
   getAccrualRuns(
     @Query('clientId') clientId?: string,
+    @CurrentUser() user?: JwtPayload,
   ): ReturnType<StorageService['getAccrualRuns']> {
-    return this.storageService.getAccrualRuns(clientId);
+    const effectiveClientId = user?.role === 'editor' ? (user.clientId ?? undefined) : clientId;
+    return this.storageService.getAccrualRuns(effectiveClientId);
   }
 
   /**
