@@ -14,24 +14,26 @@ export class DeploymentController {
   constructor(private readonly deploymentService: DeploymentService) {}
 
   @Get()
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   findAll(
     @Query('clientId') clientId?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<DeploymentService['findAll']> {
     const effectiveClientId =
-      user?.role === 'client_user' ? (user.clientId ?? undefined) : clientId;
+      user?.role === 'client_user' || user?.role === 'editor'
+        ? (user.clientId ?? undefined)
+        : clientId;
     return this.deploymentService.findAll(effectiveClientId);
   }
 
   @Get(':id')
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   findOne(@Param('id') id: string): ReturnType<DeploymentService['findOne']> {
     return this.deploymentService.findOne(id);
   }
 
   @Post()
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   create(
     @Body() dto: CreateDeploymentOrderDto,
     @CurrentUser() user: JwtPayload,
@@ -40,7 +42,7 @@ export class DeploymentController {
   }
 
   @Patch(':id/status')
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateDeploymentStatusDto,
@@ -50,7 +52,7 @@ export class DeploymentController {
   }
 
   @Patch(':id/zone')
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   updateZone(
     @Param('id') id: string,
     @Body('courierZone') courierZone: 'intra_state' | 'inter_state' | 'rural',
@@ -60,7 +62,7 @@ export class DeploymentController {
   }
 
   @Patch(':id/tracking')
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   updateTracking(
     @Param('id') id: string,
     @Body('trackingNumber') trackingNumber: string,

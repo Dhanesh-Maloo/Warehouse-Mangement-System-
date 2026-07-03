@@ -36,25 +36,27 @@ export class InspectionsController {
   ) {}
 
   @Get()
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   findAll(
     @Query('clientId') clientId?: string,
     @Query('status') status?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<InspectionsService['findAll']> {
     const effectiveClientId =
-      user?.role === 'client_user' ? (user.clientId ?? undefined) : clientId;
+      user?.role === 'client_user' || user?.role === 'editor'
+        ? (user.clientId ?? undefined)
+        : clientId;
     return this.inspectionsService.findAll(effectiveClientId, status);
   }
 
   @Get(':id')
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   findOne(@Param('id') id: string): ReturnType<InspectionsService['findOne']> {
     return this.inspectionsService.findOne(id);
   }
 
   @Post()
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   create(
     @Body() dto: CreateInspectionDto,
     @CurrentUser() user: JwtPayload,
@@ -63,7 +65,7 @@ export class InspectionsController {
   }
 
   @Patch(':id/cancel')
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   cancel(
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,
@@ -72,7 +74,7 @@ export class InspectionsController {
   }
 
   @Patch(':id/complete')
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   complete(
     @Param('id') id: string,
     @Body() dto: CompleteInspectionDto,
@@ -82,7 +84,7 @@ export class InspectionsController {
   }
 
   @Post(':id/photos')
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),

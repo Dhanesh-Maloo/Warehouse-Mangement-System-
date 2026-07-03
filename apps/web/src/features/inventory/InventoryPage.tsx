@@ -287,8 +287,16 @@ export function InventoryPage() {
   const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
   const [editFormError, setEditFormError] = useState('');
 
-  const canAdd = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'operator';
-  const canEdit = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'operator';
+  const canAdd =
+    user?.role === 'admin' ||
+    user?.role === 'manager' ||
+    user?.role === 'operator' ||
+    user?.role === 'editor';
+  const canEdit =
+    user?.role === 'admin' ||
+    user?.role === 'manager' ||
+    user?.role === 'operator' ||
+    user?.role === 'editor';
   const needsClientSelect = user?.role === 'admin' || user?.role === 'manager';
 
   const { data: clientsList = [] } = useQuery({
@@ -459,7 +467,10 @@ export function InventoryPage() {
     addMutation.mutate({ ...addForm, effectiveClientId });
   };
 
-  const clientId = user?.role === 'client_user' ? (user.clientId ?? undefined) : undefined;
+  const clientId =
+    user?.role === 'client_user' || user?.role === 'editor'
+      ? (user.clientId ?? undefined)
+      : undefined;
 
   const registerParams = new URLSearchParams();
   if (clientId) registerParams.set('clientId', clientId);

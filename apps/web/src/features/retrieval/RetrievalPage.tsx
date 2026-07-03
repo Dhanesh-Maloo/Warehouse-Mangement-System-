@@ -124,17 +124,20 @@ export function RetrievalPage() {
   const [selectedClientId, setSelectedClientId] = useState('');
 
   const isClientUser = user?.role === 'client_user';
-  const clientId = isClientUser ? (user.clientId ?? undefined) : undefined;
+  const isEditor = user?.role === 'editor';
+  // editors are scoped to their own client like client_users, but can create retrievals
+  const isClientScoped = isClientUser || isEditor;
+  const clientId = isClientScoped ? (user?.clientId ?? undefined) : undefined;
 
   // Fetch clients (admin/manager/operator only)
   const { data: clients = [] } = useQuery({
     queryKey: ['clients-list'],
     queryFn: () => api.get<{ data: Client[] }>('/clients').then((r) => r.data),
-    enabled: !isClientUser,
+    enabled: !isClientScoped,
   });
 
   // Deployed assets for the relevant client
-  const assetClientId = isClientUser ? clientId : selectedClientId;
+  const assetClientId = isClientScoped ? clientId : selectedClientId;
   const { data: deployedAssets = [] } = useQuery({
     queryKey: ['deployed-assets', assetClientId],
     queryFn: async () => {
@@ -180,7 +183,7 @@ export function RetrievalPage() {
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    const cid = isClientUser ? (user.clientId ?? '') : selectedClientId;
+    const cid = isClientScoped ? (user?.clientId ?? '') : selectedClientId;
     createMutation.mutate({
       clientId: cid,
       assetId: form.assetId,
@@ -233,8 +236,8 @@ export function RetrievalPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
           <h2 className="text-base font-semibold text-gray-900">New Retrieval Request</h2>
           <form onSubmit={handleCreate} className="space-y-5">
-            {/* Client selector (admin roles only) */}
-            {!isClientUser && (
+            {/* Client selector (not shown for client-scoped roles) */}
+            {!isClientScoped && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

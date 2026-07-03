@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -42,5 +42,12 @@ export class UsersController {
     @Body('status') status: 'active' | 'suspended',
   ): ReturnType<UsersService['setStatus']> {
     return this.usersService.setStatus(id, status);
+  }
+
+  /** Soft delete — sets status to 'suspended'. Users are never hard-deleted (audit log, created records reference them). */
+  @Delete(':id')
+  @Roles('admin')
+  deactivate(@Param('id') id: string): ReturnType<UsersService['setStatus']> {
+    return this.usersService.setStatus(id, 'suspended');
   }
 }

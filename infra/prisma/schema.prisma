@@ -19,6 +19,8 @@ enum UserRole {
   manager
   admin
   client_user
+  // Can create/edit records for their own client only; never delete/deactivate/approve.
+  editor
 }
 
 enum UserStatus {

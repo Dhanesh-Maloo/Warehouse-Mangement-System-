@@ -29,8 +29,8 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   role!: UserRole;
 
-  // Required when role is client_user
-  @ValidateIf((o: CreateUserDto) => o.role === 'client_user')
+  // Required when role is client_user or editor (both are scoped to a single client)
+  @ValidateIf((o: CreateUserDto) => o.role === 'client_user' || o.role === 'editor')
   @IsUUID()
   clientId?: string;
 }

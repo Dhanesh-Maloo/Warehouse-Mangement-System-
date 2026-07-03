@@ -83,8 +83,11 @@ export function DisposalPage() {
   const qc = useQueryClient();
 
   const isClientUser = user?.role === 'client_user';
+  const isEditor = user?.role === 'editor';
+  // editors are scoped to their own client like client_users, but can create disposal requests
+  const isClientScoped = isClientUser || isEditor;
   const isAdminOrManager = user?.role === 'admin' || user?.role === 'manager';
-  const clientId = isClientUser ? (user.clientId ?? undefined) : undefined;
+  const clientId = isClientScoped ? (user?.clientId ?? undefined) : undefined;
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [showForm, setShowForm] = useState(false);
@@ -96,14 +99,14 @@ export function DisposalPage() {
   const [disposalType, setDisposalType] = useState<DisposalType>('non_certified');
   const [notes, setNotes] = useState('');
 
-  const effectiveClientId = isClientUser ? (clientId ?? '') : selectedClientId;
+  const effectiveClientId = isClientScoped ? (clientId ?? '') : selectedClientId;
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
   const { data: clientsList = [] } = useQuery({
     queryKey: ['clients-list-disposal'],
     queryFn: () => api.get<{ data: Client[]; total: number }>('/clients').then((r) => r.data),
-    enabled: !isClientUser,
+    enabled: !isClientScoped,
   });
 
   const { data: assets = [] } = useQuery({
@@ -203,8 +206,8 @@ export function DisposalPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
           <h2 className="text-base font-semibold text-gray-900">New Disposal Request</h2>
           <form onSubmit={handleCreate} className="space-y-5">
-            {/* Client selector (admin/manager only) */}
-            {!isClientUser && (
+            {/* Client selector (not shown for client-scoped roles) */}
+            {!isClientScoped && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Client <span className="text-red-500">*</span>

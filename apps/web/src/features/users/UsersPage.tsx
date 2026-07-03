@@ -24,6 +24,7 @@ const ROLE_COLORS: Record<string, string> = {
   manager: 'bg-purple-100 text-purple-700',
   operator: 'bg-blue-100 text-blue-700',
   client_user: 'bg-gray-100 text-gray-700',
+  editor: 'bg-amber-100 text-amber-700',
 };
 
 const EMPTY = { email: '', password: '', fullName: '', phone: '', role: 'operator', clientId: '' };
@@ -58,7 +59,8 @@ export function UsersPage() {
         fullName: form.fullName,
         phone: form.phone || undefined,
         role: form.role,
-        clientId: form.role === 'client_user' ? form.clientId : undefined,
+        clientId:
+          form.role === 'client_user' || form.role === 'editor' ? form.clientId : undefined,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['users'] });
@@ -169,9 +171,10 @@ export function UsersPage() {
                 <option value="manager">Manager</option>
                 <option value="admin">Admin</option>
                 <option value="client_user">Client user</option>
+                <option value="editor">Editor (add/edit only, no delete — single client)</option>
               </select>
             </div>
-            {form.role === 'client_user' && (
+            {(form.role === 'client_user' || form.role === 'editor') && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Client <span className="text-red-500">*</span>

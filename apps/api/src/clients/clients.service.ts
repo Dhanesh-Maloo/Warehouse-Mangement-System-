@@ -72,4 +72,21 @@ export class ClientsService {
     });
     return client;
   }
+
+  /** Soft-delete: sets isActive = false. Never a hard delete — history stays intact. */
+  async deactivate(id: string): Promise<Client> {
+    await this.findOne(id);
+    const client = await this.prisma.client.update({
+      where: { id },
+      data: { isActive: false },
+    });
+    await this.audit.log({
+      userId: 'system',
+      action: 'client.deactivate',
+      entity: 'Client',
+      entityId: id,
+      newValue: { isActive: false },
+    });
+    return client;
+  }
 }

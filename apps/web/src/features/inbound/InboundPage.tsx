@@ -42,7 +42,10 @@ export function InboundPage() {
   const [items, setItems] = useState<DeliveryItem[]>([{ ...EMPTY_ITEM }]);
 
   const isClientUser = user?.role === 'client_user';
-  const clientId = isClientUser ? (user.clientId ?? undefined) : undefined;
+  const isEditor = user?.role === 'editor';
+  // editors are scoped to their own client like client_users, but can create deliveries
+  const isClientScoped = isClientUser || isEditor;
+  const clientId = isClientScoped ? (user?.clientId ?? undefined) : undefined;
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients-list'],
@@ -50,7 +53,7 @@ export function InboundPage() {
       const res = await api.get<{ data: Client[] }>('/clients');
       return res.data;
     },
-    enabled: !isClientUser,
+    enabled: !isClientScoped,
   });
 
   const { data: deliveries = [], isLoading } = useQuery({
@@ -98,7 +101,7 @@ export function InboundPage() {
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    const cid = isClientUser ? (user.clientId ?? '') : selectedClientId;
+    const cid = isClientScoped ? (user?.clientId ?? '') : selectedClientId;
     createMutation.mutate({
       clientId: cid,
       purchaseOrderRef: poRef,
@@ -132,7 +135,7 @@ export function InboundPage() {
           <h2 className="text-base font-semibold text-gray-900">Log expected delivery</h2>
           <form onSubmit={handleCreate} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {!isClientUser && (
+              {!isClientScoped && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Client <span className="text-red-500">*</span>

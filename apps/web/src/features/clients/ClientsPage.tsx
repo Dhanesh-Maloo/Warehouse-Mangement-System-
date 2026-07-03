@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Building2, Plus, X, Pencil } from 'lucide-react';
+import { Building2, Plus, X, Pencil, Trash2 } from 'lucide-react';
 
 interface Client {
   id: string;
@@ -36,6 +36,7 @@ export function ClientsPage() {
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [formError, setFormError] = useState('');
+  const [confirmDeactivate, setConfirmDeactivate] = useState<Client | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['clients'],
@@ -81,6 +82,15 @@ export function ClientsPage() {
       setShowForm(false);
     },
     onError: (e: Error) => setFormError(e.message),
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: (id: string) => api.del(`/clients/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['clients'] });
+      setConfirmDeactivate(null);
+    },
+    onError: (e: Error) => alert(e.message),
   });
 
   function field(k: keyof typeof form, v: string) {
@@ -162,6 +172,30 @@ export function ClientsPage() {
         </div>
       )}
 
+      {confirmDeactivate && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-5 space-y-3">
+          <p className="text-sm font-medium text-red-800">
+            Deactivate <strong>{confirmDeactivate.name}</strong>? Their assets, ledger history, and
+            users are kept — this only hides them from active use and cannot be undone from the UI.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => deactivateMutation.mutate(confirmDeactivate.id)}
+              disabled={deactivateMutation.isPending}
+              className="bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 hover:bg-red-700"
+            >
+              {deactivateMutation.isPending ? 'Deactivating…' : 'Yes, deactivate'}
+            </button>
+            <button
+              onClick={() => setConfirmDeactivate(null)}
+              className="text-sm text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="text-sm text-gray-400">Loading…</div>
       ) : (
@@ -188,6 +222,15 @@ export function ClientsPage() {
                       className="p-1 text-gray-400 hover:text-[#E86F2C]"
                     >
                       <Pencil size={14} />
+                    </button>
+                  )}
+                  {isAdmin && c.isActive && (
+                    <button
+                      onClick={() => setConfirmDeactivate(c)}
+                      className="p-1 text-gray-400 hover:text-red-600"
+                      title="Deactivate client"
+                    >
+                      <Trash2 size={14} />
                     </button>
                   )}
                 </div>

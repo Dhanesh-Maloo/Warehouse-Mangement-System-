@@ -15,15 +15,20 @@ export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
   @Post()
-  @Roles('admin', 'manager', 'operator')
-  create(@Body() dto: CreateAssetDto): ReturnType<AssetsService['create']> {
+  @Roles('admin', 'manager', 'operator', 'editor')
+  create(
+    @Body() dto: CreateAssetDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<AssetsService['create']> {
+    // editors can only create assets for their own client
+    const clientId = user.role === 'editor' ? (user.clientId ?? dto.clientId) : dto.clientId;
     return this.assetsService.create({
       serialNumber: dto.serialNumber,
       assetTag: dto.assetTag,
       model: dto.model,
       manufacturer: dto.manufacturer,
       category: dto.category as AssetCategory,
-      clientId: dto.clientId,
+      clientId,
       currentLocationId: dto.currentLocationId,
       conditionGrade: dto.conditionGrade as ConditionGrade | undefined,
       assetCondition: dto.assetCondition as AssetCondition | undefined,
@@ -40,7 +45,7 @@ export class AssetsController {
   }
 
   @Get()
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   findAll(
     @Query('clientId') clientId?: string,
     @Query('category') category?: string,
@@ -50,9 +55,11 @@ export class AssetsController {
     @Query('take') take?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<AssetsService['findAll']> {
-    // client_users can only see their own client's assets
+    // client_users and editors can only see their own client's assets
     const effectiveClientId =
-      user?.role === 'client_user' ? (user.clientId ?? undefined) : clientId;
+      user?.role === 'client_user' || user?.role === 'editor'
+        ? (user.clientId ?? undefined)
+        : clientId;
 
     return this.assetsService.findAll({
       clientId: effectiveClientId,
@@ -65,13 +72,13 @@ export class AssetsController {
   }
 
   @Get(':id')
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   findOne(@Param('id') id: string): ReturnType<AssetsService['findOne']> {
     return this.assetsService.findOne(id);
   }
 
   @Patch(':id')
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateAssetStatusDto,
@@ -80,7 +87,7 @@ export class AssetsController {
   }
 
   @Patch(':id/move')
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   move(
     @Param('id') id: string,
     @Body('locationId') locationId: string,

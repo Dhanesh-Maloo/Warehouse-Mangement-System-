@@ -37,8 +37,11 @@ export function EndUsersPage() {
   const qc = useQueryClient();
   const isAdmin = user?.role === 'admin';
   const isManager = user?.role === 'manager';
+  const isEditor = user?.role === 'editor';
   const isClientUser = user?.role === 'client_user';
-  const canEdit = isAdmin || isManager;
+  // editors are scoped to their own client the same way client_users are, but can add/edit
+  const isClientScoped = isClientUser || isEditor;
+  const canEdit = isAdmin || isManager || isEditor;
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<EndUser | null>(null);
@@ -48,11 +51,11 @@ export function EndUsersPage() {
   const [confirmDeactivate, setConfirmDeactivate] = useState<EndUser | null>(null);
 
   const queryParams = new URLSearchParams();
-  if (isClientUser && user?.clientId) queryParams.set('clientId', user.clientId);
+  if (isClientScoped && user?.clientId) queryParams.set('clientId', user.clientId);
   if (search) queryParams.set('search', search);
 
   const { data: endUsers = [], isLoading } = useQuery({
-    queryKey: ['end-users', isClientUser ? user?.clientId : null, search],
+    queryKey: ['end-users', isClientScoped ? user?.clientId : null, search],
     queryFn: () => api.get<EndUser[]>(`/end-users?${queryParams.toString()}`),
   });
 
@@ -62,11 +65,11 @@ export function EndUsersPage() {
       const r = await api.get<{ data: Client[] }>('/clients');
       return r.data;
     },
-    enabled: !isClientUser && (showForm || canEdit),
+    enabled: !isClientScoped && (showForm || canEdit),
   });
 
   function openCreate() {
-    setForm({ ...EMPTY, clientId: isClientUser ? (user?.clientId ?? '') : '' });
+    setForm({ ...EMPTY, clientId: isClientScoped ? (user?.clientId ?? '') : '' });
     setEditing(null);
     setFormError('');
     setShowForm(true);
@@ -91,7 +94,7 @@ export function EndUsersPage() {
     mutationFn: () => {
       const payload = {
         name: form.name,
-        clientId: isClientUser ? (user?.clientId ?? form.clientId) : form.clientId,
+        clientId: isClientScoped ? (user?.clientId ?? form.clientId) : form.clientId,
         employeeId: form.employeeId || undefined,
         email: form.email || undefined,
         phone: form.phone || undefined,
@@ -174,8 +177,8 @@ export function EndUsersPage() {
               />
             </div>
 
-            {/* Client selector (admins/managers only) */}
-            {!isClientUser && (
+            {/* Client selector (not shown for client-scoped roles) */}
+            {!isClientScoped && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Client <span className="text-red-500">*</span>
@@ -258,7 +261,7 @@ export function EndUsersPage() {
             <button
               onClick={() => saveMutation.mutate()}
               disabled={
-                saveMutation.isPending || !form.name.trim() || (!isClientUser && !form.clientId)
+                saveMutation.isPending || !form.name.trim() || (!isClientScoped && !form.clientId)
               }
               className="bg-[#E86F2C] text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 transition-colors hover:bg-[#D05E1E]"
             >

@@ -13,30 +13,32 @@ export class DisposalController {
   constructor(private readonly disposalService: DisposalService) {}
 
   @Get()
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   findAll(
     @Query('clientId') clientId?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<DisposalService['findAll']> {
     const effectiveClientId =
-      user?.role === 'client_user' ? (user.clientId ?? undefined) : clientId;
+      user?.role === 'client_user' || user?.role === 'editor'
+        ? (user.clientId ?? undefined)
+        : clientId;
     return this.disposalService.findAll(effectiveClientId);
   }
 
   @Get('asset/:assetId')
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   findByAsset(@Param('assetId') assetId: string): ReturnType<DisposalService['findByAsset']> {
     return this.disposalService.findByAsset(assetId);
   }
 
   @Get(':id')
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   findOne(@Param('id') id: string): ReturnType<DisposalService['findOne']> {
     return this.disposalService.findOne(id);
   }
 
   @Post()
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   create(
     @Body() dto: CreateDisposalRequestDto,
     @CurrentUser() user: JwtPayload,
@@ -44,6 +46,7 @@ export class DisposalController {
     return this.disposalService.create(dto, user.sub);
   }
 
+  // Approval is an authority gate, not a plain edit — editors are excluded.
   @Patch(':id/approve')
   @Roles('admin', 'manager')
   approve(
@@ -54,7 +57,7 @@ export class DisposalController {
   }
 
   @Patch(':id/start-processing')
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   startProcessing(
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,
@@ -63,7 +66,7 @@ export class DisposalController {
   }
 
   @Patch(':id/complete')
-  @Roles('admin', 'manager', 'operator')
+  @Roles('admin', 'manager', 'operator', 'editor')
   complete(
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,

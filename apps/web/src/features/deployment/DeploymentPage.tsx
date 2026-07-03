@@ -106,9 +106,13 @@ export function DeploymentPage() {
   const qc = useQueryClient();
 
   const isClientUser = user?.role === 'client_user';
-  const canCreate = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'operator';
+  const isEditor = user?.role === 'editor';
+  // editors are scoped to their own client like client_users, but can create/edit
+  const isClientScoped = isClientUser || isEditor;
+  const canCreate =
+    user?.role === 'admin' || user?.role === 'manager' || user?.role === 'operator' || isEditor;
 
-  const clientId = isClientUser ? (user?.clientId ?? undefined) : undefined;
+  const clientId = isClientScoped ? (user?.clientId ?? undefined) : undefined;
 
   // New deployment form visibility
   const [showForm, setShowForm] = useState(false);
@@ -143,11 +147,11 @@ export function DeploymentPage() {
       const res = await api.get<{ data: Client[] }>('/clients');
       return res.data;
     },
-    enabled: !isClientUser,
+    enabled: !isClientScoped,
   });
 
   // Resolve which clientId to use for assets / end-users / deployment list
-  const activeClientId = isClientUser ? clientId : filterClientId || undefined;
+  const activeClientId = isClientScoped ? clientId : filterClientId || undefined;
 
   const { data: availableAssets = [] } = useQuery({
     queryKey: ['inventory-in-storage', activeClientId],
@@ -258,7 +262,7 @@ export function DeploymentPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormError('');
-    const cid = isClientUser ? (user?.clientId ?? '') : (activeClientId ?? '');
+    const cid = isClientScoped ? (user?.clientId ?? '') : (activeClientId ?? '');
     if (!cid) {
       setFormError('Select a client first.');
       return;
@@ -361,7 +365,7 @@ export function DeploymentPage() {
           <p className="text-sm text-gray-500 mt-1">Pick, pack and dispatch assets to end users</p>
         </div>
         <div className="flex items-center gap-3">
-          {!isClientUser && (
+          {!isClientScoped && (
             <select
               value={filterClientId}
               onChange={(e) => setFilterClientId(e.target.value)}
@@ -411,8 +415,8 @@ export function DeploymentPage() {
           </div>
 
           <form onSubmit={handleCreate} className="space-y-6">
-            {/* Client selector (non client_user) */}
-            {!isClientUser && (
+            {/* Client selector (not shown for client-scoped roles) */}
+            {!isClientScoped && (
               <div className="max-w-sm">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Client <span className="text-red-500">*</span>
@@ -500,7 +504,7 @@ export function DeploymentPage() {
                         <button
                           type="button"
                           onMouseDown={() => {
-                            const cid = isClientUser
+                            const cid = isClientScoped
                               ? (user?.clientId ?? '')
                               : (activeClientId ?? '');
                             if (!cid) {

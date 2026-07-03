@@ -23,36 +23,42 @@ import type { JwtPayload } from '../common/types/jwt-payload.type';
 export class EndUsersController {
   constructor(private readonly endUsersService: EndUsersService) {}
 
-  /** GET /end-users — all roles; client_user is forced to their own clientId */
+  /** GET /end-users — all roles; client_user/editor are forced to their own clientId */
   @Get()
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   findAll(
     @Query('clientId') clientId?: string,
     @Query('search') search?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<EndUsersService['findAll']> {
     const effectiveClientId =
-      user?.role === 'client_user' ? (user.clientId ?? undefined) : clientId;
+      user?.role === 'client_user' || user?.role === 'editor'
+        ? (user.clientId ?? undefined)
+        : clientId;
     return this.endUsersService.findAll(effectiveClientId, search);
   }
 
   /** GET /end-users/:id — all roles */
   @Get(':id')
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor')
   findOne(@Param('id') id: string): ReturnType<EndUsersService['findOne']> {
     return this.endUsersService.findOne(id);
   }
 
-  /** POST /end-users — admin, manager */
+  /** POST /end-users — admin, manager, editor (editor forced to own clientId) */
   @Post()
-  @Roles('admin', 'manager')
-  create(@Body() dto: CreateEndUserDto): ReturnType<EndUsersService['create']> {
+  @Roles('admin', 'manager', 'editor')
+  create(
+    @Body() dto: CreateEndUserDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<EndUsersService['create']> {
+    if (user.role === 'editor' && user.clientId) dto.clientId = user.clientId;
     return this.endUsersService.create(dto);
   }
 
-  /** PATCH /end-users/:id — admin, manager */
+  /** PATCH /end-users/:id — admin, manager, editor */
   @Patch(':id')
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'editor')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateEndUserDto,
