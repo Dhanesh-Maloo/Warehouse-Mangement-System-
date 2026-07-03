@@ -43,6 +43,10 @@ export class DocumentsController {
     private readonly r2: R2Service,
   ) {}
 
+  private static isClientScoped(role: string): boolean {
+    return role === 'client_user' || role === 'editor' || role === 'client_admin';
+  }
+
   @Post('assets/:assetId/documents')
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   @UseInterceptors(pdfInterceptor)
@@ -55,13 +59,22 @@ export class DocumentsController {
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
     const r2Key = `documents/assets/${unique}${extname(file.originalname)}`;
     await this.r2.upload(r2Key, file.buffer, file.mimetype);
-    return this.documentsService.createForAsset(assetId, file, r2Key, user.clientId ?? 'system', user.sub);
+    const requestingClientId = DocumentsController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    return this.documentsService.createForAsset(assetId, file, r2Key, user.sub, requestingClientId);
   }
 
   @Get('assets/:assetId/documents')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
-  listForAsset(@Param('assetId') assetId: string): ReturnType<DocumentsService['findByAsset']> {
-    return this.documentsService.findByAsset(assetId);
+  listForAsset(
+    @Param('assetId') assetId: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DocumentsService['findByAsset']> {
+    const requestingClientId = DocumentsController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    return this.documentsService.findByAsset(assetId, requestingClientId);
   }
 
   @Post('inspections/:inspectionId/documents')
@@ -76,21 +89,41 @@ export class DocumentsController {
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
     const r2Key = `documents/inspections/${unique}${extname(file.originalname)}`;
     await this.r2.upload(r2Key, file.buffer, file.mimetype);
-    return this.documentsService.createForInspection(inspectionId, file, r2Key, user.sub);
+    const requestingClientId = DocumentsController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    return this.documentsService.createForInspection(
+      inspectionId,
+      file,
+      r2Key,
+      user.sub,
+      requestingClientId,
+    );
   }
 
   @Get('inspections/:inspectionId/documents')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   listForInspection(
     @Param('inspectionId') inspectionId: string,
+    @CurrentUser() user: JwtPayload,
   ): ReturnType<DocumentsService['findByInspection']> {
-    return this.documentsService.findByInspection(inspectionId);
+    const requestingClientId = DocumentsController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    return this.documentsService.findByInspection(inspectionId, requestingClientId);
   }
 
   @Get('documents/:id/download')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
-  async download(@Param('id') id: string, @Res() res: Response): Promise<void> {
-    const doc = await this.documentsService.findOne(id);
+  async download(
+    @Param('id') id: string,
+    @Res() res: Response,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<void> {
+    const requestingClientId = DocumentsController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    const doc = await this.documentsService.findOne(id, requestingClientId);
     try {
       const stream = await this.r2.getStream(doc.storagePath);
       res.setHeader('Content-Disposition', `attachment; filename="${doc.originalName}"`);

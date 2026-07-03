@@ -49,8 +49,14 @@ export class DisposalController {
 
   @Get('asset/:assetId')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
-  findByAsset(@Param('assetId') assetId: string): ReturnType<DisposalService['findByAsset']> {
-    return this.disposalService.findByAsset(assetId);
+  findByAsset(
+    @Param('assetId') assetId: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DisposalService['findByAsset']> {
+    const clientId = DisposalController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    return this.disposalService.findByAsset(assetId, clientId);
   }
 
   @Get(':id')

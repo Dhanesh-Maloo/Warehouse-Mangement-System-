@@ -206,9 +206,10 @@ export class RetrievalService {
 
   findByAsset(
     assetId: string,
+    clientId?: string,
   ): Prisma.PrismaPromise<Prisma.RetrievalRequestGetPayload<{ include: { asset: true } }>[]> {
     return this.prisma.retrievalRequest.findMany({
-      where: { assetId },
+      where: clientId ? { assetId, clientId } : { assetId },
       include: { asset: true },
       orderBy: { requestedAt: 'desc' },
     });

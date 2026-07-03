@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -324,6 +325,7 @@ export class InboundService {
 
   async generateGrnPdf(
     grnId: string,
+    requestingClientId?: string,
   ): Promise<{ stream: NodeJS.ReadableStream; filename: string }> {
     const grn = await this.prisma.goodsReceivedNote.findUnique({
       where: { id: grnId },
@@ -347,6 +349,9 @@ export class InboundService {
       },
     });
     if (!grn) throw new NotFoundException(`GRN ${grnId} not found`);
+    if (requestingClientId && grn.expectedDelivery.clientId !== requestingClientId) {
+      throw new ForbiddenException('Cannot download a GRN from another client');
+    }
 
     const displayNumber =
       grn.grnNumber ??

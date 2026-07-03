@@ -204,9 +204,10 @@ export class DisposalService {
 
   findByAsset(
     assetId: string,
+    clientId?: string,
   ): Prisma.PrismaPromise<Prisma.DisposalRequestGetPayload<{ include: { asset: true } }>[]> {
     return this.prisma.disposalRequest.findMany({
-      where: { assetId },
+      where: clientId ? { assetId, clientId } : { assetId },
       include: { asset: true },
       orderBy: { createdAt: 'desc' },
     });

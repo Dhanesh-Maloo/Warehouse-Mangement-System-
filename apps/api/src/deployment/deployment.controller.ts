@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  ForbiddenException,
+} from '@nestjs/common';
 import { DeploymentService } from './deployment.service';
 import { CreateDeploymentOrderDto } from './dto/create-deployment-order.dto';
 import { UpdateDeploymentStatusDto } from './dto/update-deployment-status.dto';
@@ -12,6 +22,18 @@ import type { JwtPayload } from '../common/types/jwt-payload.type';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DeploymentController {
   constructor(private readonly deploymentService: DeploymentService) {}
+
+  private static isClientScoped(role: string): boolean {
+    return role === 'client_user' || role === 'editor' || role === 'client_admin';
+  }
+
+  private async assertOwnsOrder(id: string, user: JwtPayload): Promise<void> {
+    if (!DeploymentController.isClientScoped(user.role)) return;
+    const order = await this.deploymentService.findOne(id);
+    if (order.clientId !== user.clientId) {
+      throw new ForbiddenException('Cannot act on a deployment order from another client');
+    }
+  }
 
   @Get()
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
@@ -28,7 +50,11 @@ export class DeploymentController {
 
   @Get(':id')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
-  findOne(@Param('id') id: string): ReturnType<DeploymentService['findOne']> {
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DeploymentService['findOne']> {
+    await this.assertOwnsOrder(id, user);
     return this.deploymentService.findOne(id);
   }
 
@@ -43,31 +69,34 @@ export class DeploymentController {
 
   @Patch(':id/status')
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
-  updateStatus(
+  async updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateDeploymentStatusDto,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<DeploymentService['updateStatus']> {
+    await this.assertOwnsOrder(id, user);
     return this.deploymentService.updateStatus(id, dto, user.sub);
   }
 
   @Patch(':id/zone')
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
-  updateZone(
+  async updateZone(
     @Param('id') id: string,
     @Body('courierZone') courierZone: 'intra_state' | 'inter_state' | 'rural',
     @CurrentUser() user: JwtPayload,
   ): ReturnType<DeploymentService['updateZone']> {
+    await this.assertOwnsOrder(id, user);
     return this.deploymentService.updateZone(id, courierZone, user.sub);
   }
 
   @Patch(':id/tracking')
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
-  updateTracking(
+  async updateTracking(
     @Param('id') id: string,
     @Body('trackingNumber') trackingNumber: string,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<DeploymentService['updateTracking']> {
+    await this.assertOwnsOrder(id, user);
     return this.deploymentService.updateTracking(id, trackingNumber, user.sub);
   }
 }

@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  ForbiddenException,
+} from '@nestjs/common';
 import { AssetsService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetStatusDto } from './dto/update-asset-status.dto';
@@ -13,6 +23,18 @@ import type { AssetCategory, AssetStatus, AssetCondition, ConditionGrade } from 
 @Controller('assets')
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
+
+  private static isClientScoped(role: string): boolean {
+    return role === 'client_user' || role === 'editor' || role === 'client_admin';
+  }
+
+  private async assertOwnsAsset(id: string, user: JwtPayload): Promise<void> {
+    if (!AssetsController.isClientScoped(user.role)) return;
+    const asset = await this.assetsService.findOne(id);
+    if (asset.clientId !== user.clientId) {
+      throw new ForbiddenException('Cannot act on an asset from another client');
+    }
+  }
 
   @Post()
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
@@ -76,25 +98,33 @@ export class AssetsController {
 
   @Get(':id')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
-  findOne(@Param('id') id: string): ReturnType<AssetsService['findOne']> {
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<AssetsService['findOne']> {
+    await this.assertOwnsAsset(id, user);
     return this.assetsService.findOne(id);
   }
 
   @Patch(':id')
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
-  update(
+  async update(
     @Param('id') id: string,
     @Body() dto: UpdateAssetStatusDto,
+    @CurrentUser() user: JwtPayload,
   ): ReturnType<AssetsService['updateStatus']> {
+    await this.assertOwnsAsset(id, user);
     return this.assetsService.updateStatus(id, dto);
   }
 
   @Patch(':id/move')
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
-  move(
+  async move(
     @Param('id') id: string,
     @Body('locationId') locationId: string,
+    @CurrentUser() user: JwtPayload,
   ): ReturnType<AssetsService['moveLocation']> {
+    await this.assertOwnsAsset(id, user);
     return this.assetsService.moveLocation(id, locationId);
   }
 }

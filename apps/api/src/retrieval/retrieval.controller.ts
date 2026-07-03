@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  ForbiddenException,
+} from '@nestjs/common';
 import { RetrievalService } from './retrieval.service';
 import { CreateRetrievalRequestDto } from './dto/create-retrieval-request.dto';
 import { UpdateRetrievalStatusDto } from './dto/update-retrieval-status.dto';
@@ -12,6 +22,18 @@ import type { JwtPayload } from '../common/types/jwt-payload.type';
 @Controller('retrieval')
 export class RetrievalController {
   constructor(private readonly retrievalService: RetrievalService) {}
+
+  private static isClientScoped(role: string): boolean {
+    return role === 'client_user' || role === 'editor' || role === 'client_admin';
+  }
+
+  private async assertOwnsRetrieval(id: string, user: JwtPayload): Promise<void> {
+    if (!RetrievalController.isClientScoped(user.role)) return;
+    const retrieval = await this.retrievalService.findOne(id);
+    if (retrieval.clientId !== user.clientId) {
+      throw new ForbiddenException('Cannot act on a retrieval request from another client');
+    }
+  }
 
   @Get()
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
@@ -28,13 +50,23 @@ export class RetrievalController {
 
   @Get('asset/:assetId')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
-  findByAsset(@Param('assetId') assetId: string): ReturnType<RetrievalService['findByAsset']> {
-    return this.retrievalService.findByAsset(assetId);
+  findByAsset(
+    @Param('assetId') assetId: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<RetrievalService['findByAsset']> {
+    const clientId = RetrievalController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    return this.retrievalService.findByAsset(assetId, clientId);
   }
 
   @Get(':id')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
-  findOne(@Param('id') id: string): ReturnType<RetrievalService['findOne']> {
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<RetrievalService['findOne']> {
+    await this.assertOwnsRetrieval(id, user);
     return this.retrievalService.findOne(id);
   }
 
@@ -49,11 +81,12 @@ export class RetrievalController {
 
   @Patch(':id/status')
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
-  updateStatus(
+  async updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateRetrievalStatusDto,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<RetrievalService['updateStatus']> {
+    await this.assertOwnsRetrieval(id, user);
     return this.retrievalService.updateStatus(id, dto, user.sub);
   }
 }

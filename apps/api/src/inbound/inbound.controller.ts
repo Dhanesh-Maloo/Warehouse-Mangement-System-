@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  Res,
+  UseGuards,
+  ForbiddenException,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { InboundService } from './inbound.service';
 import { CreateExpectedDeliveryDto } from './dto/create-expected-delivery.dto';
@@ -13,6 +24,18 @@ import type { JwtPayload } from '../common/types/jwt-payload.type';
 @Controller('inbound')
 export class InboundController {
   constructor(private readonly inboundService: InboundService) {}
+
+  private static isClientScoped(role: string): boolean {
+    return role === 'client_user' || role === 'editor' || role === 'client_admin';
+  }
+
+  private async assertOwnsDelivery(id: string, user: JwtPayload): Promise<void> {
+    if (!InboundController.isClientScoped(user.role)) return;
+    const delivery = await this.inboundService.findOneDelivery(id);
+    if (delivery.clientId !== user.clientId) {
+      throw new ForbiddenException('Cannot act on a delivery from another client');
+    }
+  }
 
   @Get('deliveries')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
@@ -30,7 +53,11 @@ export class InboundController {
 
   @Get('deliveries/:id')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
-  findOneDelivery(@Param('id') id: string): ReturnType<InboundService['findOneDelivery']> {
+  async findOneDelivery(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<InboundService['findOneDelivery']> {
+    await this.assertOwnsDelivery(id, user);
     return this.inboundService.findOneDelivery(id);
   }
 
@@ -56,11 +83,12 @@ export class InboundController {
 
   @Patch('deliveries/:id/status')
   @Roles('admin', 'manager', 'editor', 'client_admin')
-  updateDeliveryStatus(
+  async updateDeliveryStatus(
     @Param('id') id: string,
     @Body('status') status: 'pending' | 'partially_received' | 'completed' | 'cancelled',
     @CurrentUser() user: JwtPayload,
   ): ReturnType<InboundService['updateDeliveryStatus']> {
+    await this.assertOwnsDelivery(id, user);
     return this.inboundService.updateDeliveryStatus(id, status, user.sub);
   }
 
@@ -79,8 +107,15 @@ export class InboundController {
 
   @Get('grns/:id/pdf')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
-  async downloadGrnPdf(@Param('id') id: string, @Res() res: Response): Promise<void> {
-    const { stream, filename } = await this.inboundService.generateGrnPdf(id);
+  async downloadGrnPdf(
+    @Param('id') id: string,
+    @Res() res: Response,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<void> {
+    const requestingClientId = InboundController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    const { stream, filename } = await this.inboundService.generateGrnPdf(id, requestingClientId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     stream.pipe(res);

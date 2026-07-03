@@ -14,8 +14,8 @@ export class DocumentsService {
     assetId: string,
     file: Express.Multer.File,
     r2Key: string,
-    clientId: string,
     uploadedByUserId: string,
+    requestingClientId?: string,
     inspectionId?: string,
   ): Promise<
     Prisma.AssetDocumentGetPayload<{
@@ -24,12 +24,15 @@ export class DocumentsService {
   > {
     const asset = await this.prisma.asset.findUnique({ where: { id: assetId } });
     if (!asset) throw new NotFoundException(`Asset ${assetId} not found`);
+    if (requestingClientId && asset.clientId !== requestingClientId) {
+      throw new ForbiddenException('Cannot upload a document for an asset from another client');
+    }
 
     return this.prisma.assetDocument.create({
       data: {
         assetId,
         inspectionId: inspectionId ?? null,
-        clientId,
+        clientId: asset.clientId,
         originalName: file.originalname,
         storagePath: r2Key,
         mimeType: file.mimetype,
@@ -45,6 +48,7 @@ export class DocumentsService {
     file: Express.Multer.File,
     r2Key: string,
     uploadedByUserId: string,
+    requestingClientId?: string,
   ): Promise<
     Prisma.AssetDocumentGetPayload<{
       include: { uploadedBy: { select: { id: true; fullName: true } } };
@@ -55,6 +59,11 @@ export class DocumentsService {
       select: { assetId: true, asset: { select: { clientId: true } } },
     });
     if (!inspection) throw new NotFoundException(`Inspection ${inspectionId} not found`);
+    if (requestingClientId && inspection.asset.clientId !== requestingClientId) {
+      throw new ForbiddenException(
+        'Cannot upload a document for an inspection from another client',
+      );
+    }
     return this.prisma.assetDocument.create({
       data: {
         assetId: inspection.assetId,
@@ -70,11 +79,20 @@ export class DocumentsService {
     });
   }
 
-  async findByAsset(assetId: string): Promise<
+  async findByAsset(
+    assetId: string,
+    requestingClientId?: string,
+  ): Promise<
     Prisma.AssetDocumentGetPayload<{
       include: { uploadedBy: { select: { id: true; fullName: true } } };
     }>[]
   > {
+    if (requestingClientId) {
+      const asset = await this.prisma.asset.findUnique({ where: { id: assetId } });
+      if (asset && asset.clientId !== requestingClientId) {
+        throw new ForbiddenException('Cannot view documents for an asset from another client');
+      }
+    }
     return this.prisma.assetDocument.findMany({
       where: { assetId },
       include: { uploadedBy: { select: { id: true, fullName: true } } },
@@ -82,11 +100,23 @@ export class DocumentsService {
     });
   }
 
-  async findByInspection(inspectionId: string): Promise<
+  async findByInspection(
+    inspectionId: string,
+    requestingClientId?: string,
+  ): Promise<
     Prisma.AssetDocumentGetPayload<{
       include: { uploadedBy: { select: { id: true; fullName: true } } };
     }>[]
   > {
+    if (requestingClientId) {
+      const inspection = await this.prisma.inspection.findUnique({
+        where: { id: inspectionId },
+        select: { asset: { select: { clientId: true } } },
+      });
+      if (inspection && inspection.asset.clientId !== requestingClientId) {
+        throw new ForbiddenException('Cannot view documents for an inspection from another client');
+      }
+    }
     return this.prisma.assetDocument.findMany({
       where: { inspectionId },
       include: { uploadedBy: { select: { id: true, fullName: true } } },
@@ -94,9 +124,15 @@ export class DocumentsService {
     });
   }
 
-  async findOne(id: string): Promise<import('@prisma/client').AssetDocument> {
+  async findOne(
+    id: string,
+    requestingClientId?: string,
+  ): Promise<import('@prisma/client').AssetDocument> {
     const doc = await this.prisma.assetDocument.findUnique({ where: { id } });
     if (!doc) throw new NotFoundException(`Document ${id} not found`);
+    if (requestingClientId && doc.clientId !== requestingClientId) {
+      throw new ForbiddenException('Cannot access a document from another client');
+    }
     return doc;
   }
 

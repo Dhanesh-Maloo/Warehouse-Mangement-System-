@@ -12,6 +12,7 @@ import {
   UploadedFile,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -35,6 +36,18 @@ export class InspectionsController {
     private readonly r2: R2Service,
   ) {}
 
+  private static isClientScoped(role: string): boolean {
+    return role === 'client_user' || role === 'editor' || role === 'client_admin';
+  }
+
+  private async assertOwnsInspection(id: string, user: JwtPayload): Promise<void> {
+    if (!InspectionsController.isClientScoped(user.role)) return;
+    const inspection = await this.inspectionsService.findOne(id);
+    if (inspection.asset.clientId !== user.clientId) {
+      throw new ForbiddenException('Cannot act on an inspection from another client');
+    }
+  }
+
   @Get()
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(
@@ -51,7 +64,11 @@ export class InspectionsController {
 
   @Get(':id')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
-  findOne(@Param('id') id: string): ReturnType<InspectionsService['findOne']> {
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<InspectionsService['findOne']> {
+    await this.assertOwnsInspection(id, user);
     return this.inspectionsService.findOne(id);
   }
 
@@ -66,20 +83,22 @@ export class InspectionsController {
 
   @Patch(':id/cancel')
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
-  cancel(
+  async cancel(
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<InspectionsService['cancel']> {
+    await this.assertOwnsInspection(id, user);
     return this.inspectionsService.cancel(id, user.sub);
   }
 
   @Patch(':id/complete')
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
-  complete(
+  async complete(
     @Param('id') id: string,
     @Body() dto: CompleteInspectionDto,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<InspectionsService['complete']> {
+    await this.assertOwnsInspection(id, user);
     return this.inspectionsService.complete(id, dto, user.sub);
   }
 
@@ -101,8 +120,10 @@ export class InspectionsController {
   async uploadPhoto(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: JwtPayload,
   ): Promise<{ key: string }> {
     if (!file) throw new BadRequestException('No file uploaded');
+    await this.assertOwnsInspection(id, user);
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
     const key = `inspections/${id}/${unique}${extname(file.originalname)}`;
     await this.r2.upload(key, file.buffer, file.mimetype);
@@ -110,12 +131,14 @@ export class InspectionsController {
   }
 
   @Get('photos/:inspectionId/:filename')
-  @Roles('admin', 'manager', 'operator', 'client_user')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   async servePhoto(
     @Param('inspectionId') inspectionId: string,
     @Param('filename') filename: string,
     @Res() res: Response,
+    @CurrentUser() user: JwtPayload,
   ): Promise<void> {
+    await this.assertOwnsInspection(inspectionId, user);
     const key = `inspections/${inspectionId}/${filename}`;
     try {
       const stream = await this.r2.getStream(key);
