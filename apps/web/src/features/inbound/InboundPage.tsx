@@ -67,6 +67,7 @@ export function InboundPage() {
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       api.patch(`/inbound/deliveries/${id}/status`, { status }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['inbound-deliveries'] }),
+    onError: (e: Error) => alert(e.message),
   });
 
   const filteredDeliveries = deliveries.filter((d) => {

@@ -180,6 +180,7 @@ export function RetrievalPage() {
       void qc.invalidateQueries({ queryKey: ['assets'] });
       void qc.invalidateQueries({ queryKey: ['inventory-summary'] });
     },
+    onError: (e: Error) => alert(e.message),
   });
 
   function handleCreate(e: React.FormEvent) {

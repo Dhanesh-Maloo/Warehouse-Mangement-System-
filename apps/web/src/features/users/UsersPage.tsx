@@ -83,6 +83,7 @@ export function UsersPage() {
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       api.patch(`/users/${id}/status`, { status }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['users'] }),
+    onError: (e: Error) => alert(e.message),
   });
 
   function field(k: keyof typeof form, v: string) {

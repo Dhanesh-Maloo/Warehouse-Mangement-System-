@@ -116,7 +116,9 @@ export function DisposalPage() {
     queryFn: async () => {
       const params = new URLSearchParams({ status: 'in_storage' });
       if (effectiveClientId) params.set('clientId', effectiveClientId);
-      const res = await api.get<{ data: InventoryAsset[]; total: number }>(`/assets?${params.toString()}`);
+      const res = await api.get<{ data: InventoryAsset[]; total: number }>(
+        `/assets?${params.toString()}`,
+      );
       return res.data;
     },
     enabled: showForm && !!effectiveClientId,
@@ -150,6 +152,13 @@ export function DisposalPage() {
       void qc.invalidateQueries({ queryKey: ['assets'] });
       void qc.invalidateQueries({ queryKey: ['inventory-summary'] });
       setConfirmApproveId(null);
+    },
+  });
+
+  const startProcessingMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/disposal/${id}/start-processing`, {}),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['disposal-requests'] });
     },
   });
 
@@ -432,6 +441,20 @@ export function DisposalPage() {
                           <option value="pending">Pending</option>
                           <option value="approved">Approved</option>
                         </select>
+                      ) : d.status === 'approved' ? (
+                        <select
+                          defaultValue="approved"
+                          onChange={(e) => {
+                            if (e.target.value === 'in_progress')
+                              startProcessingMutation.mutate(d.id);
+                            e.target.value = 'approved';
+                          }}
+                          disabled={startProcessingMutation.isPending}
+                          className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white disabled:opacity-50"
+                        >
+                          <option value="approved">Approved</option>
+                          <option value="in_progress">Start Processing</option>
+                        </select>
                       ) : d.status === 'in_progress' ? (
                         <select
                           defaultValue="in_progress"
@@ -477,7 +500,12 @@ export function DisposalPage() {
         </div>
       )}
 
-      {/* Completion error toast (inline) */}
+      {/* Start-processing / completion error toasts (inline) */}
+      {startProcessingMutation.error && (
+        <p className="text-sm text-red-600">
+          Start processing failed: {(startProcessingMutation.error as Error).message}
+        </p>
+      )}
       {completeMutation.error && (
         <p className="text-sm text-red-600">
           Complete failed: {(completeMutation.error as Error).message}

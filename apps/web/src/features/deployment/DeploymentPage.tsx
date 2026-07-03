@@ -137,7 +137,9 @@ export function DeploymentPage() {
   const [statusError, setStatusError] = useState('');
 
   // Inline tracking number editing
-  const [editingTracking, setEditingTracking] = useState<{ orderId: string; value: string } | null>(null);
+  const [editingTracking, setEditingTracking] = useState<{ orderId: string; value: string } | null>(
+    null,
+  );
 
   // Filter / search client (admin view)
   const [filterClientId, setFilterClientId] = useState('');
@@ -246,9 +248,15 @@ export function DeploymentPage() {
   });
 
   const zoneMutation = useMutation({
-    mutationFn: ({ id, courierZone }: { id: string; courierZone: DeploymentOrder['courierZone'] }) =>
-      api.patch(`/deployment/${id}/zone`, { courierZone }),
+    mutationFn: ({
+      id,
+      courierZone,
+    }: {
+      id: string;
+      courierZone: DeploymentOrder['courierZone'];
+    }) => api.patch(`/deployment/${id}/zone`, { courierZone }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['deployment-orders'] }),
+    onError: (e: Error) => alert(e.message),
   });
 
   const trackingMutation = useMutation({
@@ -258,6 +266,7 @@ export function DeploymentPage() {
       void qc.invalidateQueries({ queryKey: ['deployment-orders'] });
       setEditingTracking(null);
     },
+    onError: (e: Error) => alert(e.message),
   });
 
   // ---------------------------------------------------------------------------
@@ -281,9 +290,7 @@ export function DeploymentPage() {
     let resolvedEndUserId = form.endUserId || undefined;
     const typedName = endUserInput.trim();
     if (typedName && !resolvedEndUserId) {
-      const match = endUsers.find(
-        (eu) => eu.name.toLowerCase() === typedName.toLowerCase(),
-      );
+      const match = endUsers.find((eu) => eu.name.toLowerCase() === typedName.toLowerCase());
       if (match) {
         resolvedEndUserId = match.id;
       } else {
@@ -870,7 +877,9 @@ export function DeploymentPage() {
                           }
                           onChange={(e) =>
                             setEditingTracking((prev) =>
-                              prev?.orderId === order.id ? { ...prev, value: e.target.value } : prev,
+                              prev?.orderId === order.id
+                                ? { ...prev, value: e.target.value }
+                                : prev,
                             )
                           }
                           onBlur={() => {
@@ -930,9 +939,7 @@ export function DeploymentPage() {
                             >
                               Cancel
                             </button>
-                            {statusError && (
-                              <p className="text-xs text-red-600">{statusError}</p>
-                            )}
+                            {statusError && <p className="text-xs text-red-600">{statusError}</p>}
                           </div>
                         ) : null}
                       </td>
