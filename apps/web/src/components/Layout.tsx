@@ -81,7 +81,7 @@ const navGroups: NavGroup[] = [
   },
   {
     group: 'Help',
-    items: [{ to: '/help', label: 'How to Use', icon: HelpCircle }],
+    items: [{ to: '/help', label: 'User Manual', icon: HelpCircle }],
   },
 ];
 

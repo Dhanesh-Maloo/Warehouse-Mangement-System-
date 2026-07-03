@@ -458,7 +458,7 @@ export function HelpPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">How to Use</h1>
+        <h1 className="text-2xl font-bold text-gray-900">User Manual</h1>
         <p className="text-sm text-gray-500 mt-1">
           A complete guide to every module and every role in IValue WMS.
         </p>
