@@ -418,7 +418,20 @@ export function InventoryPage() {
     },
   });
 
+  // Transitions into these statuses must go through their dedicated workflow
+  // endpoints (deployment/retrieval/disposal) so ledger entries, order records,
+  // and — for disposal — the approval gate aren't bypassed by a bare status patch.
+  const WORKFLOW_STATUS_ROUTES: Record<string, string> = {
+    deployed: '/deployment',
+    returning: '/retrieval',
+    disposed: '/disposal',
+  };
+
   function handleInlineSave(assetId: string, field: string, value: string) {
+    if (field === 'currentStatus' && value in WORKFLOW_STATUS_ROUTES) {
+      navigate(WORKFLOW_STATUS_ROUTES[value]);
+      return;
+    }
     setSavingCells((prev) => new Set(prev).add(`${assetId}:${field}`));
     const patch: Record<string, unknown> =
       field === 'hasCertification'

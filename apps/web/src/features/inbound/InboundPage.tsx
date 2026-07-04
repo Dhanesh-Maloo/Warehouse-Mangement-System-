@@ -352,8 +352,13 @@ export function InboundPage() {
                         onClick={(e) => e.stopPropagation()}
                         onChange={(e) => {
                           e.stopPropagation();
-                          const newStatus = e.target.value === 'completed' ? 'completed' : 'pending';
-                          statusChangeMutation.mutate({ id: d.id, status: newStatus });
+                          if (e.target.value === 'completed') {
+                            // Marking a delivery "Received" must go through the
+                            // receive-devices flow so assets/GRN/ledger entries get created.
+                            navigate(`/inbound/${d.id}/receive`);
+                            return;
+                          }
+                          statusChangeMutation.mutate({ id: d.id, status: 'pending' });
                         }}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#E86F2C] appearance-none pr-6 ${
                           d.status === 'completed'
