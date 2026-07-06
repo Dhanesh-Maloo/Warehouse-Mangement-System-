@@ -22,9 +22,12 @@ import { EndUsersPage } from './features/end-users/EndUsersPage';
 import { DeploymentPage } from './features/deployment';
 import { RetrievalPage } from './features/retrieval';
 import { DisposalPage } from './features/disposal';
+import { RepairPage } from './features/repair';
+import { ResalePage } from './features/resale/ResalePage';
 import { BillingPage } from './features/billing';
 import { AuditLogPage } from './features/audit/AuditLogPage';
 import { HelpPage } from './features/help';
+import { RuralPincodesPage } from './features/logistics/RuralPincodesPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -67,8 +70,11 @@ export function App() {
                 <Route path="deployment" element={<DeploymentPage />} />
                 <Route path="retrieval" element={<RetrievalPage />} />
                 <Route path="disposal" element={<DisposalPage />} />
+                <Route path="repair" element={<RepairPage />} />
+                <Route path="resale" element={<ResalePage />} />
                 <Route path="billing" element={<BillingPage />} />
                 <Route path="audit-log" element={<AuditLogPage />} />
+                <Route path="rural-pincodes" element={<RuralPincodesPage />} />
                 <Route path="help" element={<HelpPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

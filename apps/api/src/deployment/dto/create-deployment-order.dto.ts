@@ -53,9 +53,6 @@ export class CreateDeploymentOrderDto {
   @IsString()
   contactPhone!: string;
 
-  @IsEnum(['intra_state', 'inter_state', 'rural'])
-  courierZone!: 'intra_state' | 'inter_state' | 'rural';
-
   @IsOptional()
   @IsBoolean()
   requiresLabeling?: boolean = false;

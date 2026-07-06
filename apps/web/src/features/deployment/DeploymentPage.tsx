@@ -91,7 +91,6 @@ const EMPTY_FORM = {
   addrPincode: '',
   contactName: '',
   contactPhone: '',
-  courierZone: 'intra_state' as DeploymentOrder['courierZone'],
   requiresLabeling: false,
   requiresRepacking: false,
   notes: '',
@@ -190,6 +189,20 @@ export function DeploymentPage() {
       if (activeClientId) params.set('clientId', activeClientId);
       return api.get<DeploymentOrder[]>(`/deployment?${params.toString()}`);
     },
+  });
+
+  // Courier zone is derived server-side from the delivery pincode. This is a
+  // read-only preview for the cost estimate — the backend re-resolves it
+  // authoritatively when the order is created.
+  const pincode = form.addrPincode.trim();
+  const { data: zonePreview } = useQuery({
+    queryKey: ['courier-zone-preview', pincode],
+    queryFn: () =>
+      api.get<'intra_state' | 'inter_state' | 'rural'>(
+        `/logistics/resolve-zone?pincode=${encodeURIComponent(pincode)}`,
+      ),
+    enabled: showForm && /^\d{6}$/.test(pincode),
+    retry: false,
   });
 
   // ---------------------------------------------------------------------------
@@ -319,7 +332,6 @@ export function DeploymentPage() {
       },
       contactName: form.contactName,
       contactPhone: form.contactPhone,
-      courierZone: form.courierZone,
       requiresLabeling: form.requiresLabeling,
       requiresRepacking: form.requiresRepacking,
       notes: form.notes || undefined,
@@ -351,9 +363,9 @@ export function DeploymentPage() {
   function estimatedCost(): string {
     let paise = 0;
     paise += form.bundleType === 'standard' ? 12800 : 38000;
-    if (form.courierZone === 'intra_state') paise += 150000;
-    else if (form.courierZone === 'inter_state') paise += 250000;
-    else paise += 320000;
+    if (zonePreview === 'intra_state') paise += 150000;
+    else if (zonePreview === 'inter_state') paise += 250000;
+    else if (zonePreview === 'rural') paise += 320000;
     if (form.requiresLabeling) paise += 4800;
     if (form.requiresRepacking) paise += 14000;
     const rupees = paise / 100;
@@ -664,21 +676,24 @@ export function DeploymentPage() {
               </div>
             </div>
 
-            {/* Courier zone */}
+            {/* Courier zone — auto-derived from the delivery pincode */}
             <div className="max-w-sm">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Courier zone <span className="text-red-500">*</span>
-              </label>
-              <select
-                required
-                value={form.courierZone}
-                onChange={(e) => f('courierZone', e.target.value as DeploymentOrder['courierZone'])}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
-              >
-                <option value="intra_state">Intra-state City — ₹1,500</option>
-                <option value="inter_state">Inter-state — ₹2,500</option>
-                <option value="rural">Rural — ₹3,200</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Courier zone</label>
+              <div className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700">
+                {!/^\d{6}$/.test(pincode)
+                  ? 'Enter a 6-digit PIN code above to determine the zone'
+                  : zonePreview === 'intra_state'
+                    ? 'Intra-state City — ₹1,500'
+                    : zonePreview === 'inter_state'
+                      ? 'Inter-state — ₹2,500'
+                      : zonePreview === 'rural'
+                        ? 'Rural — ₹3,200'
+                        : 'Resolving…'}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Automatically determined from the PIN code. Can be corrected after the order is
+                created if misclassified.
+              </p>
             </div>
 
             {/* Add-ons */}

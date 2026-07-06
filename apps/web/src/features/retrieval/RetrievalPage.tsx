@@ -21,6 +21,12 @@ interface InventoryAsset {
   category: string;
 }
 
+interface EndUser {
+  id: string;
+  name: string;
+  clientId: string;
+}
+
 type RetrievalStatus =
   | 'pending'
   | 'initiated'
@@ -50,6 +56,9 @@ interface RetrievalRequest {
   courierZone: CourierZone;
   bundleType: BundleType;
   requiresPostInspection: boolean;
+  requiresWipe: boolean;
+  requiresRedeploySetup: boolean;
+  damageFound: boolean | null;
   notes?: string;
   trackingNumber?: string;
   status: RetrievalStatus;
@@ -106,8 +115,16 @@ const EMPTY_FORM = {
   pincode: '',
   contactName: '',
   contactPhone: '',
-  courierZone: 'intra_state' as CourierZone,
   requiresPostInspection: false,
+  requiresWipe: false,
+  requiresRedeploySetup: false,
+  redeployEndUserId: '',
+  redeployAddressLine1: '',
+  redeployCity: '',
+  redeployState: '',
+  redeployPincode: '',
+  redeployContactName: '',
+  redeployContactPhone: '',
   notes: '',
 };
 
@@ -150,11 +167,29 @@ export function RetrievalPage() {
     enabled: showForm && !!assetClientId,
   });
 
+  // End users for the relevant client — only needed to pick a Full Cycle redeploy destination
+  const { data: endUsers = [] } = useQuery({
+    queryKey: ['end-users', assetClientId],
+    queryFn: () => api.get<EndUser[]>(`/end-users?clientId=${assetClientId}`),
+    enabled: showForm && form.bundleType === 'full_cycle' && !!assetClientId,
+  });
+
   // Retrieval requests list
   const { data: retrievals = [], isLoading } = useQuery({
     queryKey: ['retrieval-requests', clientId],
     queryFn: () =>
       api.get<RetrievalRequest[]>(`/retrieval${clientId ? `?clientId=${clientId}` : ''}`),
+  });
+
+  // Courier zone is derived server-side from the pickup pincode. This is a
+  // read-only preview for the cost estimate — the backend re-resolves it
+  // authoritatively when the request is created.
+  const { data: zonePreview } = useQuery({
+    queryKey: ['courier-zone-preview', form.pincode],
+    queryFn: () =>
+      api.get<CourierZone>(`/logistics/resolve-zone?pincode=${encodeURIComponent(form.pincode)}`),
+    enabled: showForm && /^\d{6}$/.test(form.pincode),
+    retry: false,
   });
 
   // Create mutation
@@ -186,6 +221,7 @@ export function RetrievalPage() {
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     const cid = isClientScoped ? (user?.clientId ?? '') : selectedClientId;
+    const isFullCycle = form.bundleType === 'full_cycle';
     createMutation.mutate({
       clientId: cid,
       assetId: form.assetId,
@@ -198,8 +234,22 @@ export function RetrievalPage() {
       },
       contactName: form.contactName,
       contactPhone: form.contactPhone,
-      courierZone: form.courierZone,
-      requiresPostInspection: form.requiresPostInspection,
+      // Diagnostic inspection is now a standard step for every retrieval —
+      // always true; the field remains for backward compatibility.
+      requiresPostInspection: true,
+      requiresWipe: form.requiresWipe,
+      requiresRedeploySetup: isFullCycle ? form.requiresRedeploySetup : undefined,
+      redeployEndUserId: isFullCycle ? form.redeployEndUserId || undefined : undefined,
+      redeployDeliveryAddress: isFullCycle
+        ? {
+            line1: form.redeployAddressLine1,
+            city: form.redeployCity,
+            state: form.redeployState,
+            pincode: form.redeployPincode,
+          }
+        : undefined,
+      redeployContactName: isFullCycle ? form.redeployContactName : undefined,
+      redeployContactPhone: isFullCycle ? form.redeployContactPhone : undefined,
       notes: form.notes.trim() || undefined,
     });
   }
@@ -208,10 +258,9 @@ export function RetrievalPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Bundle + inspection price preview
+  // Bundle price preview — the diagnostic inspection is billed separately
+  // when it's completed (INSPECT rate code), not at request-creation time.
   const bundlePaise = form.bundleType === 'full_cycle' ? 50000 : 19000;
-  const inspectionPaise = form.requiresPostInspection ? 19000 : 0;
-  const totalPaise = bundlePaise + inspectionPaise;
   const formatRupees = (p: number) => `₹${(p / 100).toFixed(0)}`;
 
   return (
@@ -381,38 +430,146 @@ export function RetrievalPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Courier zone <span className="text-red-500">*</span>
-                </label>
-                <select
-                  required
-                  value={form.courierZone}
-                  onChange={(e) => setField('courierZone', e.target.value as CourierZone)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
-                >
-                  <option value="intra_state">City — ₹1,500</option>
-                  <option value="inter_state">Interstate — ₹2,500</option>
-                  <option value="rural">Rural — ₹3,200</option>
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Courier zone</label>
+                <div className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700">
+                  {!/^\d{6}$/.test(form.pincode)
+                    ? 'Enter a 6-digit pincode above'
+                    : zonePreview === 'intra_state'
+                      ? 'City — ₹1,500'
+                      : zonePreview === 'inter_state'
+                        ? 'Interstate — ₹2,500'
+                        : zonePreview === 'rural'
+                          ? 'Rural — ₹3,200'
+                          : 'Resolving…'}
+                </div>
               </div>
             </div>
 
-            {/* Post-inspection checkbox */}
+            {/* Diagnostic step — now mandatory for every retrieval, both bundle types */}
+            <div className="rounded-lg bg-sky-50 border border-sky-100 px-4 py-2.5 text-xs text-sky-800">
+              Every retrieval now goes through a diagnostic inspection once received at the
+              warehouse — device in → inspect → physical diagnostic check → damage alert, or (Full
+              Cycle) proceed to redeploy. This happens automatically; there&apos;s no opt-out.
+            </div>
+
+            {/* Wipe — placeholder, captured but not yet executed automatically */}
             <div className="flex items-center gap-3">
               <input
-                id="post-inspection"
+                id="requires-wipe"
                 type="checkbox"
-                checked={form.requiresPostInspection}
-                onChange={(e) => setField('requiresPostInspection', e.target.checked)}
+                checked={form.requiresWipe}
+                onChange={(e) => setField('requiresWipe', e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-[#E86F2C] focus:ring-[#E86F2C] accent-[#E86F2C]"
               />
               <label
-                htmlFor="post-inspection"
+                htmlFor="requires-wipe"
                 className="text-sm text-gray-700 cursor-pointer select-none"
               >
-                Requires post-retrieval inspection <span className="text-gray-400">(+₹190)</span>
+                Requires data wipe{' '}
+                <span className="text-gray-400">
+                  (flags the request for your team — not yet automated)
+                </span>
               </label>
             </div>
+
+            {/* Full Cycle redeploy details */}
+            {form.bundleType === 'full_cycle' && (
+              <div className="rounded-lg border border-orange-200 bg-orange-50/40 p-4 space-y-4">
+                <p className="text-sm font-semibold text-gray-800">
+                  Redeploy destination <span className="text-red-500">*</span>
+                </p>
+                <p className="text-xs text-gray-500 -mt-2">
+                  Once the diagnostic check finds no damage, the deployment order below is created
+                  automatically for the new user.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      New end user
+                    </label>
+                    <select
+                      required
+                      value={form.redeployEndUserId}
+                      onChange={(e) => setField('redeployEndUserId', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+                    >
+                      <option value="">Select end user…</option>
+                      {endUsers.map((eu) => (
+                        <option key={eu.id} value={eu.id}>
+                          {eu.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 mt-6 cursor-pointer text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.requiresRedeploySetup}
+                      onChange={(e) => setField('requiresRedeploySetup', e.target.checked)}
+                      className="w-4 h-4 rounded accent-[#E86F2C]"
+                    />
+                    Requires setup <span className="text-xs text-gray-500">(Full Prep bundle)</span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    required
+                    value={form.redeployAddressLine1}
+                    onChange={(e) => setField('redeployAddressLine1', e.target.value)}
+                    placeholder="Street / building / floor"
+                    className="sm:col-span-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                  <input
+                    type="text"
+                    required
+                    value={form.redeployCity}
+                    onChange={(e) => setField('redeployCity', e.target.value)}
+                    placeholder="City"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                  <input
+                    type="text"
+                    required
+                    value={form.redeployState}
+                    onChange={(e) => setField('redeployState', e.target.value)}
+                    placeholder="State"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                  <input
+                    type="text"
+                    required
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    value={form.redeployPincode}
+                    onChange={(e) => setField('redeployPincode', e.target.value)}
+                    placeholder="Pincode (6 digits)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    required
+                    value={form.redeployContactName}
+                    onChange={(e) => setField('redeployContactName', e.target.value)}
+                    placeholder="Recipient's name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                  <input
+                    type="tel"
+                    required
+                    value={form.redeployContactPhone}
+                    onChange={(e) => setField('redeployContactPhone', e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Notes */}
             <div>
@@ -432,15 +589,10 @@ export function RetrievalPage() {
             <div className="rounded-lg bg-orange-50 border border-orange-100 px-4 py-3 text-sm text-gray-700 flex items-center justify-between">
               <span>
                 Estimated charges:{' '}
-                <span className="font-semibold">{formatRupees(bundlePaise)}</span> retrieval
-                {form.requiresPostInspection && (
-                  <>
-                    {' '}
-                    + <span className="font-semibold">₹190</span> inspection
-                  </>
-                )}
+                <span className="font-semibold">{formatRupees(bundlePaise)}</span> retrieval +
+                courier (inspection billed separately on completion)
               </span>
-              <span className="font-bold text-[#E86F2C]">Total: {formatRupees(totalPaise)}</span>
+              <span className="font-bold text-[#E86F2C]">Total: {formatRupees(bundlePaise)}</span>
             </div>
 
             {createMutation.error && (
@@ -483,7 +635,7 @@ export function RetrievalPage() {
                 <th className="text-left px-5 py-3">Pickup location</th>
                 <th className="text-left px-5 py-3">Zone</th>
                 <th className="text-left px-5 py-3">Bundle</th>
-                <th className="text-left px-5 py-3">Inspection</th>
+                <th className="text-left px-5 py-3">Damage</th>
                 <th className="text-left px-5 py-3">Tracking #</th>
                 <th className="text-left px-5 py-3">Notes</th>
                 <th className="text-left px-5 py-3">Requested</th>
@@ -537,14 +689,23 @@ export function RetrievalPage() {
                       ) : (
                         'Standard'
                       )}
+                      {r.requiresWipe && (
+                        <div className="text-[10px] text-amber-600 mt-0.5">Wipe requested</div>
+                      )}
                     </td>
 
-                    {/* Post-inspection */}
+                    {/* Damage found — set once the post-retrieval inspection completes */}
                     <td className="px-5 py-3.5">
-                      {r.requiresPostInspection ? (
-                        <span className="text-emerald-600 font-medium text-xs">Yes</span>
+                      {r.damageFound === null ? (
+                        <span className="text-gray-400 text-xs">Pending</span>
+                      ) : r.damageFound ? (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                          Damage found
+                        </span>
                       ) : (
-                        <span className="text-gray-400 text-xs">No</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                          Clean
+                        </span>
                       )}
                     </td>
 
@@ -560,7 +721,9 @@ export function RetrievalPage() {
                     {/* Notes */}
                     <td className="px-5 py-3.5 text-xs text-gray-600 max-w-[180px]">
                       {r.notes ? (
-                        <span className="line-clamp-2" title={r.notes}>{r.notes}</span>
+                        <span className="line-clamp-2" title={r.notes}>
+                          {r.notes}
+                        </span>
                       ) : (
                         <span className="text-gray-400">—</span>
                       )}
@@ -615,7 +778,6 @@ export function RetrievalPage() {
           </table>
         </div>
       )}
-
     </div>
   );
 }

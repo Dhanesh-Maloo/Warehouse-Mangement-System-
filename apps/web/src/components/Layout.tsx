@@ -29,6 +29,9 @@ import {
   Sun,
   Moon,
   HelpCircle,
+  Map,
+  Wrench,
+  Tag,
 } from 'lucide-react';
 
 type NavItem = {
@@ -52,6 +55,8 @@ const navGroups: NavGroup[] = [
       { to: '/deployment', label: 'Deployment', icon: Truck },
       { to: '/retrieval', label: 'Retrieval', icon: ArrowDownToLine },
       { to: '/disposal', label: 'Disposal', icon: Trash2 },
+      { to: '/repair', label: 'Repair', icon: Wrench },
+      { to: '/resale', label: 'Resale', icon: Tag },
     ],
   },
   {
@@ -77,6 +82,13 @@ const navGroups: NavGroup[] = [
       { to: '/users', label: 'Users', icon: Users, adminOnly: true, extraRoles: ['client_admin'] },
       { to: '/end-users', label: 'End Users', icon: UserCheck },
       { to: '/audit-log', label: 'Audit Log', icon: ShieldCheck, adminOnly: true },
+      {
+        to: '/rural-pincodes',
+        label: 'Rural Pincodes',
+        icon: Map,
+        adminOnly: true,
+        extraRoles: ['manager'],
+      },
     ],
   },
   {

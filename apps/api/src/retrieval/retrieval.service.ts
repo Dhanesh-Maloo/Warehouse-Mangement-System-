@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
+import { CourierZoneService } from '../logistics/courier-zone.service';
 import type { CreateRetrievalRequestDto } from './dto/create-retrieval-request.dto';
 import type { UpdateRetrievalStatusDto } from './dto/update-retrieval-status.dto';
 
@@ -14,6 +15,7 @@ export class RetrievalService {
     private readonly ledger: LedgerService,
     private readonly rateCard: RateCardService,
     private readonly audit: AuditService,
+    private readonly courierZone: CourierZoneService,
   ) {}
 
   findAll(
@@ -46,13 +48,15 @@ export class RetrievalService {
     // Resolve retrieval rate code based on bundle type
     const retrievalCode = dto.bundleType === 'full_cycle' ? 'RETRIEVAL_FULL_CYCLE' : 'RETRIEVAL';
 
-    // Resolve courier rate code based on zone
+    // Courier zone is derived server-side from the pickup pincode — never
+    // trust a client-supplied zone for billing.
+    const courierZone = await this.courierZone.resolveZone(dto.pickupAddress.pincode);
     const courierCodeMap: Record<string, string> = {
       intra_state: 'COURIER_CITY',
       inter_state: 'COURIER_INTERSTATE',
       rural: 'COURIER_RURAL',
     };
-    const courierCode = courierCodeMap[dto.courierZone];
+    const courierCode = courierCodeMap[courierZone];
 
     const [retrievalRate, courierRate] = await Promise.all([
       this.rateCard.findEffectiveAt(retrievalCode, occurredAt),
@@ -72,8 +76,16 @@ export class RetrievalService {
             dto.pickupAddress as unknown as import('@prisma/client').Prisma.InputJsonValue,
           contactName: dto.contactName,
           contactPhone: dto.contactPhone,
-          courierZone: dto.courierZone,
+          courierZone,
           requiresPostInspection: dto.requiresPostInspection,
+          requiresWipe: dto.requiresWipe ?? false,
+          requiresRedeploySetup: dto.requiresRedeploySetup ?? false,
+          redeployEndUserId: dto.redeployEndUserId,
+          redeployDeliveryAddress: dto.redeployDeliveryAddress
+            ? (dto.redeployDeliveryAddress as unknown as import('@prisma/client').Prisma.InputJsonValue)
+            : undefined,
+          redeployContactName: dto.redeployContactName,
+          redeployContactPhone: dto.redeployContactPhone,
           notes: dto.notes,
           createdByUserId,
         },
@@ -167,28 +179,25 @@ export class RetrievalService {
         include: { asset: true },
       });
 
-      // When received: route asset based on whether post-inspection is required
+      // When received: every retrieval (Standard and Full Cycle alike) now
+      // goes through a diagnostic inspection before storage/redeploy — this
+      // matches the confirmed SOP: device in -> inspect -> diagnostic check
+      // -> alert on damage, or (Full Cycle only) proceed to redeploy.
       if (dto.status === 'received') {
-        if (retrieval.requiresPostInspection) {
-          await tx.asset.update({
-            where: { id: retrieval.assetId },
-            data: { currentStatus: 'in_inspection' },
-          });
-          await tx.inspection.create({
-            data: {
-              assetId: retrieval.assetId,
-              type: 'outbound',
-              startedAt: now,
-              startedByUserId: retrieval.createdByUserId,
-              status: 'in_progress',
-            },
-          });
-        } else {
-          await tx.asset.update({
-            where: { id: retrieval.assetId },
-            data: { currentStatus: 'in_storage' },
-          });
-        }
+        await tx.asset.update({
+          where: { id: retrieval.assetId },
+          data: { currentStatus: 'in_inspection' },
+        });
+        await tx.inspection.create({
+          data: {
+            assetId: retrieval.assetId,
+            sourceRetrievalId: retrieval.id,
+            type: 'outbound',
+            startedAt: now,
+            startedByUserId: retrieval.createdByUserId,
+            status: 'in_progress',
+          },
+        });
       }
 
       await this.audit.log({
@@ -202,6 +211,29 @@ export class RetrievalService {
 
       return updated;
     });
+  }
+
+  /** Manually correct the courier zone of a request (no ledger correction). */
+  async updateZone(
+    id: string,
+    courierZone: 'intra_state' | 'inter_state' | 'rural',
+    updatedByUserId: string,
+  ): Promise<Prisma.RetrievalRequestGetPayload<{ include: { asset: true } }>> {
+    const retrieval = await this.findOne(id);
+    const updated = await this.prisma.retrievalRequest.update({
+      where: { id },
+      data: { courierZone },
+      include: { asset: true },
+    });
+    await this.audit.log({
+      userId: updatedByUserId,
+      action: 'retrieval.updateZone',
+      entity: 'RetrievalRequest',
+      entityId: id,
+      oldValue: { courierZone: retrieval.courierZone },
+      newValue: { courierZone },
+    });
+    return updated;
   }
 
   findByAsset(

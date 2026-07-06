@@ -89,4 +89,15 @@ export class RetrievalController {
     await this.assertOwnsRetrieval(id, user);
     return this.retrievalService.updateStatus(id, dto, user.sub);
   }
+
+  @Patch(':id/zone')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  async updateZone(
+    @Param('id') id: string,
+    @Body('courierZone') courierZone: 'intra_state' | 'inter_state' | 'rural',
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<RetrievalService['updateZone']> {
+    await this.assertOwnsRetrieval(id, user);
+    return this.retrievalService.updateZone(id, courierZone, user.sub);
+  }
 }

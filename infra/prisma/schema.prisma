@@ -37,6 +37,7 @@ enum AssetCategory {
 }
 
 // Lifecycle: receiving → in_inspection → in_storage → deployed → returning → disposed
+// in_repair and for_resale are side-branches reachable only from in_storage.
 enum AssetStatus {
   receiving
   in_inspection
@@ -44,6 +45,8 @@ enum AssetStatus {
   deployed
   returning
   disposed
+  in_repair
+  for_resale
 }
 
 enum ConditionGrade {
@@ -137,6 +140,23 @@ enum DisposalStatus {
   approved
   in_progress
   completed
+  cancelled
+}
+
+// Placeholder scope pending Esevel/Divya sign-off — see RepairRequest model comment.
+enum RepairStatus {
+  pending
+  sent
+  in_repair
+  returned
+  completed
+  cancelled
+}
+
+// Placeholder scope pending Esevel/Divya sign-off — see ResaleListing model comment.
+enum ResaleStatus {
+  listed
+  sold
   cancelled
 }
 
@@ -344,6 +364,9 @@ model GrnAsset {
 model Inspection {
   id               String           @id @default(uuid()) @map("inspection_id")
   assetId          String           @map("asset_id")
+  // Set when this inspection was auto-created by a retrieval's "received" step,
+  // so completion can report damage back to the retrieval / trigger auto-redeploy.
+  sourceRetrievalId String?         @map("source_retrieval_id")
   type             InspectionType
   status           InspectionStatus @default(in_progress)
   startedAt        DateTime         @map("started_at") @db.Timestamptz
@@ -507,6 +530,21 @@ model RetrievalRequest {
   courierZone            CourierZone         @map("courier_zone")
   trackingNumber         String?             @map("tracking_number")
   requiresPostInspection Boolean             @default(false) @map("requires_post_inspection")
+  // Placeholder — captured but not yet acted on. See CLAUDE session notes: "wipe" is
+  // provisionally expected to be executed via the existing Inspection
+  // sanitization/factoryReset checklist fields, pending Esevel confirmation.
+  requiresWipe           Boolean             @default(false) @map("requires_wipe")
+  // Only meaningful when bundleType = full_cycle. Determines whether the
+  // auto-created redeploy Deployment order uses 'full_prep' vs 'standard'.
+  requiresRedeploySetup  Boolean             @default(false) @map("requires_redeploy_setup")
+  // Redeploy destination — required at creation time when bundleType = full_cycle,
+  // so that a clean post-inspection result can auto-create the Deployment order.
+  redeployEndUserId      String?             @map("redeploy_end_user_id")
+  redeployDeliveryAddress Json?              @map("redeploy_delivery_address")
+  redeployContactName    String?             @map("redeploy_contact_name")
+  redeployContactPhone   String?             @map("redeploy_contact_phone")
+  // Set once the post-retrieval inspection completes.
+  damageFound            Boolean?            @map("damage_found")
   status                 RetrievalStatus     @default(pending)
   requestedAt            DateTime            @default(now()) @map("requested_at") @db.Timestamptz
   initiatedAt            DateTime?           @map("initiated_at") @db.Timestamptz
@@ -548,6 +586,54 @@ model DisposalRequest {
   @@map("disposal_requests")
 }
 
+// MVP scope — built ahead of full Esevel/Divya sign-off on pricing and the
+// service-center master-data question. Assumptions made:
+//  - Asset must already be in_storage to raise a repair request (retrieve first,
+//    mirroring the existing disposal ITAD-bundle precedent).
+//  - serviceCenterName is free text for now, not a maintained master-data list.
+//  - Billed via a flat REPAIR_HANDLING rate-card code seeded at 0 paise — a
+//    placeholder until Divya confirms actual pricing via the Rate Card page.
+model RepairRequest {
+  id                String       @id @default(uuid()) @map("repair_id")
+  clientId          String       @map("client_id")
+  assetId           String       @map("asset_id")
+  serviceCenterName String       @map("service_center_name")
+  estimateCostPaise BigInt?      @map("estimate_cost_paise")
+  status            RepairStatus @default(pending)
+  notes             String?
+  createdByUserId   String       @map("created_by_user_id")
+  requestedAt       DateTime     @default(now()) @map("requested_at") @db.Timestamptz
+  sentAt            DateTime?    @map("sent_at") @db.Timestamptz
+  returnedAt        DateTime?    @map("returned_at") @db.Timestamptz
+  completedAt       DateTime?    @map("completed_at") @db.Timestamptz
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("repair_requests")
+}
+
+// MVP scope — built ahead of full Esevel/Divya sign-off. Assumptions made:
+//  - Asset must already be in_storage to list for resale (retrieve first).
+//  - Listing/selling is treated as a non-billable inventory event (like
+//    US-INV-03 location moves) — no ledger entry, since resale isn't a
+//    warehouse service charge. Revisit once Divya defines the money flow.
+model ResaleListing {
+  id             String       @id @default(uuid()) @map("resale_id")
+  clientId       String       @map("client_id")
+  assetId        String       @map("asset_id")
+  listedPricePaise BigInt?    @map("listed_price_paise")
+  status         ResaleStatus @default(listed)
+  soldPricePaise BigInt?      @map("sold_price_paise")
+  soldAt         DateTime?    @map("sold_at") @db.Timestamptz
+  notes          String?
+  createdByUserId String      @map("created_by_user_id")
+  listedAt       DateTime     @default(now()) @map("listed_at") @db.Timestamptz
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("resale_listings")
+}
+
 model StorageAccrualRun {
   id                     String   @id @default(uuid()) @map("run_id")
   clientId               String   @map("client_id")
@@ -587,6 +673,19 @@ model Holiday {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   @@map("holidays")
+}
+
+// Admin-maintained list of pincodes courier partners classify as "rural" for
+// pricing purposes. Checked before the state-comparison fallback when
+// resolving a courier zone — see LogisticsModule / CourierZoneService.
+model RuralPincode {
+  id            String   @id @default(uuid()) @map("rural_pincode_id")
+  pincode       String   @unique
+  note          String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdByUser String?  @map("created_by_user_id")
+
+  @@map("rural_pincodes")
 }
 
 model AssetDocument {

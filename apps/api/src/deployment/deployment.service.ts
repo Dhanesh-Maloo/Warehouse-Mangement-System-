@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
+import { CourierZoneService } from '../logistics/courier-zone.service';
 import type { CreateDeploymentOrderDto } from './dto/create-deployment-order.dto';
 import type { UpdateDeploymentStatusDto } from './dto/update-deployment-status.dto';
 
@@ -14,6 +15,7 @@ export class DeploymentService {
     private readonly ledger: LedgerService,
     private readonly rateCard: RateCardService,
     private readonly audit: AuditService,
+    private readonly courierZone: CourierZoneService,
   ) {}
 
   /**
@@ -76,12 +78,15 @@ export class DeploymentService {
     const bundleRate = await this.rateCard.findEffectiveAt(bundleRateCode, occurredAt);
     const bundleUnitRate = bundleRate ? bundleRate.unitRatePaise : BigInt(0);
 
+    // Courier zone is derived server-side from the delivery pincode — never
+    // trust a client-supplied zone for billing.
+    const courierZone = await this.courierZone.resolveZone(dto.deliveryAddress.pincode);
     const courierCodeMap = {
       intra_state: 'COURIER_CITY',
       inter_state: 'COURIER_INTERSTATE',
       rural: 'COURIER_RURAL',
     } as const;
-    const courierCode = courierCodeMap[dto.courierZone];
+    const courierCode = courierCodeMap[courierZone];
     const courierRate = await this.rateCard.findEffectiveAt(courierCode, occurredAt);
     const courierUnitRate = courierRate ? courierRate.unitRatePaise : BigInt(0);
 
@@ -108,7 +113,7 @@ export class DeploymentService {
           deliveryAddress: dto.deliveryAddress as object,
           contactName: dto.contactName,
           contactPhone: dto.contactPhone,
-          courierZone: dto.courierZone,
+          courierZone,
           requiresLabeling: dto.requiresLabeling ?? false,
           requiresRepacking: dto.requiresRepacking ?? false,
           notes: dto.notes ?? null,

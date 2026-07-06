@@ -5,9 +5,10 @@ import { LedgerModule } from '../ledger/ledger.module';
 import { RateCardModule } from '../rate-card/rate-card.module';
 import { AuditModule } from '../audit/audit.module';
 import { R2Module } from '../r2/r2.module';
+import { DeploymentModule } from '../deployment/deployment.module';
 
 @Module({
-  imports: [LedgerModule, RateCardModule, AuditModule, R2Module],
+  imports: [LedgerModule, RateCardModule, AuditModule, R2Module, DeploymentModule],
   providers: [InspectionsService],
   controllers: [InspectionsController],
   exports: [InspectionsService],
