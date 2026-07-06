@@ -195,14 +195,20 @@ export function DeploymentPage() {
   // read-only preview for the cost estimate — the backend re-resolves it
   // authoritatively when the order is created.
   const pincode = form.addrPincode.trim();
-  const { data: zonePreview } = useQuery({
+  const {
+    data: zonePreview,
+    isError: zoneIsError,
+    error: zoneError,
+    refetch: refetchZone,
+  } = useQuery({
     queryKey: ['courier-zone-preview', pincode],
     queryFn: () =>
       api.get<'intra_state' | 'inter_state' | 'rural'>(
         `/logistics/resolve-zone?pincode=${encodeURIComponent(pincode)}`,
       ),
     enabled: showForm && /^\d{6}$/.test(pincode),
-    retry: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // ---------------------------------------------------------------------------
@@ -679,7 +685,13 @@ export function DeploymentPage() {
             {/* Courier zone — auto-derived from the delivery pincode */}
             <div className="max-w-sm">
               <label className="block text-sm font-medium text-gray-700 mb-1">Courier zone</label>
-              <div className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700">
+              <div
+                className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                  zoneIsError
+                    ? 'border-red-200 bg-red-50 text-red-700'
+                    : 'border-gray-200 bg-gray-50 text-gray-700'
+                }`}
+              >
                 {!/^\d{6}$/.test(pincode)
                   ? 'Enter a 6-digit PIN code above to determine the zone'
                   : zonePreview === 'intra_state'
@@ -688,8 +700,19 @@ export function DeploymentPage() {
                       ? 'Inter-state — ₹2,500'
                       : zonePreview === 'rural'
                         ? 'Rural — ₹3,200'
-                        : 'Resolving…'}
+                        : zoneIsError
+                          ? ((zoneError as Error)?.message ?? 'Could not resolve zone')
+                          : 'Resolving…'}
               </div>
+              {zoneIsError && (
+                <button
+                  type="button"
+                  onClick={() => void refetchZone()}
+                  className="text-xs text-[#E86F2C] font-medium mt-1 hover:underline"
+                >
+                  Retry
+                </button>
+              )}
               <p className="text-xs text-gray-400 mt-1">
                 Automatically determined from the PIN code. Can be corrected after the order is
                 created if misclassified.

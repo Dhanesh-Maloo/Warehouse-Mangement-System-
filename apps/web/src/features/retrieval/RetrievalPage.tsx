@@ -184,12 +184,18 @@ export function RetrievalPage() {
   // Courier zone is derived server-side from the pickup pincode. This is a
   // read-only preview for the cost estimate — the backend re-resolves it
   // authoritatively when the request is created.
-  const { data: zonePreview } = useQuery({
+  const {
+    data: zonePreview,
+    isError: zoneIsError,
+    error: zoneError,
+    refetch: refetchZone,
+  } = useQuery({
     queryKey: ['courier-zone-preview', form.pincode],
     queryFn: () =>
       api.get<CourierZone>(`/logistics/resolve-zone?pincode=${encodeURIComponent(form.pincode)}`),
     enabled: showForm && /^\d{6}$/.test(form.pincode),
-    retry: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Create mutation
@@ -431,7 +437,13 @@ export function RetrievalPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Courier zone</label>
-                <div className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700">
+                <div
+                  className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                    zoneIsError
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : 'border-gray-200 bg-gray-50 text-gray-700'
+                  }`}
+                >
                   {!/^\d{6}$/.test(form.pincode)
                     ? 'Enter a 6-digit pincode above'
                     : zonePreview === 'intra_state'
@@ -440,8 +452,19 @@ export function RetrievalPage() {
                         ? 'Interstate — ₹2,500'
                         : zonePreview === 'rural'
                           ? 'Rural — ₹3,200'
-                          : 'Resolving…'}
+                          : zoneIsError
+                            ? ((zoneError as Error)?.message ?? 'Could not resolve zone')
+                            : 'Resolving…'}
                 </div>
+                {zoneIsError && (
+                  <button
+                    type="button"
+                    onClick={() => void refetchZone()}
+                    className="text-xs text-[#E86F2C] font-medium mt-1 hover:underline"
+                  >
+                    Retry
+                  </button>
+                )}
               </div>
             </div>
 
