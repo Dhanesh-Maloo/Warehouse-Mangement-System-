@@ -104,11 +104,32 @@ export class InspectionsService {
       return;
     }
 
+    if (retrieval.bundleType !== 'full_cycle' || retrieval.status === 'completed') {
+      return;
+    }
+
+    // Redeploy destination fields are only conditionally validated at
+    // creation time (bundleType === 'full_cycle') — a retrieval created
+    // before that validation existed, or via any path that bypassed it,
+    // could reach here with incomplete data. Skip and log rather than
+    // silently creating a deployment order with a missing address or blank
+    // contact info.
     if (
-      retrieval.bundleType !== 'full_cycle' ||
       !retrieval.redeployDeliveryAddress ||
-      retrieval.status === 'completed'
+      !retrieval.redeployContactName ||
+      !retrieval.redeployContactPhone
     ) {
+      await this.audit.log({
+        userId: completedByUserId,
+        action: 'retrieval.autoRedeploySkippedIncompleteData',
+        entity: 'RetrievalRequest',
+        entityId: retrieval.id,
+        newValue: {
+          hasAddress: !!retrieval.redeployDeliveryAddress,
+          hasContactName: !!retrieval.redeployContactName,
+          hasContactPhone: !!retrieval.redeployContactPhone,
+        },
+      });
       return;
     }
 

@@ -272,6 +272,19 @@ async function seedRateCard(): Promise<void> {
       bundleComponentCodes: ['RETRIEVAL', 'DISPOSAL_CERTIFIED'],
     },
     {
+      // Confirmed by Divya: certification is NOT included in Non-Certified
+      // or ITAD Bundled disposal — it's a separate ₹550 + GST add-on per
+      // the rate contract. Same price point as DISPOSAL_CERTIFIED, kept as
+      // its own code so the ledger clearly shows it as an add-on line item.
+      code: 'DISPOSAL_CERT_ADDON',
+      description: 'Certification Add-on (wipe certificate + destruction certificate)',
+      basis: 'per_device' as const,
+      categoryApplies: 'any' as const,
+      unitRatePaise: BigInt(55000),
+      isBundle: false,
+      bundleComponentCodes: [] as string[],
+    },
+    {
       code: 'LABELING',
       description: 'Asset / Owner / Compliance Label Application',
       basis: 'per_label' as const,

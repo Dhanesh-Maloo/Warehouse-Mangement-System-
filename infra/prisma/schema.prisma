@@ -567,6 +567,11 @@ model DisposalRequest {
   clientId         String         @map("client_id")
   assetId          String         @map("asset_id")
   disposalType     DisposalType   @map("disposal_type")
+  // Add-on charge (₹550 + GST per the rate contract, confirmed by Divya).
+  // Certification is NOT included in non_certified or itad_bundled by
+  // default — only certified_blanco includes it inherently, so this flag
+  // is ignored (never billed) when disposalType = certified_blanco.
+  requiresCertification Boolean   @default(false) @map("requires_certification")
   status           DisposalStatus @default(pending)
   approvedAt       DateTime?      @map("approved_at") @db.Timestamptz
   initiatedAt      DateTime?      @map("initiated_at") @db.Timestamptz
@@ -591,8 +596,9 @@ model DisposalRequest {
 //  - Asset must already be in_storage to raise a repair request (retrieve first,
 //    mirroring the existing disposal ITAD-bundle precedent).
 //  - serviceCenterName is free text for now, not a maintained master-data list.
-//  - Billed via a flat REPAIR_HANDLING rate-card code seeded at 0 paise — a
-//    placeholder until Divya confirms actual pricing via the Rate Card page.
+//  - Billed via the existing 'REPAIR' rate-card code (seeded at ₹665 —
+//    "Repair Handling (coordination only)"). Does not yet cover shipping
+//    the device to/from the service center.
 model RepairRequest {
   id                String       @id @default(uuid()) @map("repair_id")
   clientId          String       @map("client_id")

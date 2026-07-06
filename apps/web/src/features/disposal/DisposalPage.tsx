@@ -32,6 +32,7 @@ interface DisposalRequest {
     manufacturer: string;
   };
   disposalType: DisposalType;
+  requiresCertification: boolean;
   status: DisposalStatus;
   notes?: string;
   createdAt: string;
@@ -72,9 +73,12 @@ const DISPOSAL_TYPE_META: Record<
   itad_bundled: {
     label: 'Retrieval + ITAD Bundled',
     price: '₹1,750',
-    description: 'Retrieve device + certified disposal, single fee',
+    description:
+      'Retrieve device + disposal handling, single fee — certification is a separate add-on',
   },
 };
+
+const CERTIFICATION_ADDON_PRICE = '₹550 + GST';
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -99,6 +103,7 @@ export function DisposalPage() {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [disposalType, setDisposalType] = useState<DisposalType>('non_certified');
+  const [requiresCertification, setRequiresCertification] = useState(false);
   const [notes, setNotes] = useState('');
 
   const effectiveClientId = isClientScoped ? (clientId ?? '') : selectedClientId;
@@ -178,6 +183,7 @@ export function DisposalPage() {
     setSelectedClientId('');
     setSelectedAssetId('');
     setDisposalType('non_certified');
+    setRequiresCertification(false);
     setNotes('');
   }
 
@@ -187,6 +193,7 @@ export function DisposalPage() {
       clientId: effectiveClientId,
       assetId: selectedAssetId,
       disposalType,
+      requiresCertification: disposalType === 'certified_blanco' ? false : requiresCertification,
       notes: notes.trim() || undefined,
     });
   }
@@ -309,6 +316,20 @@ export function DisposalPage() {
               </div>
             </div>
 
+            {/* Certification add-on — not applicable when Certified Blanco already includes it */}
+            {disposalType !== 'certified_blanco' && (
+              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={requiresCertification}
+                  onChange={(e) => setRequiresCertification(e.target.checked)}
+                  className="w-4 h-4 rounded accent-[#E86F2C]"
+                />
+                Add certification (wipe certificate + destruction certificate){' '}
+                <span className="text-xs text-gray-500">({CERTIFICATION_ADDON_PRICE})</span>
+              </label>
+            )}
+
             {/* Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -424,6 +445,11 @@ export function DisposalPage() {
                           </span>
                         </span>
                         <span className="text-xs text-gray-400">{typeMeta.description}</span>
+                        {d.requiresCertification && (
+                          <span className="text-xs font-medium text-emerald-700 mt-0.5">
+                            + Certification ({CERTIFICATION_ADDON_PRICE})
+                          </span>
+                        )}
                       </div>
                     </td>
 

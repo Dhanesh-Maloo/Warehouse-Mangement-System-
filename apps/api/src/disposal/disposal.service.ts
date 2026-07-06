@@ -60,6 +60,9 @@ export class DisposalService {
         clientId: dto.clientId,
         assetId: dto.assetId,
         disposalType: dto.disposalType,
+        // certified_blanco already includes certification — never double-bill it.
+        requiresCertification:
+          dto.disposalType === 'certified_blanco' ? false : (dto.requiresCertification ?? false),
         notes: dto.notes,
         status: 'pending',
         createdByUserId,
@@ -102,6 +105,17 @@ export class DisposalService {
     const rate = await this.rateCard.findEffectiveAt(rateCode, occurredAt);
     const unitRate = rate ? rate.unitRatePaise : BigInt(0);
 
+    // ₹550 + GST certification add-on (confirmed by Divya) — billed as its
+    // own line item so the ledger clearly separates it from the base
+    // disposal fee. certified_blanco already includes certification, so
+    // requiresCertification is always false for that type (enforced at
+    // create time) and this never double-bills it.
+    let certUnitRate: bigint | null = null;
+    if (disposal.requiresCertification) {
+      const certRate = await this.rateCard.findEffectiveAt('DISPOSAL_CERT_ADDON', occurredAt);
+      certUnitRate = certRate ? certRate.unitRatePaise : BigInt(0);
+    }
+
     const updated = await this.prisma.disposalRequest.update({
       where: { id },
       data: {
@@ -124,6 +138,21 @@ export class DisposalService {
       referenceId: id,
       referenceType: 'disposal',
     });
+
+    if (certUnitRate !== null) {
+      await this.ledger.create({
+        eventType: 'DISPOSAL_CERT_ADDON',
+        asset: { connect: { id: disposal.assetId } },
+        client: { connect: { id: disposal.clientId } },
+        quantity: 1,
+        unitRatePaise: certUnitRate,
+        amountPaise: certUnitRate,
+        occurredAt,
+        createdBy: approvedByUserId,
+        referenceId: id,
+        referenceType: 'disposal',
+      });
+    }
 
     await this.audit.log({
       userId: approvedByUserId,

@@ -92,7 +92,7 @@ export class RepairService {
     }
 
     const occurredAt = new Date();
-    const rate = await this.rateCard.findEffectiveAt('REPAIR_HANDLING', occurredAt);
+    const rate = await this.rateCard.findEffectiveAt('REPAIR', occurredAt);
     const unitRate = rate ? rate.unitRatePaise : BigInt(0);
 
     const repair = await this.prisma.$transaction(async (tx) => {
@@ -118,7 +118,7 @@ export class RepairService {
     });
 
     await this.ledger.create({
-      eventType: 'REPAIR_HANDLING',
+      eventType: 'REPAIR',
       asset: { connect: { id: dto.assetId } },
       client: { connect: { id: dto.clientId } },
       quantity: 1,
