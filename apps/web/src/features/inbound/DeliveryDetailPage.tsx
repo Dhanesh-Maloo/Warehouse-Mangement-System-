@@ -2,7 +2,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
-import { ArrowLeft, PackagePlus, Download } from 'lucide-react';
+import { ArrowLeft, PackagePlus, Download, StickyNote } from 'lucide-react';
 
 interface DeliveryItem {
   id: string;
@@ -118,8 +118,13 @@ export function DeliveryDetailPage() {
               month: 'long',
               year: 'numeric',
             })}
-            {delivery.notes && <> · {delivery.notes}</>}
           </p>
+          {delivery.notes && (
+            <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-xl">
+              <StickyNote size={15} className="text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-amber-900">{delivery.notes}</p>
+            </div>
+          )}
         </div>
         {canReceive && (
           <Link
