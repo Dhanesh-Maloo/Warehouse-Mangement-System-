@@ -1,6 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
 import {
@@ -12,9 +11,6 @@ import {
   Clock,
   Truck,
   ArrowRight,
-  FlaskConical,
-  Trash2,
-  Loader2,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -109,131 +105,10 @@ function StatCard({
   );
 }
 
-// ─── Demo Panel ───────────────────────────────────────────────────────────────
-
-interface DemoStatus {
-  seeded: boolean;
-  assetCount: number;
-  userCount: number;
-}
-
-function DemoPanel() {
-  const qc = useQueryClient();
-  const [confirmRemove, setConfirmRemove] = useState(false);
-
-  const { data: status, isLoading } = useQuery({
-    queryKey: ['demo-status'],
-    queryFn: () => api.get<DemoStatus>('/demo/status'),
-  });
-
-  const seedMutation = useMutation({
-    mutationFn: () => api.post<{ message: string }>('/demo/seed', {}),
-    onSuccess: () => {
-      void qc.invalidateQueries();
-    },
-  });
-
-  const teardownMutation = useMutation({
-    mutationFn: () => api.del<{ message: string }>('/demo/seed'),
-    onSuccess: () => {
-      setConfirmRemove(false);
-      void qc.invalidateQueries();
-    },
-  });
-
-  const busy = seedMutation.isPending || teardownMutation.isPending;
-
-  return (
-    <div className="bg-white rounded-xl border border-dashed border-gray-300 shadow-sm p-5">
-      <div className="flex items-center gap-2 mb-3">
-        <FlaskConical size={16} className="text-gray-400" />
-        <h2 className="text-sm font-semibold text-gray-600">Demo data</h2>
-        {isLoading && <Loader2 size={13} className="animate-spin text-gray-300 ml-auto" />}
-      </div>
-
-      {status?.seeded ? (
-        <div className="space-y-3">
-          <div className="text-xs text-gray-500">
-            Techflow Solutions demo loaded —{' '}
-            <span className="font-medium text-gray-700">{status.assetCount} assets</span>,{' '}
-            {status.userCount} users.
-            <br />
-            Credentials: any <code className="bg-gray-100 px-1 rounded">@demo.local</code> user,
-            password <code className="bg-gray-100 px-1 rounded">Demo@1234</code>
-          </div>
-          {!confirmRemove ? (
-            <button
-              onClick={() => setConfirmRemove(true)}
-              disabled={busy}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
-            >
-              <Trash2 size={12} />
-              Remove demo data
-            </button>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-xs text-red-600 font-medium">
-                This will delete all Techflow demo data. Are you sure?
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => teardownMutation.mutate()}
-                  disabled={busy}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
-                >
-                  {teardownMutation.isPending ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={12} />
-                  )}
-                  Yes, remove
-                </button>
-                <button
-                  onClick={() => setConfirmRemove(false)}
-                  disabled={busy}
-                  className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-              {teardownMutation.isError && (
-                <p className="text-xs text-red-500">{String(teardownMutation.error)}</p>
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <p className="text-xs text-gray-500">
-            Load 22 realistic assets across all statuses — inspections, deployments, retrievals,
-            disposals, and ledger entries — to explore the full app.
-          </p>
-          <button
-            onClick={() => seedMutation.mutate()}
-            disabled={busy}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[#E86F2C] border border-orange-200 rounded-lg hover:bg-orange-50 transition-colors disabled:opacity-50"
-          >
-            {seedMutation.isPending ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <FlaskConical size={12} />
-            )}
-            Load demo data
-          </button>
-          {seedMutation.isError && (
-            <p className="text-xs text-red-500">{String(seedMutation.error)}</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
   const clientId =
     user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
       ? (user.clientId ?? undefined)
@@ -542,13 +417,6 @@ export function DashboardPage() {
               </div>
             )}
           </div>
-
-          {/* Demo data panel — admin only */}
-          {isAdmin && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <DemoPanel />
-            </div>
-          )}
         </>
       )}
     </div>

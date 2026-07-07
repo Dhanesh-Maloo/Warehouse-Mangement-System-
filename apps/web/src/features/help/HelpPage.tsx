@@ -16,6 +16,9 @@ import {
   CircleDollarSign,
   ShieldCheck,
   ChevronDown,
+  Wrench,
+  Tag,
+  Map,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -249,6 +252,32 @@ const MODULES: ModuleInfo[] = [
       'Client user only views; Admin/Manager/Operator/Editor/Client admin can file requests and progress them; only Admin/Manager/Client admin (own client) can approve.',
   },
   {
+    id: 'repair',
+    title: 'Repair',
+    icon: Wrench,
+    summary:
+      'Send an in-storage device to an external service center for repair and track its return.',
+    steps: [
+      'Click "New Repair Request", pick the client (auto-filled for client-scoped roles), the in-storage asset, and the service center name.',
+      'Optionally add an estimate cost and notes, then submit.',
+      'Progress the request from pending → sent → in repair → returned → completed (or cancel at any point before completed) using the status dropdown.',
+    ],
+    roles:
+      'Client user only views; Admin/Manager/Operator/Editor/Client admin can file and progress requests — scoped to their own client for Editor/Client admin.',
+  },
+  {
+    id: 'resale',
+    title: 'Resale',
+    icon: Tag,
+    summary: 'List an in-storage device for resale and record the sale once it’s sold.',
+    steps: [
+      'Click "New Resale Listing", pick the client (auto-filled for client-scoped roles), the in-storage asset, and an optional listed price.',
+      'Mark a listing "Sold" and optionally record the sold price, or "Cancel" it.',
+    ],
+    roles:
+      'Client user only views; Admin/Manager/Operator/Editor/Client admin can create listings and update status — scoped to their own client for Editor/Client admin.',
+  },
+  {
     id: 'locations',
     title: 'Locations',
     icon: MapPin,
@@ -355,6 +384,19 @@ const MODULES: ModuleInfo[] = [
       'Expand a row to see the before/after values of what changed.',
     ],
     roles: 'Admin and Manager only.',
+  },
+  {
+    id: 'rural-pincodes',
+    title: 'Rural Pincodes',
+    icon: Map,
+    summary:
+      'Maintain the list of pincodes that always resolve to the "Rural" courier zone for Deployment and Retrieval orders, overriding the automatic intra-state/inter-state comparison.',
+    steps: [
+      'Enter a 6-digit pincode and an optional note, then click "Add".',
+      'Remove a pincode from the list with the trash icon — it reverts to automatic zone resolution.',
+    ],
+    roles:
+      'Admin/Manager only — both list, add and remove entries; no other role can see this page.',
   },
 ];
 
