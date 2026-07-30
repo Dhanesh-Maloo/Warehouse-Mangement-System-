@@ -1,0 +1,15 @@
+-- AlterTable
+ALTER TABLE "inspections" DROP COLUMN "all_accessories_present",
+ADD COLUMN     "ac_adapter_present" BOOLEAN,
+ADD COLUMN     "battery_health" TEXT,
+ADD COLUMN     "contact_number" TEXT,
+ADD COLUMN     "contact_person" TEXT,
+ADD COLUMN     "cpu" TEXT,
+ADD COLUMN     "display" TEXT,
+ADD COLUMN     "hardware_test_result" TEXT,
+ADD COLUMN     "headset_present" BOOLEAN,
+ADD COLUMN     "operating_system" TEXT,
+ADD COLUMN     "other_accessories" TEXT,
+ADD COLUMN     "power_cable_present" BOOLEAN,
+ADD COLUMN     "ram" TEXT,
+ADD COLUMN     "ticket_number" TEXT;

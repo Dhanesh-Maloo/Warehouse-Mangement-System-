@@ -31,13 +31,19 @@ interface InspectionDetail {
   startedAt: string;
   completedAt: string | null;
   conditionGrade: string | null;
+  ticketNumber: string | null;
+  contactPerson: string | null;
+  contactNumber: string | null;
   scratchesOnCasing: boolean | null;
   lidClosingOk: boolean | null;
   scratchesOnScreen: boolean | null;
   keyboardIssues: boolean | null;
   missingFeet: boolean | null;
   chargerDamage: boolean | null;
-  allAccessoriesPresent: boolean | null;
+  acAdapterPresent: boolean | null;
+  powerCablePresent: boolean | null;
+  headsetPresent: boolean | null;
+  otherAccessories: string | null;
   webcamOk: boolean | null;
   speakersOk: boolean | null;
   bluetoothOk: boolean | null;
@@ -50,6 +56,12 @@ interface InspectionDetail {
   imagesUploaded: boolean | null;
   sanitization: boolean | null;
   factoryReset: boolean | null;
+  operatingSystem: string | null;
+  cpu: string | null;
+  ram: string | null;
+  display: string | null;
+  batteryHealth: string | null;
+  hardwareTestResult: string | null;
   notes: string | null;
   slaMinutes: number | null;
   photos: Photo[];
@@ -98,11 +110,9 @@ const CHECKLIST_SECTIONS: { title: string; items: ChecklistItem[] }[] = [
         label: 'Damage to adapter / charger (exposed wire, etc.)',
         yesIsGood: false,
       },
-      {
-        key: 'allAccessoriesPresent',
-        label: 'Returned with all accessories (AC Adapter & Headset)',
-        yesIsGood: true,
-      },
+      { key: 'acAdapterPresent', label: 'Returned with AC Adapter', yesIsGood: true },
+      { key: 'powerCablePresent', label: 'Returned with Power Cable', yesIsGood: true },
+      { key: 'headsetPresent', label: 'Returned with Headset', yesIsGood: true },
     ],
   },
   {
@@ -117,7 +127,11 @@ const CHECKLIST_SECTIONS: { title: string; items: ChecklistItem[] }[] = [
       { key: 'trackpadOk', label: 'Trackpad in working condition', yesIsGood: true },
       { key: 'portsOk', label: 'All ports in working condition', yesIsGood: true },
       { key: 'powersOnOk', label: 'Unit powered on without any hardware errors', yesIsGood: true },
-      { key: 'imagesUploaded', label: 'Uploaded photos (top, bottom, front, etc.)', yesIsGood: true },
+      {
+        key: 'imagesUploaded',
+        label: 'Uploaded photos (top, bottom, front, etc.)',
+        yesIsGood: true,
+      },
     ],
   },
   {
@@ -210,6 +224,16 @@ export function InspectionDetailPage() {
   const [checks, setChecks] = useState<CheckState>(buildInitialChecks);
   const [grade, setGrade] = useState<Grade | ''>('');
   const [notes, setNotes] = useState('');
+  const [ticketNumber, setTicketNumber] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
+  const [contactNumber, setContactNumber] = useState('');
+  const [otherAccessories, setOtherAccessories] = useState('');
+  const [operatingSystem, setOperatingSystem] = useState('');
+  const [cpu, setCpu] = useState('');
+  const [ram, setRam] = useState('');
+  const [display, setDisplay] = useState('');
+  const [batteryHealth, setBatteryHealth] = useState('');
+  const [hardwareTestResult, setHardwareTestResult] = useState('');
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [error, setError] = useState('');
@@ -233,7 +257,10 @@ export function InspectionDetailPage() {
       Promise.all(
         toAdd.map(async (f) => {
           const blob = await compressImage(f);
-          return { file: new File([blob], f.name, { type: blob.type }), preview: URL.createObjectURL(blob) };
+          return {
+            file: new File([blob], f.name, { type: blob.type }),
+            preview: URL.createObjectURL(blob),
+          };
         }),
       ).then((compressed) => setPhotos((p) => [...p, ...compressed]));
       return prev;
@@ -286,7 +313,17 @@ export function InspectionDetailPage() {
 
       return api.patch(`/inspections/${id ?? ''}/complete`, {
         conditionGrade: grade,
+        ticketNumber: ticketNumber.trim() || undefined,
+        contactPerson: contactPerson.trim() || undefined,
+        contactNumber: contactNumber.trim() || undefined,
         ...checks,
+        otherAccessories: otherAccessories.trim() || undefined,
+        operatingSystem: operatingSystem.trim() || undefined,
+        cpu: cpu.trim() || undefined,
+        ram: ram.trim() || undefined,
+        display: display.trim() || undefined,
+        batteryHealth: batteryHealth.trim() || undefined,
+        hardwareTestResult: hardwareTestResult.trim() || undefined,
         notes: notes.trim() || undefined,
         photoKeys,
       });
@@ -472,6 +509,32 @@ export function InspectionDetailPage() {
       {/* ── Completed read-only view ── */}
       {isComplete ? (
         <div className="space-y-4">
+          {(inspection.ticketNumber || inspection.contactPerson || inspection.contactNumber) && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <h2 className="text-sm font-semibold text-gray-700 mb-2">Job Details</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                {inspection.ticketNumber && (
+                  <div>
+                    <span className="text-xs text-gray-400 block">Ticket number</span>
+                    {inspection.ticketNumber}
+                  </div>
+                )}
+                {inspection.contactPerson && (
+                  <div>
+                    <span className="text-xs text-gray-400 block">Contact person</span>
+                    {inspection.contactPerson}
+                  </div>
+                )}
+                {inspection.contactNumber && (
+                  <div>
+                    <span className="text-xs text-gray-400 block">Contact number/email</span>
+                    {inspection.contactNumber}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {CHECKLIST_SECTIONS.map((section) => (
             <div
               key={section.title}
@@ -543,6 +606,62 @@ export function InspectionDetailPage() {
             </div>
           ))}
 
+          {inspection.otherAccessories && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <h2 className="text-sm font-semibold text-gray-700 mb-2">Other accessories</h2>
+              <p className="text-sm text-gray-600">{inspection.otherAccessories}</p>
+            </div>
+          )}
+
+          {(inspection.operatingSystem ||
+            inspection.cpu ||
+            inspection.ram ||
+            inspection.display ||
+            inspection.batteryHealth ||
+            inspection.hardwareTestResult) && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <h2 className="text-sm font-semibold text-gray-700 mb-2">Device Diagnostics</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                {inspection.operatingSystem && (
+                  <div>
+                    <span className="text-xs text-gray-400 block">Operating system</span>
+                    {inspection.operatingSystem}
+                  </div>
+                )}
+                {inspection.cpu && (
+                  <div>
+                    <span className="text-xs text-gray-400 block">CPU</span>
+                    {inspection.cpu}
+                  </div>
+                )}
+                {inspection.ram && (
+                  <div>
+                    <span className="text-xs text-gray-400 block">RAM</span>
+                    {inspection.ram}
+                  </div>
+                )}
+                {inspection.display && (
+                  <div>
+                    <span className="text-xs text-gray-400 block">Display</span>
+                    {inspection.display}
+                  </div>
+                )}
+                {inspection.batteryHealth && (
+                  <div>
+                    <span className="text-xs text-gray-400 block">Battery health</span>
+                    {inspection.batteryHealth}
+                  </div>
+                )}
+                {inspection.hardwareTestResult && (
+                  <div>
+                    <span className="text-xs text-gray-400 block">Hardware test</span>
+                    {inspection.hardwareTestResult}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {inspection.notes && (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <h2 className="text-sm font-semibold text-gray-700 mb-2">Notes</h2>
@@ -611,6 +730,48 @@ export function InspectionDetailPage() {
       ) : (
         /* ── In-progress form ── */
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Job details */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-700">
+              Job Details <span className="text-gray-400 font-normal">(optional)</span>
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Ticket number
+                </label>
+                <input
+                  type="text"
+                  value={ticketNumber}
+                  onChange={(e) => setTicketNumber(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Contact person
+                </label>
+                <input
+                  type="text"
+                  value={contactPerson}
+                  onChange={(e) => setContactPerson(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Contact number/email
+                </label>
+                <input
+                  type="text"
+                  value={contactNumber}
+                  onChange={(e) => setContactNumber(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Condition grade */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h2 className="text-sm font-semibold text-gray-700 mb-3">
@@ -727,6 +888,91 @@ export function InspectionDetailPage() {
               </div>
             );
           })}
+
+          {/* Other accessories */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h2 className="text-sm font-semibold text-gray-700 mb-2">
+              Other accessories <span className="text-gray-400 font-normal">(optional)</span>
+            </h2>
+            <input
+              type="text"
+              value={otherAccessories}
+              onChange={(e) => setOtherAccessories(e.target.value)}
+              placeholder="e.g. Webcam and Wireless Mouse"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+            />
+          </div>
+
+          {/* Device diagnostics */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-700">
+              Device Diagnostics <span className="text-gray-400 font-normal">(optional)</span>
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Operating system and version
+                </label>
+                <input
+                  type="text"
+                  value={operatingSystem}
+                  onChange={(e) => setOperatingSystem(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">CPU</label>
+                <input
+                  type="text"
+                  value={cpu}
+                  onChange={(e) => setCpu(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">RAM</label>
+                <input
+                  type="text"
+                  value={ram}
+                  onChange={(e) => setRam(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Display</label>
+                <input
+                  type="text"
+                  value={display}
+                  onChange={(e) => setDisplay(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Battery health
+                </label>
+                <input
+                  type="text"
+                  value={batteryHealth}
+                  onChange={(e) => setBatteryHealth(e.target.value)}
+                  placeholder="e.g. Cycle count 92%"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Hardware test
+                </label>
+                <input
+                  type="text"
+                  value={hardwareTestResult}
+                  onChange={(e) => setHardwareTestResult(e.target.value)}
+                  placeholder="e.g. Passed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Photos */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">

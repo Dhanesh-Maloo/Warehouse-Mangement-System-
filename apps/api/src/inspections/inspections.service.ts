@@ -50,11 +50,9 @@ const CHECKLIST_SECTIONS: { title: string; items: ChecklistItem[] }[] = [
         label: 'Damage to adapter / charger (exposed wire, etc.)',
         yesIsGood: false,
       },
-      {
-        key: 'allAccessoriesPresent',
-        label: 'Returned with all accessories (AC Adapter & Headset)',
-        yesIsGood: true,
-      },
+      { key: 'acAdapterPresent', label: 'Returned with AC Adapter', yesIsGood: true },
+      { key: 'powerCablePresent', label: 'Returned with Power Cable', yesIsGood: true },
+      { key: 'headsetPresent', label: 'Returned with Headset', yesIsGood: true },
     ],
   },
   {
@@ -354,13 +352,19 @@ export class InspectionsService {
           completedByUserId,
           status: 'completed',
           conditionGrade: dto.conditionGrade,
+          ticketNumber: dto.ticketNumber,
+          contactPerson: dto.contactPerson,
+          contactNumber: dto.contactNumber,
           scratchesOnCasing: dto.scratchesOnCasing,
           lidClosingOk: dto.lidClosingOk,
           scratchesOnScreen: dto.scratchesOnScreen,
           keyboardIssues: dto.keyboardIssues,
           missingFeet: dto.missingFeet,
           chargerDamage: dto.chargerDamage,
-          allAccessoriesPresent: dto.allAccessoriesPresent,
+          acAdapterPresent: dto.acAdapterPresent,
+          powerCablePresent: dto.powerCablePresent,
+          headsetPresent: dto.headsetPresent,
+          otherAccessories: dto.otherAccessories,
           webcamOk: dto.webcamOk,
           speakersOk: dto.speakersOk,
           bluetoothOk: dto.bluetoothOk,
@@ -373,6 +377,12 @@ export class InspectionsService {
           imagesUploaded: dto.imagesUploaded,
           sanitization: dto.sanitization ?? null,
           factoryReset: dto.factoryReset ?? null,
+          operatingSystem: dto.operatingSystem,
+          cpu: dto.cpu,
+          ram: dto.ram,
+          display: dto.display,
+          batteryHealth: dto.batteryHealth,
+          hardwareTestResult: dto.hardwareTestResult,
           notes: dto.notes,
           slaMinutes,
         },
@@ -517,8 +527,38 @@ export class InspectionsService {
     doc.fontSize(9).font('Helvetica-Bold').text('Inspected by', 400, 178);
     doc.font('Helvetica').text(inspector?.fullName ?? inspection.startedByUser.fullName, 400, 191);
 
-    // Condition grade
     let y = 225;
+
+    // Job details — only shown when at least one was captured
+    if (inspection.ticketNumber || inspection.contactPerson || inspection.contactNumber) {
+      doc.fontSize(10).font('Helvetica-Bold').fillColor('#1A2B3C').text('Job Details', 50, y);
+      y += 16;
+      if (inspection.ticketNumber) {
+        doc
+          .fontSize(9)
+          .font('Helvetica')
+          .fillColor('#000000')
+          .text(`Ticket number: ${inspection.ticketNumber}`, 60, y);
+        y += 14;
+      }
+      if (inspection.contactPerson) {
+        doc
+          .fontSize(9)
+          .font('Helvetica')
+          .text(`Contact person: ${inspection.contactPerson}`, 60, y);
+        y += 14;
+      }
+      if (inspection.contactNumber) {
+        doc
+          .fontSize(9)
+          .font('Helvetica')
+          .text(`Contact number/email: ${inspection.contactNumber}`, 60, y);
+        y += 14;
+      }
+      y += 6;
+    }
+
+    // Condition grade
     if (inspection.conditionGrade) {
       doc
         .fontSize(9)
@@ -562,6 +602,51 @@ export class InspectionsService {
         y += 15;
       }
       y += 8;
+    }
+
+    if (inspection.otherAccessories) {
+      if (y > 720) {
+        doc.addPage();
+        y = 50;
+      }
+      doc
+        .fontSize(9)
+        .font('Helvetica')
+        .fillColor('#000000')
+        .text(`Other accessories: ${inspection.otherAccessories}`, 60, y, { width: 480 });
+      y += 20;
+    }
+
+    // Device diagnostics — only shown when at least one was captured
+    const diagnosticsFields: [string, string | null][] = [
+      ['Operating system', inspection.operatingSystem],
+      ['CPU', inspection.cpu],
+      ['RAM', inspection.ram],
+      ['Display', inspection.display],
+      ['Battery health', inspection.batteryHealth],
+      ['Hardware test', inspection.hardwareTestResult],
+    ];
+    const presentDiagnostics = diagnosticsFields.filter(([, value]) => !!value);
+    if (presentDiagnostics.length > 0) {
+      if (y > 680) {
+        doc.addPage();
+        y = 50;
+      }
+      doc
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .fillColor('#1A2B3C')
+        .text('Device Diagnostics', 50, y);
+      y += 16;
+      for (const [label, value] of presentDiagnostics) {
+        if (y > 730) {
+          doc.addPage();
+          y = 50;
+        }
+        doc.fontSize(9).font('Helvetica').fillColor('#000000').text(`${label}: ${value}`, 60, y);
+        y += 14;
+      }
+      y += 6;
     }
 
     if (inspection.notes) {

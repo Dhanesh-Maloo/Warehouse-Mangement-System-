@@ -5,6 +5,19 @@ export class CompleteInspectionDto {
   @IsEnum(ConditionGrade)
   conditionGrade!: ConditionGrade;
 
+  // Job details
+  @IsOptional()
+  @IsString()
+  ticketNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPerson?: string;
+
+  @IsOptional()
+  @IsString()
+  contactNumber?: string;
+
   // Physical appearance
   @IsBoolean()
   scratchesOnCasing!: boolean;
@@ -24,8 +37,19 @@ export class CompleteInspectionDto {
   @IsBoolean()
   chargerDamage!: boolean;
 
+  // Accessories — itemized
   @IsBoolean()
-  allAccessoriesPresent!: boolean;
+  acAdapterPresent!: boolean;
+
+  @IsBoolean()
+  powerCablePresent!: boolean;
+
+  @IsBoolean()
+  headsetPresent!: boolean;
+
+  @IsOptional()
+  @IsString()
+  otherAccessories?: string;
 
   // Functional checks
   @IsBoolean()
@@ -66,6 +90,31 @@ export class CompleteInspectionDto {
   @IsOptional()
   @IsBoolean()
   factoryReset?: boolean | null;
+
+  // Device diagnostics — free text
+  @IsOptional()
+  @IsString()
+  operatingSystem?: string;
+
+  @IsOptional()
+  @IsString()
+  cpu?: string;
+
+  @IsOptional()
+  @IsString()
+  ram?: string;
+
+  @IsOptional()
+  @IsString()
+  display?: string;
+
+  @IsOptional()
+  @IsString()
+  batteryHealth?: string;
+
+  @IsOptional()
+  @IsString()
+  hardwareTestResult?: string;
 
   @IsOptional()
   @IsString()

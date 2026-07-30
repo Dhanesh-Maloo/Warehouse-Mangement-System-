@@ -376,6 +376,10 @@ model Inspection {
   completedAt      DateTime?        @map("completed_at") @db.Timestamptz
   completedByUserId String?         @map("completed_by_user_id")
   conditionGrade   ConditionGrade?  @map("condition_grade")
+  // Job details — filled in alongside the checklist at completion time
+  ticketNumber     String?          @map("ticket_number")
+  contactPerson    String?          @map("contact_person")
+  contactNumber    String?          @map("contact_number")
   // Checklist booleans — null until inspection is completed
   // Physical appearance
   scratchesOnCasing       Boolean? @map("scratches_on_casing")
@@ -384,7 +388,11 @@ model Inspection {
   keyboardIssues          Boolean? @map("keyboard_issues")
   missingFeet             Boolean? @map("missing_feet")
   chargerDamage           Boolean? @map("charger_damage")
-  allAccessoriesPresent   Boolean? @map("all_accessories_present")
+  // Accessories — itemized (replaces the old single allAccessoriesPresent summary)
+  acAdapterPresent        Boolean? @map("ac_adapter_present")
+  powerCablePresent       Boolean? @map("power_cable_present")
+  headsetPresent          Boolean? @map("headset_present")
+  otherAccessories        String?  @map("other_accessories")
   // Functional checks
   webcamOk                Boolean? @map("webcam_ok")
   speakersOk              Boolean? @map("speakers_ok")
@@ -399,6 +407,13 @@ model Inspection {
   // Process — nullable so null = N/A
   sanitization            Boolean? @map("sanitization")
   factoryReset            Boolean? @map("factory_reset")
+  // Device diagnostics — free-text, filled in at completion time
+  operatingSystem  String?          @map("operating_system")
+  cpu              String?          @map("cpu")
+  ram              String?          @map("ram")
+  display          String?          @map("display")
+  batteryHealth    String?          @map("battery_health")
+  hardwareTestResult String?        @map("hardware_test_result")
   notes            String?
   // Business-hours minutes from startedAt to completedAt (IST, Mon-Fri 09-18)
   slaMinutes       Int?             @map("sla_minutes")
