@@ -14,12 +14,15 @@ describe('InspectionsService', () => {
     inspectionPhoto: { count: jest.Mock; createMany: jest.Mock };
     asset: { findUnique: jest.Mock; update: jest.Mock };
     retrievalRequest: { update: jest.Mock };
+    user: { findUnique: jest.Mock };
+    assetDocument: { findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
     $transaction: jest.Mock;
   };
   let mockLedger: { create: jest.Mock };
   let mockRateCard: { findEffectiveAt: jest.Mock };
   let mockAudit: { log: jest.Mock };
   let mockDeployment: { create: jest.Mock };
+  let mockR2: { getStream: jest.Mock; upload: jest.Mock; delete: jest.Mock };
   let service: InspectionsService;
 
   const baseInspection = {
@@ -105,12 +108,25 @@ describe('InspectionsService', () => {
           .fn()
           .mockImplementation((args) => Promise.resolve({ ...retrievalBase, ...args.data })),
       },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ fullName: 'Inspector One' }),
+      },
+      assetDocument: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({}),
+        update: jest.fn().mockResolvedValue({}),
+      },
       $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(mockPrisma)),
     };
     mockLedger = { create: jest.fn().mockResolvedValue({}) };
     mockRateCard = { findEffectiveAt: jest.fn().mockResolvedValue({ unitRatePaise: BigInt(500) }) };
     mockAudit = { log: jest.fn().mockResolvedValue(undefined) };
     mockDeployment = { create: jest.fn().mockResolvedValue({}) };
+    mockR2 = {
+      getStream: jest.fn().mockResolvedValue(undefined),
+      upload: jest.fn().mockResolvedValue(undefined),
+      delete: jest.fn().mockResolvedValue(undefined),
+    };
 
     service = new InspectionsService(
       mockPrisma as unknown as ConstructorParameters<typeof InspectionsService>[0],
@@ -118,6 +134,7 @@ describe('InspectionsService', () => {
       mockRateCard as unknown as ConstructorParameters<typeof InspectionsService>[2],
       mockAudit as unknown as ConstructorParameters<typeof InspectionsService>[3],
       mockDeployment as unknown as ConstructorParameters<typeof InspectionsService>[4],
+      mockR2 as unknown as ConstructorParameters<typeof InspectionsService>[5],
     );
   });
 
@@ -399,6 +416,138 @@ describe('InspectionsService', () => {
       // status should NOT have been advanced to completed since deploy failed
       expect(mockPrisma.retrievalRequest.update).not.toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: 'completed', completedAt: expect.any(Date) } }),
+      );
+    });
+  });
+
+  describe('generateConditionReportPdf', () => {
+    const completedInspection = {
+      id: 'inspection-1',
+      assetId: 'asset-1',
+      status: 'completed',
+      type: 'inbound',
+      startedAt: new Date('2026-07-01T05:00:00.000Z'),
+      completedAt: new Date('2026-07-01T06:00:00.000Z'),
+      completedByUserId: 'user-2',
+      conditionGrade: 'A',
+      notes: 'All good',
+      scratchesOnCasing: false,
+      lidClosingOk: true,
+      scratchesOnScreen: false,
+      keyboardIssues: false,
+      missingFeet: false,
+      chargerDamage: false,
+      allAccessoriesPresent: true,
+      webcamOk: true,
+      speakersOk: true,
+      bluetoothOk: true,
+      batteryCharges: true,
+      screenOk: true,
+      keyboardOk: true,
+      trackpadOk: true,
+      portsOk: true,
+      powersOnOk: true,
+      imagesUploaded: true,
+      sanitization: null,
+      factoryReset: null,
+      photos: [],
+      startedByUser: { fullName: 'Starter One' },
+      asset: {
+        id: 'asset-1',
+        clientId: 'client-1',
+        serialNumber: 'SN-001',
+        assetTag: 'TAG-001',
+        model: 'ThinkPad X1',
+        manufacturer: 'Lenovo',
+      },
+    };
+
+    it('throws NotFoundException when the inspection does not exist', async () => {
+      mockPrisma.inspection.findUnique.mockResolvedValueOnce(null);
+      await expect(service.generateConditionReportPdf('missing')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('throws ForbiddenException when the inspection belongs to another client', async () => {
+      mockPrisma.inspection.findUnique.mockResolvedValueOnce(completedInspection);
+      await expect(
+        service.generateConditionReportPdf('inspection-1', 'other-client'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws BadRequestException when the inspection is not completed', async () => {
+      mockPrisma.inspection.findUnique.mockResolvedValueOnce({
+        ...completedInspection,
+        status: 'in_progress',
+      });
+      await expect(service.generateConditionReportPdf('inspection-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('generates a PDF stream for a completed inspection the caller owns', async () => {
+      mockPrisma.inspection.findUnique.mockResolvedValueOnce(completedInspection);
+      const { stream, filename } = await service.generateConditionReportPdf(
+        'inspection-1',
+        'client-1',
+      );
+      expect(filename).toBe('condition-report-SN-001.pdf');
+      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'user-2' } }),
+      );
+
+      const chunks: Buffer[] = [];
+      await new Promise<void>((resolve, reject) => {
+        stream.on('data', (chunk) => chunks.push(chunk as Buffer));
+        stream.on('end', () => resolve());
+        stream.on('error', reject);
+      });
+      expect(Buffer.concat(chunks).length).toBeGreaterThan(0);
+    });
+
+    it('does not persist a document when generatedByUserId is not supplied (e.g. client_user download)', async () => {
+      mockPrisma.inspection.findUnique.mockResolvedValueOnce(completedInspection);
+      await service.generateConditionReportPdf('inspection-1', 'client-1');
+      expect(mockR2.upload).not.toHaveBeenCalled();
+      expect(mockPrisma.assetDocument.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a new AssetDocument on first generation when generatedByUserId is supplied', async () => {
+      mockPrisma.inspection.findUnique.mockResolvedValueOnce(completedInspection);
+      await service.generateConditionReportPdf('inspection-1', undefined, 'staff-1');
+
+      expect(mockR2.upload).toHaveBeenCalledWith(
+        'documents/inspections/condition-report-inspection-1.pdf',
+        expect.any(Buffer),
+        'application/pdf',
+      );
+      expect(mockPrisma.assetDocument.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            assetId: 'asset-1',
+            inspectionId: 'inspection-1',
+            clientId: 'client-1',
+            storagePath: 'documents/inspections/condition-report-inspection-1.pdf',
+            uploadedByUserId: 'staff-1',
+          }),
+        }),
+      );
+      expect(mockPrisma.assetDocument.update).not.toHaveBeenCalled();
+    });
+
+    it('updates the existing AssetDocument on regeneration instead of creating a duplicate', async () => {
+      mockPrisma.inspection.findUnique.mockResolvedValueOnce(completedInspection);
+      mockPrisma.assetDocument.findFirst.mockResolvedValueOnce({ id: 'doc-1' });
+
+      await service.generateConditionReportPdf('inspection-1', undefined, 'staff-1');
+
+      expect(mockPrisma.assetDocument.create).not.toHaveBeenCalled();
+      expect(mockPrisma.assetDocument.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'doc-1' },
+          data: expect.objectContaining({ uploadedByUserId: 'staff-1' }),
+        }),
       );
     });
   });

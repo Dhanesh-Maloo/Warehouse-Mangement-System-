@@ -14,6 +14,7 @@ import {
   Trash2,
   Clock,
   XOctagon,
+  FileDown,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -335,6 +336,23 @@ export function InspectionDetailPage() {
 
   const isComplete = inspection.status !== 'in_progress';
 
+  const currentInspection = inspection;
+  async function downloadReport() {
+    const token = localStorage.getItem('wh_token');
+    const base = import.meta.env.VITE_API_URL ?? '';
+    const res = await fetch(`${base}/api/v1/inspections/${currentInspection.id}/report`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `condition-report-${currentInspection.asset.serialNumber}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const passCount = ALL_ITEMS.filter((item) => {
     const val = isComplete
       ? (inspection[item.key] as boolean | null)
@@ -388,12 +406,21 @@ export function InspectionDetailPage() {
             })}
           </p>
         </div>
-        {isComplete && inspection.conditionGrade && (
+        {inspection.status === 'completed' && inspection.conditionGrade && (
           <span
             className={`px-3 py-1 rounded-lg text-sm font-bold border ${GRADE_LABELS[inspection.conditionGrade as Grade]?.color}`}
           >
             Grade {inspection.conditionGrade}
           </span>
+        )}
+        {inspection.status === 'completed' && (
+          <button
+            onClick={() => void downloadReport()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            <FileDown size={15} />
+            Download report
+          </button>
         )}
         {!isComplete && (
           <button

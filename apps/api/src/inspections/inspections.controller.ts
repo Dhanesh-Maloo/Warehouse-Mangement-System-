@@ -135,6 +135,30 @@ export class InspectionsController {
     return { key };
   }
 
+  @Get(':id/report')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
+  async downloadReport(
+    @Param('id') id: string,
+    @Res() res: Response,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<void> {
+    const requestingClientId = InspectionsController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    // Only persist an archived copy when someone with upload rights
+    // downloads it (same role split as the document-upload endpoints) — a
+    // plain client_user's own download shouldn't attribute the stored
+    // document to them.
+    const { stream, filename } = await this.inspectionsService.generateConditionReportPdf(
+      id,
+      requestingClientId,
+      user.role === 'client_user' ? undefined : user.sub,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    stream.pipe(res);
+  }
+
   @Get('photos/:inspectionId/:filename')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   async servePhoto(
