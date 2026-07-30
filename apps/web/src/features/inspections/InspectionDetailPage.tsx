@@ -905,43 +905,51 @@ export function InspectionDetailPage() {
 
           {/* Device diagnostics */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-gray-700">
-              Device Diagnostics <span className="text-gray-400 font-normal">(optional)</span>
-            </h2>
+            <h2 className="text-sm font-semibold text-gray-700">Device Diagnostics</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Operating system and version
+                  Operating system and version <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  required
                   value={operatingSystem}
                   onChange={(e) => setOperatingSystem(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">CPU</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  CPU <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
+                  required
                   value={cpu}
                   onChange={(e) => setCpu(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">RAM</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  RAM <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
+                  required
                   value={ram}
                   onChange={(e) => setRam(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Display</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Display <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
+                  required
                   value={display}
                   onChange={(e) => setDisplay(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
@@ -949,10 +957,11 @@ export function InspectionDetailPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Battery health
+                  Battery health <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  required
                   value={batteryHealth}
                   onChange={(e) => setBatteryHealth(e.target.value)}
                   placeholder="e.g. Cycle count 92%"
@@ -961,10 +970,11 @@ export function InspectionDetailPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Hardware test
+                  Hardware test <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  required
                   value={hardwareTestResult}
                   onChange={(e) => setHardwareTestResult(e.target.value)}
                   placeholder="e.g. Passed"

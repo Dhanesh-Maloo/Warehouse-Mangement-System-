@@ -1,4 +1,4 @@
-import { IsEnum, IsBoolean, IsOptional, IsString, IsArray } from 'class-validator';
+import { IsEnum, IsBoolean, IsOptional, IsString, IsArray, IsNotEmpty } from 'class-validator';
 import { ConditionGrade } from '@prisma/client';
 
 export class CompleteInspectionDto {
@@ -91,30 +91,30 @@ export class CompleteInspectionDto {
   @IsBoolean()
   factoryReset?: boolean | null;
 
-  // Device diagnostics — free text
-  @IsOptional()
+  // Device diagnostics — free text, mandatory
   @IsString()
-  operatingSystem?: string;
+  @IsNotEmpty()
+  operatingSystem!: string;
 
-  @IsOptional()
   @IsString()
-  cpu?: string;
+  @IsNotEmpty()
+  cpu!: string;
 
-  @IsOptional()
   @IsString()
-  ram?: string;
+  @IsNotEmpty()
+  ram!: string;
 
-  @IsOptional()
   @IsString()
-  display?: string;
+  @IsNotEmpty()
+  display!: string;
 
-  @IsOptional()
   @IsString()
-  batteryHealth?: string;
+  @IsNotEmpty()
+  batteryHealth!: string;
 
-  @IsOptional()
   @IsString()
-  hardwareTestResult?: string;
+  @IsNotEmpty()
+  hardwareTestResult!: string;
 
   @IsOptional()
   @IsString()

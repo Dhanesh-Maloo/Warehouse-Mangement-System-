@@ -57,6 +57,12 @@ describe('InspectionsService', () => {
     portsOk: true,
     powersOnOk: true,
     imagesUploaded: true,
+    operatingSystem: 'Windows 11 Pro 25H2',
+    cpu: 'i3-13Gen',
+    ram: '8GB',
+    display: '13 inch',
+    batteryHealth: 'Cycle count 92%',
+    hardwareTestResult: 'Passed',
     photoKeys: ['photo-1'],
   };
 
