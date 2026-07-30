@@ -47,6 +47,7 @@ enum AssetStatus {
   disposed
   in_repair
   for_resale
+  sold
 }
 
 enum ConditionGrade {
@@ -609,6 +610,7 @@ model RepairRequest {
   notes             String?
   createdByUserId   String       @map("created_by_user_id")
   requestedAt       DateTime     @default(now()) @map("requested_at") @db.Timestamptz
+  slaTargetAt       DateTime?    @map("sla_target_at") @db.Timestamptz
   sentAt            DateTime?    @map("sent_at") @db.Timestamptz
   returnedAt        DateTime?    @map("returned_at") @db.Timestamptz
   completedAt       DateTime?    @map("completed_at") @db.Timestamptz

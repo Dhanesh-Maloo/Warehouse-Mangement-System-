@@ -129,6 +129,97 @@ describe('RepairService', () => {
         }),
       );
     });
+
+    it('defaults slaTargetAt to 5 business days ahead when not provided', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
+      mockPrisma.repairRequest.create.mockResolvedValue({
+        id: 'repair-3',
+        assetId: 'asset-1',
+        status: 'pending',
+      });
+      mockPrisma.asset.update.mockResolvedValue({ ...baseAsset, currentStatus: 'in_repair' });
+      mockPrisma.asset.findMany.mockResolvedValue([baseAsset]);
+      mockRateCard.findEffectiveAt.mockResolvedValue(null);
+
+      const before = Date.now();
+      await service.create(dto as any, 'user-1');
+
+      const createCall = mockPrisma.repairRequest.create.mock.calls[0][0];
+      const slaTargetAt: Date = createCall.data.slaTargetAt;
+      expect(slaTargetAt).toBeInstanceOf(Date);
+      // 5 business days of 9-hour days is at least 5 calendar days out, and
+      // can never land before the request was created.
+      expect(slaTargetAt.getTime()).toBeGreaterThan(before);
+      expect(slaTargetAt.getTime() - before).toBeGreaterThanOrEqual(5 * 24 * 60 * 60 * 1000);
+    });
+
+    it('uses the provided slaTargetAt override instead of the default', async () => {
+      const override = '2026-08-15T10:00:00.000Z';
+      mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
+      mockPrisma.repairRequest.create.mockResolvedValue({
+        id: 'repair-4',
+        assetId: 'asset-1',
+        status: 'pending',
+      });
+      mockPrisma.asset.update.mockResolvedValue({ ...baseAsset, currentStatus: 'in_repair' });
+      mockPrisma.asset.findMany.mockResolvedValue([baseAsset]);
+      mockRateCard.findEffectiveAt.mockResolvedValue(null);
+
+      await service.create({ ...dto, slaTargetAt: override } as any, 'user-1');
+
+      const createCall = mockPrisma.repairRequest.create.mock.calls[0][0];
+      expect(createCall.data.slaTargetAt).toEqual(new Date(override));
+    });
+  });
+
+  describe('isOverdue', () => {
+    it('flags a non-terminal repair past its slaTargetAt as overdue', async () => {
+      mockPrisma.repairRequest.findMany.mockResolvedValue([
+        {
+          id: 'repair-1',
+          assetId: 'asset-1',
+          status: 'in_repair',
+          slaTargetAt: new Date(Date.now() - 60_000),
+        },
+      ]);
+      mockPrisma.asset.findMany.mockResolvedValue([baseAsset]);
+
+      const [result] = await service.findAll('client-1');
+
+      expect(result.isOverdue).toBe(true);
+    });
+
+    it('does not flag a repair whose slaTargetAt is still in the future', async () => {
+      mockPrisma.repairRequest.findMany.mockResolvedValue([
+        {
+          id: 'repair-1',
+          assetId: 'asset-1',
+          status: 'in_repair',
+          slaTargetAt: new Date(Date.now() + 60_000),
+        },
+      ]);
+      mockPrisma.asset.findMany.mockResolvedValue([baseAsset]);
+
+      const [result] = await service.findAll('client-1');
+
+      expect(result.isOverdue).toBe(false);
+    });
+
+    it('does not flag a completed repair even if past its slaTargetAt', async () => {
+      mockPrisma.repairRequest.findMany.mockResolvedValue([
+        {
+          id: 'repair-1',
+          assetId: 'asset-1',
+          status: 'completed',
+          slaTargetAt: new Date(Date.now() - 60_000),
+        },
+      ]);
+      mockPrisma.asset.findMany.mockResolvedValue([baseAsset]);
+
+      const [result] = await service.findAll('client-1');
+
+      expect(result.isOverdue).toBe(false);
+    });
   });
 
   describe('updateStatus', () => {

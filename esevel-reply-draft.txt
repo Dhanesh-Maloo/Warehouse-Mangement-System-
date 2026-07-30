@@ -1,0 +1,22 @@
+Subject: RE: Retrieval & Redeploy SOP – Clarifications Before Live Deployment
+
+Hi Jericho,
+
+Thanks for confirming — this all makes sense and matches how we'll proceed.
+
+1. Diagnostic Inspection & Data Wipe
+Understood — diagnostic inspection stays mandatory for every retrieval as-is, no changes needed there. Data wipe will continue to be selected per retrieval based on your confirmation with the client, so no forced-wipe or skip logic is required on our side.
+
+2. Repair SLA / Overdue Tracking
+Noted as a priority. We'll add a target completion date (SLA) to each repair request and overdue tracking/alerts so you can monitor turnaround against the target. We'll follow up with a timeline shortly.
+
+3. Resale — Asset Status Sync
+Noted as well. We'll update the underlying asset record to a "sold" status once a resale listing is marked sold, so it drops out of active-asset views. We'll confirm a timeline for this alongside the repair SLA work.
+
+4. Disposal/ITAD Certification
+Good to have this confirmed as working per your expectations — no action needed here.
+
+We'll come back to you shortly with timelines for items 2 and 3. Let us know if anything else needs adjusting in the meantime.
+
+Best regards,
+Dhanesh

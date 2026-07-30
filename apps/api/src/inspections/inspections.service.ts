@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
@@ -8,54 +13,7 @@ import { DeploymentService } from '../deployment/deployment.service';
 import type { CreateInspectionDto } from './dto/create-inspection.dto';
 import type { CompleteInspectionDto } from './dto/complete-inspection.dto';
 import type { CreateDeploymentOrderDto } from '../deployment/dto/create-deployment-order.dto';
-
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-const BH_START_HOUR = 9;
-const BH_END_HOUR = 18;
-
-function businessMinutesBetween(start: Date, end: Date, holidays: Set<string>): number {
-  let minutes = 0;
-  const cursor = new Date(start);
-  while (cursor < end) {
-    const istDate = new Date(cursor.getTime() + IST_OFFSET_MS);
-    const dayOfWeek = istDate.getUTCDay();
-    const hour = istDate.getUTCHours();
-    const dateKey = istDate.toISOString().slice(0, 10);
-    if (
-      dayOfWeek >= 1 &&
-      dayOfWeek <= 5 &&
-      hour >= BH_START_HOUR &&
-      hour < BH_END_HOUR &&
-      !holidays.has(dateKey)
-    ) {
-      minutes += 1;
-    }
-    cursor.setTime(cursor.getTime() + 60_000);
-  }
-  return minutes;
-}
-
-function addBusinessMinutes(start: Date, minutesToAdd: number, holidays: Set<string>): Date {
-  let remaining = minutesToAdd;
-  const cursor = new Date(start);
-  while (remaining > 0) {
-    cursor.setTime(cursor.getTime() + 60_000);
-    const istDate = new Date(cursor.getTime() + IST_OFFSET_MS);
-    const dayOfWeek = istDate.getUTCDay();
-    const hour = istDate.getUTCHours();
-    const dateKey = istDate.toISOString().slice(0, 10);
-    if (
-      dayOfWeek >= 1 &&
-      dayOfWeek <= 5 &&
-      hour >= BH_START_HOUR &&
-      hour < BH_END_HOUR &&
-      !holidays.has(dateKey)
-    ) {
-      remaining -= 1;
-    }
-  }
-  return cursor;
-}
+import { businessMinutesBetween, addBusinessMinutes } from '../common/business-hours.util';
 
 @Injectable()
 export class InspectionsService {
@@ -203,9 +161,14 @@ export class InspectionsService {
   async create(
     dto: CreateInspectionDto,
     startedByUserId: string,
+    requestingClientId?: string,
   ): Promise<Prisma.InspectionGetPayload<{ include: { asset: true } }>> {
     const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } });
     if (!asset) throw new NotFoundException(`Asset ${dto.assetId} not found`);
+
+    if (requestingClientId && asset.clientId !== requestingClientId) {
+      throw new ForbiddenException('Cannot create an inspection for an asset from another client');
+    }
 
     const open = await this.prisma.inspection.findFirst({
       where: { assetId: dto.assetId, status: 'in_progress' },

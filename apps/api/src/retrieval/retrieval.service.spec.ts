@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RetrievalService } from './retrieval.service';
 import type { CreateRetrievalRequestDto } from './dto/create-retrieval-request.dto';
 import type { UpdateRetrievalStatusDto } from './dto/update-retrieval-status.dto';
@@ -6,7 +6,7 @@ import type { UpdateRetrievalStatusDto } from './dto/update-retrieval-status.dto
 describe('RetrievalService', () => {
   let mockPrisma: {
     retrievalRequest: { create: jest.Mock; update: jest.Mock; findUnique: jest.Mock };
-    asset: { update: jest.Mock };
+    asset: { findUnique: jest.Mock; update: jest.Mock };
     inspection: { create: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -49,7 +49,10 @@ describe('RetrievalService', () => {
         update: jest.fn().mockImplementation((args) => Promise.resolve({ id: args.where.id })),
         findUnique: jest.fn(),
       },
-      asset: { update: jest.fn().mockResolvedValue({}) },
+      asset: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'asset-1', clientId: 'client-1' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
       inspection: { create: jest.fn().mockResolvedValue({}) },
       $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(mockPrisma)),
     };
@@ -68,6 +71,18 @@ describe('RetrievalService', () => {
   });
 
   describe('create', () => {
+    it('throws NotFoundException if the asset does not exist', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue(null);
+
+      await expect(service.create(baseDto, 'user-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequestException if the asset belongs to a different client', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', clientId: 'other-client' });
+
+      await expect(service.create(baseDto, 'user-1')).rejects.toThrow(BadRequestException);
+    });
+
     it.each([
       ['intra_state', 'COURIER_CITY'],
       ['inter_state', 'COURIER_INTERSTATE'],

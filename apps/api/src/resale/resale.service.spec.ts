@@ -123,8 +123,9 @@ describe('ResaleService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('listed -> sold stores soldPricePaise/soldAt and leaves the asset as for_resale', async () => {
+    it('listed -> sold stores soldPricePaise/soldAt and moves the asset to sold', async () => {
       setupListing('listed');
+      mockPrisma.asset.update.mockResolvedValue({ ...baseAsset, currentStatus: 'sold' });
 
       const result = await service.updateStatus(
         'listing-1',
@@ -135,8 +136,11 @@ describe('ResaleService', () => {
       expect(result.status).toBe('sold');
       expect(result.soldPricePaise).toBe(BigInt(5000));
       expect(result.soldAt).toBeInstanceOf(Date);
-      expect(mockPrisma.asset.update).not.toHaveBeenCalled();
-      expect(result.asset.currentStatus).toBe('in_storage');
+      expect(mockPrisma.asset.update).toHaveBeenCalledWith({
+        where: { id: 'asset-1' },
+        data: { currentStatus: 'sold' },
+      });
+      expect(result.asset.currentStatus).toBe('sold');
     });
 
     it('listed -> cancelled reverts the asset to in_storage', async () => {

@@ -78,7 +78,12 @@ export class InspectionsController {
     @Body() dto: CreateInspectionDto,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<InspectionsService['create']> {
-    return this.inspectionsService.create(dto, user.sub);
+    // Inspections have no clientId of their own — they inherit scope from the
+    // referenced asset, so the service must check asset.clientId itself.
+    const requestingClientId = InspectionsController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    return this.inspectionsService.create(dto, user.sub, requestingClientId);
   }
 
   @Patch(':id/cancel')

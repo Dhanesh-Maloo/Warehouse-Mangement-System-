@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsInt, IsISO8601, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CreateRepairRequestDto {
   @IsUUID()
@@ -15,6 +15,12 @@ export class CreateRepairRequestDto {
   @Min(0)
   @IsOptional()
   estimateCostPaise?: number;
+
+  // Overrides the default SLA target (5 business days from request creation)
+  // when the service center gives a different completion estimate.
+  @IsISO8601()
+  @IsOptional()
+  slaTargetAt?: string;
 
   @IsString()
   @IsOptional()

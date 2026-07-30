@@ -64,6 +64,10 @@ export class DeploymentController {
     @Body() dto: CreateDeploymentOrderDto,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<DeploymentService['create']> {
+    // editors/client_admins can only create deployment orders for their own client
+    if ((user.role === 'editor' || user.role === 'client_admin') && user.clientId) {
+      dto.clientId = user.clientId;
+    }
     return this.deploymentService.create(dto, user.sub);
   }
 

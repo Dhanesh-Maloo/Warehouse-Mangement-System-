@@ -129,10 +129,16 @@ export class ResaleService {
         },
       });
 
-      // 'sold' keeps the asset as 'for_resale' — there's no dedicated
-      // sold/removed-from-inventory asset status yet (known simplification).
-      // 'cancelled' reverts the asset to in_storage — the resale attempt was abandoned.
+      // 'sold' moves the asset to a terminal 'sold' status so it drops out of
+      // active-asset views. 'cancelled' reverts the asset to in_storage — the
+      // resale attempt was abandoned.
       let updatedAsset = await tx.asset.findUnique({ where: { id: listing.assetId } });
+      if (dto.status === 'sold') {
+        updatedAsset = await tx.asset.update({
+          where: { id: listing.assetId },
+          data: { currentStatus: 'sold' },
+        });
+      }
       if (dto.status === 'cancelled') {
         updatedAsset = await tx.asset.update({
           where: { id: listing.assetId },

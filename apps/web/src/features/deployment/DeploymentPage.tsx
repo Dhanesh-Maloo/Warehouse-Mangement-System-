@@ -196,20 +196,21 @@ export function DeploymentPage() {
   // authoritatively when the order is created.
   const pincode = form.addrPincode.trim();
   const {
-    data: zonePreview,
+    data: zoneData,
     isError: zoneIsError,
     error: zoneError,
     refetch: refetchZone,
   } = useQuery({
     queryKey: ['courier-zone-preview', pincode],
     queryFn: () =>
-      api.get<'intra_state' | 'inter_state' | 'rural'>(
+      api.get<{ zone: 'intra_state' | 'inter_state' | 'rural' }>(
         `/logistics/resolve-zone?pincode=${encodeURIComponent(pincode)}`,
       ),
     enabled: showForm && /^\d{6}$/.test(pincode),
     retry: 2,
     retryDelay: 1000,
   });
+  const zonePreview = zoneData?.zone;
 
   // ---------------------------------------------------------------------------
   // Mutations

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
+import { addBusinessMinutes } from '../common/business-hours.util';
 import type { CreateRepairRequestDto } from './dto/create-repair-request.dto';
 import type { UpdateRepairStatusDto } from './dto/update-repair-status.dto';
 
@@ -14,7 +15,10 @@ export interface RepairAssetSummary {
   manufacturer: string;
 }
 
-export type RepairRequestWithAsset = RepairRequest & { asset: RepairAssetSummary | null };
+export type RepairRequestWithAsset = RepairRequest & {
+  asset: RepairAssetSummary | null;
+  isOverdue: boolean;
+};
 
 // RepairRequest has no Prisma relation to Asset — it's a plain FK column, not a
 // relation field — so the related asset is looked up separately (batched by id)
@@ -29,6 +33,13 @@ const REPAIR_TRANSITIONS: Record<string, string[]> = {
   cancelled: [],
 };
 
+const REPAIR_TERMINAL_STATUSES = new Set(['completed', 'cancelled']);
+
+// Default repair SLA: 5 business days (9 business hours/day, per CLAUDE.md
+// rule 4 — Mon-Fri 09:00-18:00 IST, excluding holidays), overridable per
+// request when the service center gives a different completion estimate.
+const DEFAULT_SLA_BUSINESS_MINUTES = 5 * 9 * 60;
+
 @Injectable()
 export class RepairService {
   constructor(
@@ -38,6 +49,18 @@ export class RepairService {
     private readonly audit: AuditService,
   ) {}
 
+  // Holiday calendar lookup is not wired up yet (see Holiday model) — mirrors
+  // the same stub used by InspectionsService until that's implemented.
+  private getHolidaySet(): Set<string> {
+    return new Set<string>();
+  }
+
+  private isOverdue(repair: Pick<RepairRequest, 'status' | 'slaTargetAt'>): boolean {
+    if (REPAIR_TERMINAL_STATUSES.has(repair.status)) return false;
+    if (!repair.slaTargetAt) return false;
+    return repair.slaTargetAt.getTime() < Date.now();
+  }
+
   private async attachAssets(rows: RepairRequest[]): Promise<RepairRequestWithAsset[]> {
     if (rows.length === 0) return [];
     const assetIds = [...new Set(rows.map((r) => r.assetId))];
@@ -46,7 +69,11 @@ export class RepairService {
       select: { id: true, serialNumber: true, model: true, manufacturer: true },
     });
     const byId = new Map(assets.map((a) => [a.id, a]));
-    return rows.map((r) => ({ ...r, asset: byId.get(r.assetId) ?? null }));
+    return rows.map((r) => ({
+      ...r,
+      asset: byId.get(r.assetId) ?? null,
+      isOverdue: this.isOverdue(r),
+    }));
   }
 
   async findAll(clientId?: string): Promise<RepairRequestWithAsset[]> {
@@ -95,6 +122,10 @@ export class RepairService {
     const rate = await this.rateCard.findEffectiveAt('REPAIR', occurredAt);
     const unitRate = rate ? rate.unitRatePaise : BigInt(0);
 
+    const slaTargetAt = dto.slaTargetAt
+      ? new Date(dto.slaTargetAt)
+      : addBusinessMinutes(occurredAt, DEFAULT_SLA_BUSINESS_MINUTES, this.getHolidaySet());
+
     const repair = await this.prisma.$transaction(async (tx) => {
       const created = await tx.repairRequest.create({
         data: {
@@ -103,6 +134,7 @@ export class RepairService {
           serviceCenterName: dto.serviceCenterName,
           estimateCostPaise:
             dto.estimateCostPaise !== undefined ? BigInt(dto.estimateCostPaise) : undefined,
+          slaTargetAt,
           notes: dto.notes,
           status: 'pending',
           createdByUserId,

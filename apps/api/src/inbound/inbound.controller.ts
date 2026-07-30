@@ -74,10 +74,11 @@ export class InboundController {
 
   @Post('receive')
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
-  receiveDevices(
+  async receiveDevices(
     @Body() dto: ReceiveDevicesDto,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<InboundService['receiveDevices']> {
+    await this.assertOwnsDelivery(dto.expectedDeliveryId, user);
     return this.inboundService.receiveDevices(dto, user.sub);
   }
 

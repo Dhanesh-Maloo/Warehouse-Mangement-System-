@@ -185,18 +185,21 @@ export function RetrievalPage() {
   // read-only preview for the cost estimate — the backend re-resolves it
   // authoritatively when the request is created.
   const {
-    data: zonePreview,
+    data: zoneData,
     isError: zoneIsError,
     error: zoneError,
     refetch: refetchZone,
   } = useQuery({
     queryKey: ['courier-zone-preview', form.pincode],
     queryFn: () =>
-      api.get<CourierZone>(`/logistics/resolve-zone?pincode=${encodeURIComponent(form.pincode)}`),
+      api.get<{ zone: CourierZone }>(
+        `/logistics/resolve-zone?pincode=${encodeURIComponent(form.pincode)}`,
+      ),
     enabled: showForm && /^\d{6}$/.test(form.pincode),
     retry: 2,
     retryDelay: 1000,
   });
+  const zonePreview = zoneData?.zone;
 
   // Create mutation
   const createMutation = useMutation({

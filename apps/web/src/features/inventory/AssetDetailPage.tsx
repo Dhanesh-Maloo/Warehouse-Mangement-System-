@@ -65,6 +65,9 @@ const STATUS_COLORS: Record<string, string> = {
   deployed: 'bg-[#E86F2C]/10 text-[#E86F2C]',
   returning: 'bg-purple-100 text-purple-700',
   disposed: 'bg-gray-100 text-gray-500',
+  in_repair: 'bg-amber-100 text-amber-700',
+  for_resale: 'bg-blue-100 text-blue-700',
+  sold: 'bg-emerald-100 text-emerald-700',
 };
 
 const GRADE_COLORS: Record<string, string> = {
@@ -155,9 +158,7 @@ export function AssetDetailPage() {
       repairEstimateCost: asset.repairEstimateCost?.toString() ?? '',
       awbNumber: asset.awbNumber ?? '',
       courierName: asset.courierName ?? '',
-      deliveredAt: asset.deliveredAt
-        ? new Date(asset.deliveredAt).toISOString().split('T')[0]
-        : '',
+      deliveredAt: asset.deliveredAt ? new Date(asset.deliveredAt).toISOString().split('T')[0] : '',
       disposalType: asset.disposalType ?? '',
       hasCertification: asset.hasCertification ?? false,
     });
@@ -653,9 +654,7 @@ export function AssetDetailPage() {
                   </label>
                   <select
                     value={editForm.assetCondition}
-                    onChange={(e) =>
-                      setEditForm((f) => ({ ...f, assetCondition: e.target.value }))
-                    }
+                    onChange={(e) => setEditForm((f) => ({ ...f, assetCondition: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                   >
                     <option value="">Not set</option>
@@ -669,9 +668,7 @@ export function AssetDetailPage() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
                   <select
                     value={editForm.currentStatus}
-                    onChange={(e) =>
-                      setEditForm((f) => ({ ...f, currentStatus: e.target.value }))
-                    }
+                    onChange={(e) => setEditForm((f) => ({ ...f, currentStatus: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                   >
                     <option value="receiving">Receiving</option>
@@ -764,9 +761,7 @@ export function AssetDetailPage() {
                     <input
                       type="text"
                       value={editForm.courierName}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, courierName: e.target.value }))
-                      }
+                      onChange={(e) => setEditForm((f) => ({ ...f, courierName: e.target.value }))}
                       placeholder="e.g. FedEx, DHL"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                     />
@@ -778,9 +773,7 @@ export function AssetDetailPage() {
                     <input
                       type="date"
                       value={editForm.deliveredAt}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, deliveredAt: e.target.value }))
-                      }
+                      onChange={(e) => setEditForm((f) => ({ ...f, deliveredAt: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                     />
                   </div>
@@ -790,9 +783,7 @@ export function AssetDetailPage() {
                     </label>
                     <select
                       value={editForm.disposalType}
-                      onChange={(e) =>
-                        setEditForm((f) => ({ ...f, disposalType: e.target.value }))
-                      }
+                      onChange={(e) => setEditForm((f) => ({ ...f, disposalType: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                     >
                       <option value="non_certified">Non-Certified</option>

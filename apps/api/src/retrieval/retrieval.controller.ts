@@ -76,6 +76,10 @@ export class RetrievalController {
     @Body() dto: CreateRetrievalRequestDto,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<RetrievalService['create']> {
+    // editors/client_admins can only file retrieval requests for their own client
+    if ((user.role === 'editor' || user.role === 'client_admin') && user.clientId) {
+      dto.clientId = user.clientId;
+    }
     return this.retrievalService.create(dto, user.sub);
   }
 

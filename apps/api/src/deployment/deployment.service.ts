@@ -69,6 +69,15 @@ export class DeploymentService {
     dto: CreateDeploymentOrderDto,
     createdByUserId: string,
   ): Promise<Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>> {
+    const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } });
+    if (!asset) throw new NotFoundException(`Asset ${dto.assetId} not found`);
+
+    if (asset.clientId !== dto.clientId) {
+      throw new BadRequestException(
+        `Asset ${dto.assetId} does not belong to client ${dto.clientId}`,
+      );
+    }
+
     const occurredAt = new Date();
     const bundleType = dto.bundleType ?? 'standard';
 

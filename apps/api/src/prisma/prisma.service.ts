@@ -13,6 +13,9 @@ const TENANT_SCOPED_MODELS = new Set([
   'StorageAccrualRun',
   'EventSuppression',
   'EndUser',
+  'RepairRequest',
+  'ResaleListing',
+  'AssetDocument',
 ]);
 
 @Injectable()
@@ -31,8 +34,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       ) {
         params.args = params.args ?? {};
         params.args.where = {
-          clientId,
           ...params.args.where,
+          clientId,
         };
       }
       return next(params);

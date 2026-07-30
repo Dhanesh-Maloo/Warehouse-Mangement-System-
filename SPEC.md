@@ -265,6 +265,49 @@ All tables include standard audit columns (`id`, `created_at`, `updated_at`) unl
 - Client can view and download their own GRNs and condition reports.
 - Strict scoping: any direct URL access to another client's documents returns 404.
 
+### 5.9 Retrieve & Redeploy (Repair / Resale / Disposal)
+
+Built ahead of the original spec to support Esevel's retrieve-and-redeploy workflow; the
+stories below capture the requirements clarified with Esevel via email
+(2026-07-28) and confirmed by Divya.
+
+**US-RTRV-01 — Diagnostic inspection on retrieval (mandatory)**
+- Every retrieval creates a diagnostic inspection record; this cannot be skipped or
+  made conditional. Esevel needs the diagnostic report to share with the client on
+  every retrieval, regardless of whether a data wipe is required.
+
+**US-RTRV-02 — Data wipe (optional per client)**
+- Data wipe is not mandatory for every retrieval. Esevel confirms with the end
+  client, per retrieval, whether a wipe is required, and selects it explicitly
+  on the retrieval/disposal request. No auto-wipe and no forced skip.
+
+**US-REP-01 — Repair SLA target**
+- A repair request gets a target completion date (`slaTargetAt`), computed as
+  5 business days (Mon–Fri 09:00–18:00 IST, excluding holidays) from the
+  request's creation, unless the requester supplies a different estimate from
+  the service center at creation time.
+
+**US-REP-02 — Overdue repair tracking**
+- Any repair request not yet `completed`/`cancelled` and past its
+  `slaTargetAt` is flagged `isOverdue` wherever repair requests are listed, so
+  staff can see at a glance which repairs have missed their turnaround target.
+- Out of scope for this iteration: email/push alerts (no notification
+  infrastructure exists yet), shipping/courier cost tracking to and from the
+  service center, and billing for the actual repair cost (only the estimate
+  and flat coordination fee exist today).
+
+**US-RES-01 — Asset status synced on resale sale**
+- When a resale listing is marked `sold`, the underlying asset's
+  `current_status` moves to `sold` (a new terminal `AssetStatus` value), so
+  the asset no longer appears in views that filter by asset status rather
+  than resale-listing status.
+
+**US-DISP-01 — ITAD certification add-on**
+- Certification is selected directly on the disposal request. Included at no
+  extra charge when the disposal type is a certified wipe (Blanco); for other
+  disposal types, opting in adds a certification line item priced via the
+  rate card.
+
 ---
 
 ## 6. Business logic specifications

@@ -43,6 +43,15 @@ export class RetrievalService {
     dto: CreateRetrievalRequestDto,
     createdByUserId: string,
   ): Promise<Prisma.RetrievalRequestGetPayload<{ include: { asset: true } }>> {
+    const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } });
+    if (!asset) throw new NotFoundException(`Asset ${dto.assetId} not found`);
+
+    if (asset.clientId !== dto.clientId) {
+      throw new BadRequestException(
+        `Asset ${dto.assetId} does not belong to client ${dto.clientId}`,
+      );
+    }
+
     const occurredAt = new Date();
 
     // Resolve retrieval rate code based on bundle type

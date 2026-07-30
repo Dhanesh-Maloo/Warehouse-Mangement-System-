@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
-import { CourierZoneService } from './courier-zone.service';
+import { CourierZoneService, type CourierZone } from './courier-zone.service';
 import { AddRuralPincodeDto } from './dto/add-rural-pincode.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -15,8 +15,11 @@ export class LogisticsController {
   /** Preview the courier zone for a pincode — used for live cost estimates before an order is created. */
   @Get('resolve-zone')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
-  resolveZone(@Query('pincode') pincode: string): ReturnType<CourierZoneService['resolveZone']> {
-    return this.courierZone.resolveZone(pincode);
+  async resolveZone(@Query('pincode') pincode: string): Promise<{ zone: CourierZone }> {
+    // Nest sends a bare string handler result as raw text, not JSON —
+    // wrap it in an object so the response is always valid JSON.
+    const zone = await this.courierZone.resolveZone(pincode);
+    return { zone };
   }
 
   @Get('rural-pincodes')

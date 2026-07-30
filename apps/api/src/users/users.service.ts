@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -28,6 +33,11 @@ const SELECT_SAFE = {
   lastLoginAt: true,
   createdAt: true,
 } as const;
+
+// clientId: null means "internal staff, sees everything" throughout this
+// codebase — so a client-scoped role must never be paired with a null
+// clientId. Mirrors the set of the same name in users.controller.ts.
+const CLIENT_SCOPED_ROLES = new Set(['client_user', 'editor', 'client_admin']);
 
 @Injectable()
 export class UsersService {
@@ -107,7 +117,21 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<SafeUser> {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
+
+    // Re-validate the merged (post-update) state rather than trusting DTO
+    // validation alone: PartialType marks every field @IsOptional(), which
+    // short-circuits the inherited @ValidateIf-gated clientId check on
+    // CreateUserDto whenever clientId is omitted or sent as null — so an
+    // admin could otherwise flip role to client_admin/editor/client_user
+    // while leaving (or setting) clientId to null.
+    const nextRole = dto.role ?? existing.role;
+    const nextClientId = dto.clientId !== undefined ? dto.clientId : existing.clientId;
+    if (CLIENT_SCOPED_ROLES.has(nextRole) && !nextClientId) {
+      throw new BadRequestException(
+        `Role '${nextRole}' requires a clientId — provide one in this request`,
+      );
+    }
 
     const data: Record<string, unknown> = { ...dto };
     if (dto.password) {

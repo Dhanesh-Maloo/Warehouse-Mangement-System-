@@ -38,6 +38,8 @@ interface RepairRequest {
   status: RepairStatus;
   notes?: string;
   requestedAt: string;
+  slaTargetAt: string | null;
+  isOverdue: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -343,6 +345,7 @@ export function RepairPage() {
                 <th className="text-left px-5 py-3">Estimate</th>
                 <th className="text-left px-5 py-3">Status</th>
                 <th className="text-left px-5 py-3">Requested</th>
+                <th className="text-left px-5 py-3">SLA Target</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
@@ -416,13 +419,31 @@ export function RepairPage() {
                       {new Date(r.requestedAt).toLocaleDateString('en-IN')}
                     </td>
 
+                    {/* SLA target + overdue flag */}
+                    <td className="px-5 py-3.5">
+                      {r.slaTargetAt ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-600">
+                            {new Date(r.slaTargetAt).toLocaleDateString('en-IN')}
+                          </span>
+                          {r.isOverdue && (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                              Overdue
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+
                     <td />
                   </tr>
                 );
               })}
               {repairs.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={7} className="px-5 py-12 text-center text-gray-400 text-sm">
                     No repair requests yet. Create one above.
                   </td>
                 </tr>

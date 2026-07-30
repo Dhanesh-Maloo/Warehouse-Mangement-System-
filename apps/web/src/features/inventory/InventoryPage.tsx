@@ -66,7 +66,10 @@ type AssetStatus =
   | 'in_storage'
   | 'deployed'
   | 'returning'
-  | 'disposed';
+  | 'disposed'
+  | 'in_repair'
+  | 'for_resale'
+  | 'sold';
 
 const EMPTY_ADD_FORM = {
   serialNumber: '',
@@ -425,6 +428,8 @@ export function InventoryPage() {
     deployed: '/deployment',
     returning: '/retrieval',
     disposed: '/disposal',
+    in_repair: '/repair',
+    for_resale: '/resale',
   };
 
   function handleInlineSave(assetId: string, field: string, value: string) {
@@ -890,6 +895,9 @@ export function InventoryPage() {
                     deployed: 'Deployed',
                     returning: 'Returning',
                     disposed: 'Disposed',
+                    in_repair: 'In Repair',
+                    for_resale: 'For Resale',
+                    sold: 'Sold',
                   };
                   const STATUS_COLORS: Record<string, string> = {
                     receiving: 'bg-sky-100 text-sky-700',
@@ -898,6 +906,9 @@ export function InventoryPage() {
                     deployed: 'bg-[#E86F2C]/10 text-[#E86F2C]',
                     returning: 'bg-amber-100 text-amber-700',
                     disposed: 'bg-gray-100 text-gray-500',
+                    in_repair: 'bg-amber-100 text-amber-700',
+                    for_resale: 'bg-blue-100 text-blue-700',
+                    sold: 'bg-emerald-100 text-emerald-700',
                   };
 
                   return (
@@ -981,6 +992,8 @@ export function InventoryPage() {
                               { value: 'deployed', label: 'Deployed' },
                               { value: 'returning', label: 'Returning' },
                               { value: 'disposed', label: 'Disposed' },
+                              { value: 'in_repair', label: 'In Repair' },
+                              { value: 'for_resale', label: 'For Resale' },
                             ]}
                             onSave={handleInlineSave}
                             renderBadge={(v) => (

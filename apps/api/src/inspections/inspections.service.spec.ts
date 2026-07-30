@@ -1,12 +1,18 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InspectionsService } from './inspections.service';
 import type { CompleteInspectionDto } from './dto/complete-inspection.dto';
+import type { CreateInspectionDto } from './dto/create-inspection.dto';
 
 describe('InspectionsService', () => {
   let mockPrisma: {
-    inspection: { findUnique: jest.Mock; update: jest.Mock };
+    inspection: {
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      findFirst: jest.Mock;
+      create: jest.Mock;
+    };
     inspectionPhoto: { count: jest.Mock; createMany: jest.Mock };
-    asset: { update: jest.Mock };
+    asset: { findUnique: jest.Mock; update: jest.Mock };
     retrievalRequest: { update: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -81,12 +87,19 @@ describe('InspectionsService', () => {
             id: args.where.id,
           }),
         ),
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest
+          .fn()
+          .mockImplementation((args) => Promise.resolve({ id: 'inspection-new', ...args.data })),
       },
       inspectionPhoto: {
         count: jest.fn().mockResolvedValue(1),
         createMany: jest.fn().mockResolvedValue({}),
       },
-      asset: { update: jest.fn().mockResolvedValue({}) },
+      asset: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'asset-1', clientId: 'client-1' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
       retrievalRequest: {
         update: jest
           .fn()
@@ -106,6 +119,60 @@ describe('InspectionsService', () => {
       mockAudit as unknown as ConstructorParameters<typeof InspectionsService>[3],
       mockDeployment as unknown as ConstructorParameters<typeof InspectionsService>[4],
     );
+  });
+
+  describe('create', () => {
+    const baseCreateDto: CreateInspectionDto = {
+      assetId: 'asset-1',
+      type: 'inbound' as CreateInspectionDto['type'],
+    };
+
+    it('throws NotFoundException if the asset does not exist', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue(null);
+
+      await expect(service.create(baseCreateDto, 'user-1', 'client-1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('throws ForbiddenException when the asset belongs to another client', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', clientId: 'other-client' });
+
+      await expect(service.create(baseCreateDto, 'user-1', 'client-1')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('does not check ownership when requestingClientId is not provided (non-client-scoped caller)', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', clientId: 'other-client' });
+
+      await expect(service.create(baseCreateDto, 'user-1')).resolves.toBeDefined();
+    });
+
+    it('creates the inspection and logs an audit entry when the asset belongs to the caller client', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', clientId: 'client-1' });
+
+      const result = await service.create(baseCreateDto, 'user-1', 'client-1');
+
+      expect(mockPrisma.inspection.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ assetId: 'asset-1', status: 'in_progress' }),
+        }),
+      );
+      expect(mockAudit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'inspection.create' }),
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('throws BadRequestException when the asset already has an open inspection', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue({ id: 'asset-1', clientId: 'client-1' });
+      mockPrisma.inspection.findFirst.mockResolvedValue({ id: 'existing-inspection' });
+
+      await expect(service.create(baseCreateDto, 'user-1', 'client-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
   });
 
   describe('complete() — unrelated to retrieval', () => {

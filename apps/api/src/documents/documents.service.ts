@@ -131,7 +131,9 @@ export class DocumentsService {
     const doc = await this.prisma.assetDocument.findUnique({ where: { id } });
     if (!doc) throw new NotFoundException(`Document ${id} not found`);
     if (requestingClientId && doc.clientId !== requestingClientId) {
-      throw new ForbiddenException('Cannot access a document from another client');
+      // 404, not 403 — SPEC.md US-PORT-02 requires that direct URL access to
+      // another client's documents not confirm the record's existence.
+      throw new NotFoundException(`Document ${id} not found`);
     }
     return doc;
   }
