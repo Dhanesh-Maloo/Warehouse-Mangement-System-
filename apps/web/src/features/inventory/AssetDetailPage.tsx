@@ -677,6 +677,9 @@ export function AssetDetailPage() {
                     <option value="deployed">Deployed</option>
                     <option value="returning">Returning</option>
                     <option value="disposed">Disposed</option>
+                    <option value="in_repair">In repair</option>
+                    <option value="for_resale">For resale</option>
+                    <option value="sold">Sold</option>
                   </select>
                 </div>
               </div>

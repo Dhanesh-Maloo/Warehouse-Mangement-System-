@@ -994,6 +994,7 @@ export function InventoryPage() {
                               { value: 'disposed', label: 'Disposed' },
                               { value: 'in_repair', label: 'In Repair' },
                               { value: 'for_resale', label: 'For Resale' },
+                              { value: 'sold', label: 'Sold' },
                             ]}
                             onSave={handleInlineSave}
                             renderBadge={(v) => (
@@ -1292,6 +1293,9 @@ export function InventoryPage() {
                     <option value="deployed">Deployed</option>
                     <option value="returning">Returning</option>
                     <option value="disposed">Disposed</option>
+                    <option value="in_repair">In repair</option>
+                    <option value="for_resale">For resale</option>
+                    <option value="sold">Sold</option>
                   </select>
                 </div>
                 <div>
