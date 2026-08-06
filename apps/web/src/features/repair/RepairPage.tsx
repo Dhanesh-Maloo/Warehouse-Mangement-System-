@@ -280,7 +280,7 @@ export function RepairPage() {
                 value={form.assetId}
                 onChange={(e) => setField('assetId', e.target.value)}
                 disabled={!effectiveClientId}
-                className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] disabled:bg-gray-50 disabled:text-gray-400"
+                className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] disabled:bg-gray-50 disabled:text-gray-400 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-500 dark:disabled:bg-slate-950 dark:disabled:text-slate-600"
               >
                 <option value="">
                   {effectiveClientId
@@ -507,7 +507,7 @@ export function RepairPage() {
                             })
                           }
                           disabled={updateStatusMutation.isPending}
-                          className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white disabled:opacity-50"
+                          className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white disabled:opacity-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-500"
                         >
                           <option value={r.status}>{STATUS_LABELS[r.status]}</option>
                           {nextStatuses.map((s) => (
