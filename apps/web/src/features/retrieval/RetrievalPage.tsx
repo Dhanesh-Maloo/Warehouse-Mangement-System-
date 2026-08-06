@@ -345,7 +345,7 @@ export function RetrievalPage() {
                   </option>
                   {deployedAssets.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.serialNumber} — {a.model}
+                      {a.serialNumber} - {a.model}
                     </option>
                   ))}
                 </select>
@@ -361,8 +361,8 @@ export function RetrievalPage() {
                   onChange={(e) => setField('bundleType', e.target.value as BundleType)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                 >
-                  <option value="standard">Standard — ₹190</option>
-                  <option value="full_cycle">Full Cycle (retrieve + redeploy) — ₹500</option>
+                  <option value="standard">Standard - ₹190</option>
+                  <option value="full_cycle">Full Cycle (retrieve + redeploy) - ₹500</option>
                 </select>
               </div>
             </div>
@@ -450,11 +450,11 @@ export function RetrievalPage() {
                   {!/^\d{6}$/.test(form.pincode)
                     ? 'Enter a 6-digit pincode above'
                     : zonePreview === 'intra_state'
-                      ? 'City — ₹1,500'
+                      ? 'City - ₹1,500'
                       : zonePreview === 'inter_state'
-                        ? 'Interstate — ₹2,500'
+                        ? 'Interstate - ₹2,500'
                         : zonePreview === 'rural'
-                          ? 'Rural — ₹3,200'
+                          ? 'Rural - ₹3,200'
                           : zoneIsError
                             ? ((zoneError as Error)?.message ?? 'Could not resolve zone')
                             : 'Resolving…'}
@@ -474,7 +474,7 @@ export function RetrievalPage() {
             {/* Diagnostic step — now mandatory for every retrieval, both bundle types */}
             <div className="rounded-lg bg-sky-50 border border-sky-100 px-4 py-2.5 text-xs text-sky-800">
               Every retrieval now goes through a diagnostic inspection once received at the
-              warehouse — device in → inspect → physical diagnostic check → damage alert, or (Full
+              warehouse - device in → inspect → physical diagnostic check → damage alert, or (Full
               Cycle) proceed to redeploy. This happens automatically; there&apos;s no opt-out.
             </div>
 
@@ -493,7 +493,7 @@ export function RetrievalPage() {
               >
                 Requires data wipe{' '}
                 <span className="text-gray-400">
-                  (flags the request for your team — not yet automated)
+                  (flags the request for your team - not yet automated)
                 </span>
               </label>
             </div>
@@ -740,7 +740,7 @@ export function RetrievalPage() {
                       {r.trackingNumber ? (
                         <span className="font-mono text-gray-700">{r.trackingNumber}</span>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-gray-400">-</span>
                       )}
                     </td>
 
@@ -751,7 +751,7 @@ export function RetrievalPage() {
                           {r.notes}
                         </span>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-gray-400">-</span>
                       )}
                     </td>
 

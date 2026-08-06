@@ -114,7 +114,7 @@ export function RuralPincodesPage() {
               {pincodes.map((p) => (
                 <tr key={p.id} className="border-b border-gray-50">
                   <td className="px-5 py-3 font-mono">{p.pincode}</td>
-                  <td className="px-5 py-3 text-gray-600">{p.note ?? '—'}</td>
+                  <td className="px-5 py-3 text-gray-600">{p.note ?? '-'}</td>
                   <td className="px-5 py-3 text-gray-500 text-xs">
                     {new Date(p.createdAt).toLocaleDateString('en-IN')}
                   </td>

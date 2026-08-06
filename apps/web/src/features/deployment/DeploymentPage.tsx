@@ -483,7 +483,7 @@ export function DeploymentPage() {
                   <option value="">Select asset in storage…</option>
                   {availableAssets.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.serialNumber} — {a.manufacturer} {a.model}
+                      {a.serialNumber} - {a.manufacturer} {a.model}
                     </option>
                   ))}
                 </select>
@@ -577,7 +577,7 @@ export function DeploymentPage() {
                 {(
                   [
                     { value: 'standard', label: 'Standard (Pick & Pack)', price: '₹128' },
-                    { value: 'full_prep', label: 'Full Prep — bundled', price: '₹380' },
+                    { value: 'full_prep', label: 'Full Prep - bundled', price: '₹380' },
                   ] as const
                 ).map((opt) => (
                   <label
@@ -696,11 +696,11 @@ export function DeploymentPage() {
                 {!/^\d{6}$/.test(pincode)
                   ? 'Enter a 6-digit PIN code above to determine the zone'
                   : zonePreview === 'intra_state'
-                    ? 'Intra-state City — ₹1,500'
+                    ? 'Intra-state City - ₹1,500'
                     : zonePreview === 'inter_state'
-                      ? 'Inter-state — ₹2,500'
+                      ? 'Inter-state - ₹2,500'
                       : zonePreview === 'rural'
-                        ? 'Rural — ₹3,200'
+                        ? 'Rural - ₹3,200'
                         : zoneIsError
                           ? ((zoneError as Error)?.message ?? 'Could not resolve zone')
                           : 'Resolving…'}

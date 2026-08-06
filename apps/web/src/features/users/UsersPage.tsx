@@ -182,9 +182,9 @@ export function UsersPage() {
                 {isAdmin && <option value="manager">Manager</option>}
                 {isAdmin && <option value="admin">Admin</option>}
                 <option value="client_user">Client user</option>
-                <option value="editor">Editor (add/edit only, no delete — single client)</option>
+                <option value="editor">Editor (add/edit only, no delete - single client)</option>
                 <option value="client_admin">
-                  Client admin (full control, incl. delete — single client)
+                  Client admin (full control, incl. delete - single client)
                 </option>
               </select>
             </div>

@@ -93,7 +93,7 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-IN', {
 });
 
 function formatEstimate(paise: string | null): string {
-  if (paise === null || paise === undefined) return '—';
+  if (paise === null || paise === undefined) return '-';
   return CURRENCY_FORMATTER.format(Number(paise) / 100);
 }
 
@@ -291,7 +291,7 @@ export function RepairPage() {
                 </option>
                 {assets.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.serialNumber} — {a.manufacturer} {a.model}
+                    {a.serialNumber} - {a.manufacturer} {a.model}
                   </option>
                 ))}
               </select>
@@ -372,7 +372,7 @@ export function RepairPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 SLA Target Date{' '}
                 <span className="text-gray-400 font-normal">
-                  (optional —{' '}
+                  (optional -{' '}
                   {form.repairType === 'oem_warranty'
                     ? 'OEM-confirmed date, if known'
                     : form.repairCategory === 'hardware'
@@ -390,7 +390,7 @@ export function RepairPage() {
               {(form.repairType === 'oem_warranty' || form.repairCategory === 'hardware') &&
                 !form.slaTargetAt && (
                   <p className="text-xs text-gray-400 mt-1">
-                    No fixed SLA for this repair type — leave blank and set the target date later
+                    No fixed SLA for this repair type - leave blank and set the target date later
                     once known.
                   </p>
                 )}

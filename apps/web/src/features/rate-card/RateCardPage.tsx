@@ -97,7 +97,7 @@ export function RateCardPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Rate Card</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Current pricing — creating a new rate closes the previous version
+            Current pricing - creating a new rate closes the previous version
           </p>
         </div>
         {isAdmin && (
@@ -120,7 +120,7 @@ export function RateCardPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-900">
-              {editingCode ? `Edit rate — ${editingCode}` : 'Add new rate'}
+              {editingCode ? `Edit rate - ${editingCode}` : 'Add new rate'}
             </h2>
             <button
               onClick={() => { setShowForm(false); setEditingCode(null); }}
@@ -155,7 +155,7 @@ export function RateCardPage() {
                 required
                 value={form.description}
                 onChange={(e) => field('description', e.target.value)}
-                placeholder="Device ingestion — laptop"
+                placeholder="Device ingestion - laptop"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
               />
             </div>

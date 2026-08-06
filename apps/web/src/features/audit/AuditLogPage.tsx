@@ -196,7 +196,7 @@ export function AuditLogPage() {
                       >
                         {e.entityId.slice(0, 8)}…
                       </td>
-                      <td className="px-5 py-3 text-xs text-gray-400">{e.ipAddress ?? '—'}</td>
+                      <td className="px-5 py-3 text-xs text-gray-400">{e.ipAddress ?? '-'}</td>
                       <td className="px-5 py-3 text-right">
                         {(Boolean(e.oldValue) || Boolean(e.newValue)) && (
                           <button

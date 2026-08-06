@@ -40,7 +40,7 @@ const ROLES: RoleInfo[] = [
     scope: 'All clients',
     summary: 'Full platform control. The only role that can manage tenants and other users freely.',
     canDo: [
-      'Everything, everywhere — every client, every module',
+      'Everything, everywhere - every client, every module',
       'Create, edit and deactivate Clients (tenants)',
       'Create and manage any user, including other admins',
       'Create and edit the Rate Card (pricing)',
@@ -74,7 +74,7 @@ const ROLES: RoleInfo[] = [
     label: 'Operator',
     color: 'bg-blue-100 text-blue-700',
     scope: 'All clients',
-    summary: 'Warehouse floor staff — receiving, inspecting, packing and dispatching devices.',
+    summary: 'Warehouse floor staff - receiving, inspecting, packing and dispatching devices.',
     canDo: [
       'Create/update assets, receive deliveries, run inspections',
       'Create and progress deployment, retrieval and disposal requests',
@@ -108,7 +108,7 @@ const ROLES: RoleInfo[] = [
     summary:
       'A client-side power user who can operate day-to-day work, but never deletes or approves.',
     canDo: [
-      'Create/edit assets, inbound deliveries, inspections, deployments, retrievals and disposal requests — for their own client only',
+      'Create/edit assets, inbound deliveries, inspections, deployments, retrievals and disposal requests - for their own client only',
       'Create/edit their own client’s end users',
       'Upload documents and inspection photos',
       'View dashboard, billing, ledger and rate card for their own client',
@@ -126,7 +126,7 @@ const ROLES: RoleInfo[] = [
     color: 'bg-teal-100 text-teal-700',
     scope: 'Own client only',
     summary:
-      'Everything an Editor can do, plus delete/approve powers and user management — all fenced to one client.',
+      'Everything an Editor can do, plus delete/approve powers and user management - all fenced to one client.',
     canDo: [
       'Everything Editor can do',
       'Deactivate their own client’s end users',
@@ -137,7 +137,7 @@ const ROLES: RoleInfo[] = [
     cannotDo: [
       'See or touch any other client’s data',
       'Manage the Client (tenant) record itself, or see the Clients page',
-      'Edit the Rate Card (view-only — pricing is shared across every client)',
+      'Edit the Rate Card (view-only - pricing is shared across every client)',
       'Create Operator/Manager/Admin accounts (blocked to prevent escalating to platform-wide access)',
     ],
   },
@@ -158,9 +158,9 @@ const MODULES: ModuleInfo[] = [
     title: 'Dashboard',
     icon: LayoutDashboard,
     summary:
-      'The home screen — a snapshot of inventory counts, pending inspections, and (for internal roles) today’s expected deliveries.',
+      'The home screen - a snapshot of inventory counts, pending inspections, and (for internal roles) today’s expected deliveries.',
     steps: [
-      'Open the app — this is the first page you land on.',
+      'Open the app - this is the first page you land on.',
       'The severity/status tiles at the top summarize how many devices are in each stage of the lifecycle.',
       'The pending inspections list flags anything overdue against the business-hours SLA.',
     ],
@@ -175,7 +175,7 @@ const MODULES: ModuleInfo[] = [
       'Log expected deliveries from a client, then receive the physical devices against them to create a Goods Received Note (GRN).',
     steps: [
       'Click "New delivery", pick the client (auto-filled for client-scoped roles), enter the PO reference, expected date, and the line items (category, model, manufacturer, quantity).',
-      'When the shipment physically arrives, open the delivery and use "Receive devices" to scan/enter each unit’s serial number — this creates asset records and posts the GRN.',
+      'When the shipment physically arrives, open the delivery and use "Receive devices" to scan/enter each unit’s serial number - this creates asset records and posts the GRN.',
       'Download the GRN as a PDF from the delivery’s detail page for warehouse records.',
     ],
     roles:
@@ -189,7 +189,7 @@ const MODULES: ModuleInfo[] = [
       'The full list of every asset (device) in the warehouse, searchable by serial number, model, status, category or client.',
     steps: [
       'Use the search bar or filters to find a device.',
-      'Click a row to open the asset’s full timeline — every action ever taken against it, in order.',
+      'Click a row to open the asset’s full timeline - every action ever taken against it, in order.',
       '"Add asset" lets Admin/Manager/Operator/Editor/Client admin manually register a device outside the normal inbound flow.',
       'Edit a device’s condition grade, status or location from its detail page.',
     ],
@@ -201,14 +201,14 @@ const MODULES: ModuleInfo[] = [
     title: 'Inspections',
     icon: ClipboardCheck,
     summary:
-      'Condition assessments performed on a device — inbound (on arrival), outbound (before redeployment), or periodic.',
+      'Condition assessments performed on a device - inbound (on arrival), outbound (before redeployment), or periodic.',
     steps: [
       'Click "Start inspection", search for the asset by serial number, and choose the inspection type.',
       'Work through the checklist (physical condition, functional tests) and assign a condition grade.',
-      'Attach photos as evidence, then "Complete" the inspection — or "Cancel" if it was started in error.',
+      'Attach photos as evidence, then "Complete" the inspection - or "Cancel" if it was started in error.',
     ],
     roles:
-      'Client user only views; Admin/Manager/Operator/Editor/Client admin can start, complete, cancel and upload photos — all scoped to their own client for Editor/Client admin.',
+      'Client user only views; Admin/Manager/Operator/Editor/Client admin can start, complete, cancel and upload photos - all scoped to their own client for Editor/Client admin.',
   },
   {
     id: 'deployment',
@@ -221,32 +221,32 @@ const MODULES: ModuleInfo[] = [
       'As the order progresses, update its status, courier zone, and tracking number from the list.',
     ],
     roles:
-      'Client user only views; Admin/Manager/Operator/Editor/Client admin can create and progress orders — scoped to their own client for Editor/Client admin.',
+      'Client user only views; Admin/Manager/Operator/Editor/Client admin can create and progress orders - scoped to their own client for Editor/Client admin.',
   },
   {
     id: 'retrieval',
     title: 'Retrieval',
     icon: ArrowDownToLine,
     summary:
-      'Bring a deployed device back into the warehouse — standard pickup, or full-cycle (retrieve + redeploy).',
+      'Bring a deployed device back into the warehouse - standard pickup, or full-cycle (retrieve + redeploy).',
     steps: [
       'Click "New Retrieval Request", pick the client and the deployed asset, then fill in pickup address and bundle type.',
       'Track status from pending → initiated → in transit → received → completed.',
       'If "requires post-inspection" was checked, an inspection is auto-created once the device is received.',
     ],
     roles:
-      'Client user only views; Admin/Manager/Operator/Editor/Client admin can create and progress requests — scoped to their own client for Editor/Client admin.',
+      'Client user only views; Admin/Manager/Operator/Editor/Client admin can create and progress requests - scoped to their own client for Editor/Client admin.',
   },
   {
     id: 'disposal',
     title: 'Disposal',
     icon: Trash2,
     summary:
-      'End-of-life handling — non-certified wipe, certified data destruction (Blanco), or full ITAD (IT Asset Disposition).',
+      'End-of-life handling - non-certified wipe, certified data destruction (Blanco), or full ITAD (IT Asset Disposition).',
     steps: [
       'Click "New Disposal Request", pick the client, the in-storage asset, and the disposal type.',
       'A Manager, Admin, or the owning client’s Client admin approves the request.',
-      'Once approved, mark it "in progress" and then "complete" — completing it marks the asset disposed permanently.',
+      'Once approved, mark it "in progress" and then "complete" - completing it marks the asset disposed permanently.',
     ],
     roles:
       'Client user only views; Admin/Manager/Operator/Editor/Client admin can file requests and progress them; only Admin/Manager/Client admin (own client) can approve.',
@@ -263,7 +263,7 @@ const MODULES: ModuleInfo[] = [
       'Progress the request from pending → sent → in repair → returned → completed (or cancel at any point before completed) using the status dropdown.',
     ],
     roles:
-      'Client user only views; Admin/Manager/Operator/Editor/Client admin can file and progress requests — scoped to their own client for Editor/Client admin.',
+      'Client user only views; Admin/Manager/Operator/Editor/Client admin can file and progress requests - scoped to their own client for Editor/Client admin.',
   },
   {
     id: 'resale',
@@ -275,7 +275,7 @@ const MODULES: ModuleInfo[] = [
       'Mark a listing "Sold" and optionally record the sold price, or "Cancel" it.',
     ],
     roles:
-      'Client user only views; Admin/Manager/Operator/Editor/Client admin can create listings and update status — scoped to their own client for Editor/Client admin.',
+      'Client user only views; Admin/Manager/Operator/Editor/Client admin can create listings and update status - scoped to their own client for Editor/Client admin.',
   },
   {
     id: 'locations',
@@ -285,7 +285,7 @@ const MODULES: ModuleInfo[] = [
       'Warehouse zones and bins (e.g. Zone A, Bin 12) used to physically place stored assets. Shared infrastructure, not tied to any one client.',
     steps: [
       'Admin/Manager can add a new location by zone code + bin code.',
-      'A location can’t be deleted while it’s still holding assets — move the assets out first.',
+      'A location can’t be deleted while it’s still holding assets - move the assets out first.',
       'Use the "Move" action on an asset’s detail page to relocate it between locations.',
     ],
     roles: 'Everyone can view; only Admin/Manager can create, edit or delete locations.',
@@ -295,11 +295,11 @@ const MODULES: ModuleInfo[] = [
     title: 'End Users',
     icon: UserCheck,
     summary:
-      'The people at a client company who actually receive deployed devices — not platform login accounts.',
+      'The people at a client company who actually receive deployed devices - not platform login accounts.',
     steps: [
       'Click "Add End User" and fill in name, employee ID, email, phone and city.',
       'End users show up in the picker when creating a Deployment Order.',
-      'Deactivate an end user who has left the company — their history is kept, they’re just hidden from new deployments.',
+      'Deactivate an end user who has left the company - their history is kept, they’re just hidden from new deployments.',
     ],
     roles:
       'Client user only views their own client’s end users; Admin/Manager/Editor/Client admin can add/edit; only Admin or the owning client’s Client admin can deactivate.',
@@ -309,10 +309,10 @@ const MODULES: ModuleInfo[] = [
     title: 'Billing',
     icon: CircleDollarSign,
     summary:
-      'Monthly storage accrual and transaction history for a client — how many devices are stored, projected monthly cost, and whether the minimum commitment is met.',
+      'Monthly storage accrual and transaction history for a client - how many devices are stored, projected monthly cost, and whether the minimum commitment is met.',
     steps: [
       'Pick a client (auto-selected for client-scoped roles) to see their current storage summary and projected cost.',
-      'Review the transaction list for a date range — every priced event that hit the ledger.',
+      'Review the transaction list for a date range - every priced event that hit the ledger.',
       '"Run accrual" (Admin only) manually triggers the monthly storage billing job across all clients.',
     ],
     roles:
@@ -323,11 +323,11 @@ const MODULES: ModuleInfo[] = [
     title: 'Ledger',
     icon: BookOpen,
     summary:
-      'The append-only record of every priced event in the system. Nothing is ever edited or deleted here — mistakes are fixed with a correction row.',
+      'The append-only record of every priced event in the system. Nothing is ever edited or deleted here - mistakes are fixed with a correction row.',
     steps: [
       'Filter by client, asset, event type or date range.',
       'Export the filtered view to CSV (Admin/Manager).',
-      'If an event was posted in error, Admin can post a correction — this adds a new negative-amount row referencing the original; the original is never touched.',
+      'If an event was posted in error, Admin can post a correction - this adds a new negative-amount row referencing the original; the original is never touched.',
     ],
     roles:
       'Client user, Editor and Client admin see only their own client’s entries; Admin/Manager see everything; only Admin can post corrections.',
@@ -340,7 +340,7 @@ const MODULES: ModuleInfo[] = [
       'The price list for every billable action (receiving, inspection, deployment, courier, storage, disposal). One shared rate card applies to every client.',
     steps: [
       'View the currently effective rate for each billable code.',
-      'Admin adds a new rate by creating a new version with a future "effective from" date — the old rate keeps applying to anything that already happened.',
+      'Admin adds a new rate by creating a new version with a future "effective from" date - the old rate keeps applying to anything that already happened.',
     ],
     roles:
       'Admin/Manager/Operator/Editor/Client admin can view current pricing; only Admin can create new rates (this is deliberately locked down since it affects every client’s bill).',
@@ -350,14 +350,14 @@ const MODULES: ModuleInfo[] = [
     title: 'Clients',
     icon: Building2,
     summary:
-      'The tenants of this platform — the companies whose devices are warehoused here (e.g. Esevel). Admin-only.',
+      'The tenants of this platform - the companies whose devices are warehoused here (e.g. Esevel). Admin-only.',
     steps: [
-      'Click "New client" to onboard a company — name, slug, GSTIN, billing contact.',
+      'Click "New client" to onboard a company - name, slug, GSTIN, billing contact.',
       'Edit a client’s contact details or GSTIN from the pencil icon.',
-      'Deactivate a client that’s no longer active — this is a soft action, all of their history (assets, ledger, users) is kept.',
+      'Deactivate a client that’s no longer active - this is a soft action, all of their history (assets, ledger, users) is kept.',
     ],
     roles:
-      'Admin only — no other role can see this page, including Client admin, since it’s tenant management, not client data.',
+      'Admin only - no other role can see this page, including Client admin, since it’s tenant management, not client data.',
   },
   {
     id: 'users',
@@ -367,7 +367,7 @@ const MODULES: ModuleInfo[] = [
       'Platform login accounts and their roles. This is where you create every role covered in the guide above.',
     steps: [
       'Click "New user", fill in name/email/password, and pick a Role.',
-      'If the role is client-scoped (Client user, Editor, Client admin), a Client picker appears — pick which company this account belongs to.',
+      'If the role is client-scoped (Client user, Editor, Client admin), a Client picker appears - pick which company this account belongs to.',
       'Suspend/Reactivate toggles a user’s access without deleting their account or history.',
     ],
     roles:
@@ -378,7 +378,7 @@ const MODULES: ModuleInfo[] = [
     title: 'Audit Log',
     icon: ShieldCheck,
     summary:
-      'A record of who changed what and when, across the whole platform — user creation, status changes, client edits, disposal approvals, and more.',
+      'A record of who changed what and when, across the whole platform - user creation, status changes, client edits, disposal approvals, and more.',
     steps: [
       'Filter by entity type, action, or date range to investigate a specific change.',
       'Expand a row to see the before/after values of what changed.',
@@ -393,10 +393,10 @@ const MODULES: ModuleInfo[] = [
       'Maintain the list of pincodes that always resolve to the "Rural" courier zone for Deployment and Retrieval orders, overriding the automatic intra-state/inter-state comparison.',
     steps: [
       'Enter a 6-digit pincode and an optional note, then click "Add".',
-      'Remove a pincode from the list with the trash icon — it reverts to automatic zone resolution.',
+      'Remove a pincode from the list with the trash icon - it reverts to automatic zone resolution.',
     ],
     roles:
-      'Admin/Manager only — both list, add and remove entries; no other role can see this page.',
+      'Admin/Manager only - both list, add and remove entries; no other role can see this page.',
   },
 ];
 
@@ -442,7 +442,7 @@ function RoleCard({ role }: { role: RoleInfo }) {
               Cannot do
             </div>
             {role.cannotDo.length === 0 ? (
-              <p className="text-sm text-gray-400">Nothing — full access.</p>
+              <p className="text-sm text-gray-400">Nothing - full access.</p>
             ) : (
               <ul className="space-y-1.5">
                 {role.cannotDo.map((item) => (

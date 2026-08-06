@@ -96,7 +96,7 @@ function LocationForm({
           <input
             value={form.description}
             onChange={(e) => field('description', e.target.value)}
-            placeholder="Zone A — Rack 1, Shelf 1"
+            placeholder="Zone A - Rack 1, Shelf 1"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
           />
         </div>
@@ -369,7 +369,7 @@ export function LocationsPage() {
             </p>
             {deleteTarget._count.assets > 0 && (
               <p className="text-sm text-amber-600 mb-1">
-                This location has {deleteTarget._count.assets} asset(s) assigned — move them first.
+                This location has {deleteTarget._count.assets} asset(s) assigned - move them first.
               </p>
             )}
             {(deleteTarget as never as { _deleteError?: string })._deleteError && (

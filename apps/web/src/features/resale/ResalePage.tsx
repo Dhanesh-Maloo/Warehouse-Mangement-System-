@@ -58,7 +58,7 @@ const NEXT_STATUSES: Partial<Record<ResaleStatus, ResaleStatus[]>> = {
 };
 
 function formatPaise(paise: string | null | undefined): string {
-  if (paise === null || paise === undefined) return '—';
+  if (paise === null || paise === undefined) return '-';
   const rupees = Number(paise) / 100;
   return `₹${rupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -260,7 +260,7 @@ export function ResalePage() {
                 </option>
                 {assets.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.serialNumber} — {a.manufacturer} {a.model}
+                    {a.serialNumber} - {a.manufacturer} {a.model}
                   </option>
                 ))}
               </select>
@@ -409,7 +409,7 @@ export function ResalePage() {
 
                     {/* Sold price */}
                     <td className="px-5 py-3.5 text-gray-700">
-                      {l.status === 'sold' ? formatPaise(l.soldPricePaise) : '—'}
+                      {l.status === 'sold' ? formatPaise(l.soldPricePaise) : '-'}
                     </td>
 
                     {/* Status — inline select for actionable rows, badge for terminal states */}

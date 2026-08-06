@@ -346,7 +346,7 @@ export function AssetDetailPage() {
           <div
             className={`text-lg font-bold ${GRADE_COLORS[asset.conditionGrade ?? ''] ?? 'text-gray-400'}`}
           >
-            {asset.conditionGrade ? `Grade ${asset.conditionGrade}` : '—'}
+            {asset.conditionGrade ? `Grade ${asset.conditionGrade}` : '-'}
           </div>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
@@ -522,9 +522,9 @@ export function AssetDetailPage() {
                   <td
                     className={`px-5 py-3 font-bold ${GRADE_COLORS[ins.conditionGrade ?? ''] ?? 'text-gray-400'}`}
                   >
-                    {ins.conditionGrade ?? '—'}
+                    {ins.conditionGrade ?? '-'}
                   </td>
-                  <td className="px-5 py-3 tabular-nums text-gray-600">{ins.slaMinutes ?? '—'}</td>
+                  <td className="px-5 py-3 tabular-nums text-gray-600">{ins.slaMinutes ?? '-'}</td>
                   <td className="px-5 py-3 text-right">
                     <Link
                       to={`/inspections/${ins.id}`}
@@ -640,10 +640,10 @@ export function AssetDetailPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                   >
                     <option value="">Not graded</option>
-                    <option value="A">A — Excellent</option>
-                    <option value="B">B — Good</option>
-                    <option value="C">C — Fair</option>
-                    <option value="D">D — Poor</option>
+                    <option value="A">A - Excellent</option>
+                    <option value="B">B - Good</option>
+                    <option value="C">C - Fair</option>
+                    <option value="D">D - Poor</option>
                   </select>
                 </div>
               </div>
@@ -875,7 +875,7 @@ export function AssetDetailPage() {
                     .filter((l) => l.id !== asset.currentLocation?.id)
                     .map((l) => (
                       <option key={l.id} value={l.id}>
-                        {l.name} — Zone {l.zoneCode} / Bin {l.binCode}
+                        {l.name} - Zone {l.zoneCode} / Bin {l.binCode}
                       </option>
                     ))}
                 </select>

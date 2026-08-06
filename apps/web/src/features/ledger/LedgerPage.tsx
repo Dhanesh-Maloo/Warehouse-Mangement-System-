@@ -124,7 +124,7 @@ export function LedgerPage() {
               </button>
             </div>
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              A correction creates a new reversal entry (negative amount) — the original entry is
+              A correction creates a new reversal entry (negative amount) - the original entry is
               never modified.
             </p>
             <div className="space-y-3">
@@ -244,7 +244,7 @@ export function LedgerPage() {
                       {new Date(e.occurredAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                     </td>
                     <td className="px-5 py-3 text-gray-500 text-xs capitalize">
-                      {e.referenceType ?? '—'}
+                      {e.referenceType ?? '-'}
                     </td>
                     <td className="px-5 py-3 font-mono text-xs text-gray-400 select-all">
                       {e.id.slice(0, 8)}…

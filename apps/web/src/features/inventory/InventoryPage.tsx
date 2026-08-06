@@ -530,7 +530,7 @@ export function InventoryPage() {
           year: '2-digit',
           timeZone: 'Asia/Kolkata',
         })
-      : '—';
+      : '-';
 
   return (
     <div className="space-y-6">
@@ -674,10 +674,10 @@ export function InventoryPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
                 >
                   <option value="">Not graded</option>
-                  <option value="A">A — Excellent</option>
-                  <option value="B">B — Good</option>
-                  <option value="C">C — Fair</option>
-                  <option value="D">D — Poor</option>
+                  <option value="A">A - Excellent</option>
+                  <option value="B">B - Good</option>
+                  <option value="C">C - Fair</option>
+                  <option value="D">D - Poor</option>
                 </select>
               </div>
               <div>
@@ -924,7 +924,7 @@ export function InventoryPage() {
 
                       {/* 2. Asset Tag */}
                       <td className="px-4 py-3 font-mono text-xs text-gray-700 whitespace-nowrap">
-                        {a.assetTag ?? <span className="text-gray-300">—</span>}
+                        {a.assetTag ?? <span className="text-gray-300">-</span>}
                       </td>
 
                       {/* 3. Serial No. — now adjacent to Asset Tag */}
@@ -941,11 +941,11 @@ export function InventoryPage() {
                             value={a.conditionGrade ?? ''}
                             saving={savingCells.has(`${a.id}:conditionGrade`)}
                             options={[
-                              { value: '', label: '— Not graded' },
-                              { value: 'A', label: 'Grade A — Excellent' },
-                              { value: 'B', label: 'Grade B — Good' },
-                              { value: 'C', label: 'Grade C — Fair' },
-                              { value: 'D', label: 'Grade D — Poor' },
+                              { value: '', label: '- Not graded' },
+                              { value: 'A', label: 'Grade A - Excellent' },
+                              { value: 'B', label: 'Grade B - Good' },
+                              { value: 'C', label: 'Grade C - Fair' },
+                              { value: 'D', label: 'Grade D - Poor' },
                             ]}
                             onSave={handleInlineSave}
                             renderBadge={(v) =>
@@ -954,7 +954,7 @@ export function InventoryPage() {
                                   Grade {v}
                                 </span>
                               ) : (
-                                <span className="text-gray-300">—</span>
+                                <span className="text-gray-300">-</span>
                               )
                             }
                           />
@@ -963,7 +963,7 @@ export function InventoryPage() {
                             Grade {a.conditionGrade}
                           </span>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-gray-300">-</span>
                         )}
                       </td>
 
@@ -1017,12 +1017,12 @@ export function InventoryPage() {
 
                       {/* 9. AWB (Tracking No.) — asset-level field, falls back to deployment */}
                       <td className="px-4 py-3 font-mono text-xs text-gray-600 whitespace-nowrap">
-                        {a.awbNumber ?? deployment?.trackingNumber ?? <span className="text-gray-300">—</span>}
+                        {a.awbNumber ?? deployment?.trackingNumber ?? <span className="text-gray-300">-</span>}
                       </td>
 
                       {/* 10. Courier — asset-level field, falls back to deployment */}
                       <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-                        {a.courierName ?? deployment?.courierName ?? <span className="text-gray-300">—</span>}
+                        {a.courierName ?? deployment?.courierName ?? <span className="text-gray-300">-</span>}
                       </td>
 
                       {/* 11. Delivered Date — asset-level field, falls back to deployment */}
@@ -1049,7 +1049,7 @@ export function InventoryPage() {
                                   {disposalLabel[v] ?? v}
                                 </span>
                               ) : (
-                                <span className="text-gray-300">—</span>
+                                <span className="text-gray-300">-</span>
                               )
                             }
                           />
@@ -1059,7 +1059,7 @@ export function InventoryPage() {
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${disposalColors[dtype] ?? 'bg-gray-100 text-gray-600'}`}>
                               {disposalLabel[dtype] ?? dtype}
                             </span>
-                          ) : <span className="text-gray-300">—</span>;
+                          ) : <span className="text-gray-300">-</span>;
                         })()}
                       </td>
 
@@ -1249,10 +1249,10 @@ export function InventoryPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
                   >
                     <option value="">Not graded</option>
-                    <option value="A">A — Excellent</option>
-                    <option value="B">B — Good</option>
-                    <option value="C">C — Fair</option>
-                    <option value="D">D — Poor</option>
+                    <option value="A">A - Excellent</option>
+                    <option value="B">B - Good</option>
+                    <option value="C">C - Fair</option>
+                    <option value="D">D - Poor</option>
                   </select>
                 </div>
                 <div>

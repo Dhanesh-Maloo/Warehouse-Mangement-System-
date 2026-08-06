@@ -382,10 +382,10 @@ export function InspectionsPage() {
                                 hour: '2-digit',
                                 minute: '2-digit',
                               })
-                            : '—'}
+                            : '-'}
                         </td>
                         <td className="px-5 py-3.5 tabular-nums text-gray-600">
-                          {ins.slaMinutes ?? '—'}
+                          {ins.slaMinutes ?? '-'}
                           {ins.slaMinutes !== null && ins.slaMinutes > SLA_TARGET_MINUTES && (
                             <span className="ml-1.5 text-red-500 text-xs">⚠</span>
                           )}
@@ -393,7 +393,7 @@ export function InspectionsPage() {
                         <td
                           className={`px-5 py-3.5 font-bold text-lg ${GRADE_COLOR[ins.conditionGrade ?? ''] ?? 'text-gray-400'}`}
                         >
-                          {ins.conditionGrade ?? '—'}
+                          {ins.conditionGrade ?? '-'}
                         </td>
                       </tr>
                     ))}

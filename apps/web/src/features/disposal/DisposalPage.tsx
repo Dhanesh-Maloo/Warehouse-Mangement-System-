@@ -66,7 +66,7 @@ const DISPOSAL_TYPE_META: Record<
     description: 'Decommission with no data wipe certificate',
   },
   certified_blanco: {
-    label: 'Certified Data Destruction — Blanco',
+    label: 'Certified Data Destruction - Blanco',
     price: '₹550',
     description: 'Certified wipe + destruction certificate',
   },
@@ -74,7 +74,7 @@ const DISPOSAL_TYPE_META: Record<
     label: 'Retrieval + ITAD Bundled',
     price: '₹1,750',
     description:
-      'Retrieve device + disposal handling, single fee — certification is a separate add-on',
+      'Retrieve device + disposal handling, single fee - certification is a separate add-on',
   },
 };
 
@@ -270,7 +270,7 @@ export function DisposalPage() {
                 </option>
                 {assets.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.serialNumber} — {a.manufacturer} {a.model}
+                    {a.serialNumber} - {a.manufacturer} {a.model}
                   </option>
                 ))}
               </select>

@@ -344,11 +344,11 @@ export function EndUsersPage() {
                       </div>
                     </td>
                     <td className="px-5 py-3 text-gray-600 text-xs font-mono">
-                      {eu.employeeId ?? '—'}
+                      {eu.employeeId ?? '-'}
                     </td>
-                    <td className="px-5 py-3 text-gray-600">{eu.email ?? '—'}</td>
-                    <td className="px-5 py-3 text-gray-600">{eu.phone ?? '—'}</td>
-                    <td className="px-5 py-3 text-gray-600">{eu.city ?? '—'}</td>
+                    <td className="px-5 py-3 text-gray-600">{eu.email ?? '-'}</td>
+                    <td className="px-5 py-3 text-gray-600">{eu.phone ?? '-'}</td>
+                    <td className="px-5 py-3 text-gray-600">{eu.city ?? '-'}</td>
                     <td className="px-5 py-3">
                       <span
                         className={`px-2.5 py-1 rounded-full text-xs font-medium ${

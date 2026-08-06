@@ -91,24 +91,24 @@ interface LedgerEntry {
 
 const EVENT_LABELS: Record<string, string> = {
   INGEST: 'Inbound (Ingest)',
-  CORRECTION_INGEST: 'Correction — Ingest',
+  CORRECTION_INGEST: 'Correction - Ingest',
   INSPECT: 'Inspection',
   PICK_PACK: 'Deployment (Pick & Pack)',
   FULL_PREP: 'Deployment (Full Prep)',
   LABELING: 'Labeling',
   REPACKING: 'Repacking',
-  COURIER_CITY: 'Courier — City',
-  COURIER_INTERSTATE: 'Courier — Interstate',
-  COURIER_RURAL: 'Courier — Rural',
+  COURIER_CITY: 'Courier - City',
+  COURIER_INTERSTATE: 'Courier - Interstate',
+  COURIER_RURAL: 'Courier - Rural',
   RETRIEVAL: 'Retrieval (Standard)',
   RETRIEVAL_FULL_CYCLE: 'Retrieval (Full Cycle)',
   DISPOSAL_NON_CERT: 'Disposal (Non-certified)',
   DISPOSAL_CERTIFIED: 'Disposal (Certified)',
   DISPOSAL_ITAD: 'Disposal (ITAD)',
-  STORAGE_LAPTOP: 'Storage — Laptop',
-  STORAGE_PERIPHERAL: 'Storage — Peripheral',
-  STORAGE_LAPTOP_REVERSAL: 'Storage Reversal — Laptop',
-  STORAGE_PERIPHERAL_REVERSAL: 'Storage Reversal — Peripheral',
+  STORAGE_LAPTOP: 'Storage - Laptop',
+  STORAGE_PERIPHERAL: 'Storage - Peripheral',
+  STORAGE_LAPTOP_REVERSAL: 'Storage Reversal - Laptop',
+  STORAGE_PERIPHERAL_REVERSAL: 'Storage Reversal - Peripheral',
   COMMITMENT_ADJUSTMENT: 'Commitment Adjustment',
 };
 
@@ -373,7 +373,7 @@ export function BillingPage() {
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle size={16} className="text-emerald-600" />
             <p className="text-sm font-semibold text-emerald-800">
-              Accrual complete — {periodLabel(accrualResult.periodStart)}
+              Accrual complete - {periodLabel(accrualResult.periodStart)}
             </p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">

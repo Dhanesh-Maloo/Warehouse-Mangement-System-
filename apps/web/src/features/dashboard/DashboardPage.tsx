@@ -152,7 +152,7 @@ export function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Asset overview — all statuses as of now</p>
+        <p className="text-sm text-gray-500 mt-1">Asset overview - all statuses as of now</p>
       </div>
 
       {summaryLoading ? (
@@ -222,7 +222,7 @@ export function DashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-sm font-semibold text-gray-700">Full asset breakdown</h2>
-                <p className="text-xs text-gray-400 mt-0.5">All statuses — should sum to {totalAssets}</p>
+                <p className="text-xs text-gray-400 mt-0.5">All statuses - should sum to {totalAssets}</p>
               </div>
               <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
                 {totalAssets} total

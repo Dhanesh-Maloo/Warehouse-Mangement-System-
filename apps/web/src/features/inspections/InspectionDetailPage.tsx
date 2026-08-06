@@ -160,22 +160,22 @@ function isPass(item: ChecklistItem, value: boolean | null): boolean {
 const GRADE_LABELS: Record<Grade, { label: string; description: string; color: string }> = {
   A: {
     label: 'Grade A',
-    description: 'Like new — all checks pass',
+    description: 'Like new - all checks pass',
     color: 'border-emerald-500 bg-emerald-50 text-emerald-700',
   },
   B: {
     label: 'Grade B',
-    description: 'Good — minor cosmetic wear',
+    description: 'Good - minor cosmetic wear',
     color: 'border-blue-500 bg-blue-50 text-blue-700',
   },
   C: {
     label: 'Grade C',
-    description: 'Fair — visible wear, functional',
+    description: 'Fair - visible wear, functional',
     color: 'border-amber-500 bg-amber-50 text-amber-700',
   },
   D: {
     label: 'Grade D',
-    description: 'Poor — significant damage',
+    description: 'Poor - significant damage',
     color: 'border-red-500 bg-red-50 text-red-700',
   },
 };
@@ -876,7 +876,7 @@ export function InspectionDetailPage() {
                                   className="w-4 h-4 accent-[#E86F2C] cursor-pointer"
                                 />
                               ) : (
-                                <span className="text-gray-200">—</span>
+                                <span className="text-gray-200">-</span>
                               )}
                             </td>
                           )}
@@ -1012,7 +1012,7 @@ export function InspectionDetailPage() {
                 className="w-full border-2 border-dashed border-gray-200 rounded-lg py-8 text-center text-sm text-gray-400 hover:border-[#E86F2C] hover:text-[#E86F2C] transition-colors"
               >
                 <Camera size={20} className="mx-auto mb-1" />
-                Upload up to 10 images — top, bottom, front, sides, etc.
+                Upload up to 10 images - top, bottom, front, sides, etc.
               </button>
             ) : (
               <div className="flex flex-wrap gap-2">

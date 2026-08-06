@@ -213,7 +213,7 @@ export function ReceiveDevicesPage() {
                 <option value="">Select location…</option>
                 {locations.map((loc) => (
                   <option key={loc.id} value={loc.id}>
-                    {loc.name} — {loc.zoneCode}/{loc.binCode}
+                    {loc.name} - {loc.zoneCode}/{loc.binCode}
                   </option>
                 ))}
               </select>
@@ -253,7 +253,7 @@ export function ReceiveDevicesPage() {
             className="w-full px-4 py-3 bg-white/10 text-white placeholder-white/40 border border-white/20 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#E86F2C] focus:border-transparent"
           />
           <p className="mt-2 text-xs text-[#8AA6BF]">
-            Point a barcode scanner here — it types the serial and sends Enter automatically.
+            Point a barcode scanner here - it types the serial and sends Enter automatically.
           </p>
         </div>
 
@@ -367,7 +367,7 @@ export function ReceiveDevicesPage() {
                       ) : (
                         <span className="flex items-center gap-1 text-emerald-600">
                           <CheckCircle size={14} />
-                          Sealed box — inspection exempt
+                          Sealed box - inspection exempt
                         </span>
                       )}
                     </span>

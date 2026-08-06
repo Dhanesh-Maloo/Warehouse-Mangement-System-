@@ -176,7 +176,7 @@ export function ClientsPage() {
         <div className="bg-red-50 border border-red-200 rounded-xl p-5 space-y-3">
           <p className="text-sm font-medium text-red-800">
             Deactivate <strong>{confirmDeactivate.name}</strong>? Their assets, ledger history, and
-            users are kept — this only hides them from active use and cannot be undone from the UI.
+            users are kept - this only hides them from active use and cannot be undone from the UI.
           </p>
           <div className="flex gap-3">
             <button
@@ -238,7 +238,7 @@ export function ClientsPage() {
               <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-gray-600">
                 <div>
                   <div className="text-gray-400 mb-0.5">GSTIN</div>
-                  <div className="font-mono">{c.gstin ?? '—'}</div>
+                  <div className="font-mono">{c.gstin ?? '-'}</div>
                 </div>
                 {c.contactEmail && (
                   <div className="col-span-2">

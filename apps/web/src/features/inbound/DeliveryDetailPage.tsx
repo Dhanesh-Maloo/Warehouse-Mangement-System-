@@ -224,7 +224,7 @@ export function DeliveryDetailPage() {
                       minute: '2-digit',
                     })}
                   </td>
-                  <td className="px-5 py-3.5 text-gray-600">{grn.courierRef ?? '—'}</td>
+                  <td className="px-5 py-3.5 text-gray-600">{grn.courierRef ?? '-'}</td>
                   <td className="px-5 py-3.5 text-right font-semibold text-gray-900">
                     {grn.deviceCount}
                   </td>
