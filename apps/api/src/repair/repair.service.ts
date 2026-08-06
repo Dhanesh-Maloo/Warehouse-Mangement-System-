@@ -41,7 +41,7 @@ const REPAIR_TERMINAL_STATUSES = new Set(['completed', 'cancelled']);
 //    internal SLA — slaTargetAt stays unset until staff enter the OEM's
 //    committed date (at creation or via updateSla once it's known).
 //  - in_house + software: fixed internal SLA of 3 business days (9 business
-//    hours/day, per CLAUDE.md rule 4 — Mon-Fri 09:00-18:00 IST, excl. holidays).
+//    hours/day, per CLAUDE.md rule 4 — Mon-Sat 09:00-18:00 IST, excl. holidays).
 //  - in_house + hardware: no fixed default — completion depends on parts
 //    availability from the OEM/supplier, so slaTargetAt stays unset until
 //    staff enter/update an estimate once parts availability is known.

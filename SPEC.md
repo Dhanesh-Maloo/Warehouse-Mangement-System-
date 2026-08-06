@@ -291,7 +291,7 @@ stories below capture the requirements clarified with Esevel via email
     fixed internal SLA: `slaTargetAt` stays unset at creation until staff
     enter the OEM-committed completion date (see US-REP-03).
   - **`in_house` + `software`** — repaired by the iValue team; defaults to
-    3 business days (Mon–Fri 09:00–18:00 IST, excluding holidays) from the
+    3 business days (Mon–Sat 09:00–18:00 IST, excluding holidays) from the
     request's creation.
   - **`in_house` + `hardware`** — repaired by the iValue team but requires a
     component replacement (keyboard, battery, display, etc.); no fixed
@@ -361,7 +361,7 @@ stories below capture the requirements clarified with Esevel via email
 > **OPEN DECISION:** confirm whether commitment is a floor (default above) or a pre-paid credit consumed by activity. Affects Phase 3.
 
 ### 6.5 SLA timers
-- Business hours: Mon–Fri, 09:00–18:00 IST. Exclude holidays from `holidays` table.
+- Business hours: Mon–Sat, 09:00–18:00 IST (warehouse operates Mon–Sat; confirmed 2026-08-06). Exclude holidays from `holidays` table.
 - Statuses: `on_track` (>20% time remaining), `at_risk` (5–20%), `breached` (≤0%).
 - Phase 1: surface in inspection list. Phase 3: full SLA dashboard.
 

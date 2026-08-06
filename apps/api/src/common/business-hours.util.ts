@@ -1,4 +1,4 @@
-// Business hours are Mon-Fri 09:00-18:00 IST, excluding holidays (CLAUDE.md rule 4).
+// Business hours are Mon-Sat 09:00-18:00 IST, excluding holidays (CLAUDE.md rule 4).
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 const BH_START_HOUR = 9;
 const BH_END_HOUR = 18;
@@ -10,7 +10,7 @@ function isBusinessMinute(cursor: Date, holidays: Set<string>): boolean {
   const dateKey = istDate.toISOString().slice(0, 10);
   return (
     dayOfWeek >= 1 &&
-    dayOfWeek <= 5 &&
+    dayOfWeek <= 6 &&
     hour >= BH_START_HOUR &&
     hour < BH_END_HOUR &&
     !holidays.has(dateKey)

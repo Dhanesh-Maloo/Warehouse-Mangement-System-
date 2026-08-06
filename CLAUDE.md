@@ -61,7 +61,7 @@ Inside `apps/web`, organise by feature: `features/auth/`, `features/clients/`, e
 
 3. **Rate card versioning.** Editing a rate creates a new version with a new `effective_from`, never an update of the existing row. Events lookup the rate effective at `occurred_at`, never the current rate.
 
-4. **Business-hours SLA.** SLA timers count Mon–Fri 09:00–18:00 IST only, excluding configured Indian public holidays. Use a `date-holidays` library or equivalent; store the holiday list in the database so admins can maintain it.
+4. **Business-hours SLA.** SLA timers count Mon–Sat 09:00–18:00 IST only, excluding configured Indian public holidays (warehouse operates Mon–Sat; confirmed 2026-08-06). Use a `date-holidays` library or equivalent; store the holiday list in the database so admins can maintain it.
 
 5. **Server-side authorisation everywhere.** Never trust the client. Every API endpoint validates: (a) the user is authenticated, (b) the user's role is allowed to perform the action, (c) if the resource belongs to a client, the user is allowed to see that client.
 
