@@ -281,20 +281,42 @@ stories below capture the requirements clarified with Esevel via email
   client, per retrieval, whether a wipe is required, and selects it explicitly
   on the retrieval/disposal request. No auto-wipe and no forced skip.
 
-**US-REP-01 — Repair SLA target**
-- A repair request gets a target completion date (`slaTargetAt`), computed as
-  5 business days (Mon–Fri 09:00–18:00 IST, excluding holidays) from the
-  request's creation, unless the requester supplies a different estimate from
-  the service center at creation time.
+**US-REP-01 — Repair SLA target (per repair type)**
+- Every repair request is classified by `repairType`: `oem_warranty` or
+  `in_house`. `in_house` requests additionally require a `repairCategory`:
+  `software` or `hardware`. SLA target (`slaTargetAt`) is computed as follows
+  (clarified with Divya, 2026-08-06):
+  - **`oem_warranty`** — the repair is handled by the OEM under warranty, so
+    turnaround depends entirely on the OEM's own service timeline. There is no
+    fixed internal SLA: `slaTargetAt` stays unset at creation until staff
+    enter the OEM-committed completion date (see US-REP-03).
+  - **`in_house` + `software`** — repaired by the iValue team; defaults to
+    3 business days (Mon–Fri 09:00–18:00 IST, excluding holidays) from the
+    request's creation.
+  - **`in_house` + `hardware`** — repaired by the iValue team but requires a
+    component replacement (keyboard, battery, display, etc.); no fixed
+    default, since completion depends on parts availability from the OEM/
+    supplier. `slaTargetAt` stays unset until staff enter an estimate once
+    parts availability is known (see US-REP-03).
+  - Any of the above can still be overridden with an explicit `slaTargetAt` at
+    creation time (e.g. a service center gives an estimate up front).
 
 **US-REP-02 — Overdue repair tracking**
-- Any repair request not yet `completed`/`cancelled` and past its
-  `slaTargetAt` is flagged `isOverdue` wherever repair requests are listed, so
-  staff can see at a glance which repairs have missed their turnaround target.
+- Any repair request not yet `completed`/`cancelled`, with a `slaTargetAt`
+  set, and past that target is flagged `isOverdue` wherever repair requests
+  are listed, so staff can see at a glance which repairs have missed their
+  turnaround target. Requests with no `slaTargetAt` set (unresolved
+  OEM/parts-dependent estimates) are never flagged overdue.
 - Out of scope for this iteration: email/push alerts (no notification
   infrastructure exists yet), shipping/courier cost tracking to and from the
   service center, and billing for the actual repair cost (only the estimate
   and flat coordination fee exist today).
+
+**US-REP-03 — Revise SLA target after creation**
+- Staff can set or revise a repair request's `slaTargetAt` at any point while
+  it is not yet `completed`/`cancelled` — e.g. once the OEM confirms a
+  completion date, or once a hardware repair's parts ETA becomes known. Each
+  revision is audit-logged.
 
 **US-RES-01 — Asset status synced on resale sale**
 - When a resale listing is marked `sold`, the underlying asset's
