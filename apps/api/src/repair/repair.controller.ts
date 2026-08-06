@@ -12,6 +12,7 @@ import {
 import { RepairService } from './repair.service';
 import { CreateRepairRequestDto } from './dto/create-repair-request.dto';
 import { UpdateRepairStatusDto } from './dto/update-repair-status.dto';
+import { UpdateRepairSlaDto } from './dto/update-repair-sla.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -92,5 +93,16 @@ export class RepairController {
   ): ReturnType<RepairService['updateStatus']> {
     await this.assertOwnsRepair(id, user);
     return this.repairService.updateStatus(id, dto, user.sub);
+  }
+
+  @Patch(':id/sla')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  async updateSla(
+    @Param('id') id: string,
+    @Body() dto: UpdateRepairSlaDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<RepairService['updateSla']> {
+    await this.assertOwnsRepair(id, user);
+    return this.repairService.updateSla(id, dto, user.sub);
   }
 }

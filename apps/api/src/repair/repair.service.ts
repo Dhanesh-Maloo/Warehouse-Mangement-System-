@@ -7,6 +7,7 @@ import { AuditService } from '../audit/audit.service';
 import { addBusinessMinutes } from '../common/business-hours.util';
 import type { CreateRepairRequestDto } from './dto/create-repair-request.dto';
 import type { UpdateRepairStatusDto } from './dto/update-repair-status.dto';
+import type { UpdateRepairSlaDto } from './dto/update-repair-sla.dto';
 
 export interface RepairAssetSummary {
   id: string;
@@ -35,10 +36,18 @@ const REPAIR_TRANSITIONS: Record<string, string[]> = {
 
 const REPAIR_TERMINAL_STATUSES = new Set(['completed', 'cancelled']);
 
-// Default repair SLA: 5 business days (9 business hours/day, per CLAUDE.md
-// rule 4 — Mon-Fri 09:00-18:00 IST, excluding holidays), overridable per
-// request when the service center gives a different completion estimate.
-const DEFAULT_SLA_BUSINESS_MINUTES = 5 * 9 * 60;
+// Repair SLA policy (clarified with Divya, 2026-08-06):
+//  - oem_warranty: turnaround is entirely on the OEM's own timeline. No fixed
+//    internal SLA — slaTargetAt stays unset until staff enter the OEM's
+//    committed date (at creation or via updateSla once it's known).
+//  - in_house + software: fixed internal SLA of 3 business days (9 business
+//    hours/day, per CLAUDE.md rule 4 — Mon-Fri 09:00-18:00 IST, excl. holidays).
+//  - in_house + hardware: no fixed default — completion depends on parts
+//    availability from the OEM/supplier, so slaTargetAt stays unset until
+//    staff enter/update an estimate once parts availability is known.
+// All of the above can be overridden with an explicit slaTargetAt at creation,
+// and revised later at any point via updateSla.
+const SOFTWARE_REPAIR_SLA_BUSINESS_MINUTES = 3 * 9 * 60;
 
 @Injectable()
 export class RepairService {
@@ -118,13 +127,21 @@ export class RepairService {
       );
     }
 
+    if (dto.repairType === 'in_house' && !dto.repairCategory) {
+      throw new BadRequestException(
+        'repairCategory (software or hardware) is required for in_house repairs',
+      );
+    }
+
     const occurredAt = new Date();
     const rate = await this.rateCard.findEffectiveAt('REPAIR', occurredAt);
     const unitRate = rate ? rate.unitRatePaise : BigInt(0);
 
     const slaTargetAt = dto.slaTargetAt
       ? new Date(dto.slaTargetAt)
-      : addBusinessMinutes(occurredAt, DEFAULT_SLA_BUSINESS_MINUTES, this.getHolidaySet());
+      : dto.repairType === 'in_house' && dto.repairCategory === 'software'
+        ? addBusinessMinutes(occurredAt, SOFTWARE_REPAIR_SLA_BUSINESS_MINUTES, this.getHolidaySet())
+        : null; // oem_warranty and in_house/hardware: no fixed default, set once known
 
     const repair = await this.prisma.$transaction(async (tx) => {
       const created = await tx.repairRequest.create({
@@ -134,6 +151,8 @@ export class RepairService {
           serviceCenterName: dto.serviceCenterName,
           estimateCostPaise:
             dto.estimateCostPaise !== undefined ? BigInt(dto.estimateCostPaise) : undefined,
+          repairType: dto.repairType,
+          repairCategory: dto.repairType === 'in_house' ? dto.repairCategory : undefined,
           slaTargetAt,
           notes: dto.notes,
           status: 'pending',
@@ -228,6 +247,43 @@ export class RepairService {
       entityId: id,
       oldValue: { status: repair.status },
       newValue: { status: dto.status },
+    });
+
+    const [withAsset] = await this.attachAssets([updated]);
+    return withAsset;
+  }
+
+  // Revises the SLA target after creation — e.g. an OEM finally confirms a
+  // completion date, or an in-house hardware repair's parts ETA becomes known.
+  async updateSla(
+    id: string,
+    dto: UpdateRepairSlaDto,
+    updatedByUserId: string,
+  ): Promise<RepairRequestWithAsset> {
+    const repair = await this.prisma.repairRequest.findUnique({ where: { id } });
+    if (!repair) throw new NotFoundException(`Repair request ${id} not found`);
+
+    if (REPAIR_TERMINAL_STATUSES.has(repair.status)) {
+      throw new BadRequestException(
+        `Cannot update SLA target on a repair request that is already '${repair.status}'`,
+      );
+    }
+
+    const slaTargetAt = new Date(dto.slaTargetAt);
+    const now = new Date();
+
+    const updated = await this.prisma.repairRequest.update({
+      where: { id },
+      data: { slaTargetAt, slaUpdatedAt: now },
+    });
+
+    await this.audit.log({
+      userId: updatedByUserId,
+      action: 'repair.updateSla',
+      entity: 'RepairRequest',
+      entityId: id,
+      oldValue: { slaTargetAt: repair.slaTargetAt },
+      newValue: { slaTargetAt, reason: dto.reason },
     });
 
     const [withAsset] = await this.attachAssets([updated]);

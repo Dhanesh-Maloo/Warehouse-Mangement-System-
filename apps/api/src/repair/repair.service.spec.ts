@@ -51,6 +51,8 @@ describe('RepairService', () => {
       clientId: 'client-1',
       assetId: 'asset-1',
       serviceCenterName: 'FixIt Co',
+      repairType: 'in_house',
+      repairCategory: 'software',
     };
 
     it('throws NotFoundException if the asset does not exist', async () => {
@@ -130,7 +132,7 @@ describe('RepairService', () => {
       );
     });
 
-    it('defaults slaTargetAt to 5 business days ahead when not provided', async () => {
+    it('defaults slaTargetAt to 3 business days ahead for in_house software repairs', async () => {
       mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
       mockPrisma.repairRequest.create.mockResolvedValue({
         id: 'repair-3',
@@ -147,10 +149,10 @@ describe('RepairService', () => {
       const createCall = mockPrisma.repairRequest.create.mock.calls[0][0];
       const slaTargetAt: Date = createCall.data.slaTargetAt;
       expect(slaTargetAt).toBeInstanceOf(Date);
-      // 5 business days of 9-hour days is at least 5 calendar days out, and
+      // 3 business days of 9-hour days is at least 3 calendar days out, and
       // can never land before the request was created.
       expect(slaTargetAt.getTime()).toBeGreaterThan(before);
-      expect(slaTargetAt.getTime() - before).toBeGreaterThanOrEqual(5 * 24 * 60 * 60 * 1000);
+      expect(slaTargetAt.getTime() - before).toBeGreaterThanOrEqual(3 * 24 * 60 * 60 * 1000);
     });
 
     it('uses the provided slaTargetAt override instead of the default', async () => {
@@ -169,6 +171,51 @@ describe('RepairService', () => {
 
       const createCall = mockPrisma.repairRequest.create.mock.calls[0][0];
       expect(createCall.data.slaTargetAt).toEqual(new Date(override));
+    });
+
+    it('leaves slaTargetAt unset for oem_warranty repairs (no fixed internal SLA)', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
+      mockPrisma.repairRequest.create.mockResolvedValue({
+        id: 'repair-5',
+        assetId: 'asset-1',
+        status: 'pending',
+      });
+      mockPrisma.asset.update.mockResolvedValue({ ...baseAsset, currentStatus: 'in_repair' });
+      mockPrisma.asset.findMany.mockResolvedValue([baseAsset]);
+      mockRateCard.findEffectiveAt.mockResolvedValue(null);
+
+      await service.create(
+        { ...dto, repairType: 'oem_warranty', repairCategory: undefined } as any,
+        'user-1',
+      );
+
+      const createCall = mockPrisma.repairRequest.create.mock.calls[0][0];
+      expect(createCall.data.slaTargetAt).toBeNull();
+    });
+
+    it('leaves slaTargetAt unset for in_house hardware repairs (parts-dependent)', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
+      mockPrisma.repairRequest.create.mockResolvedValue({
+        id: 'repair-6',
+        assetId: 'asset-1',
+        status: 'pending',
+      });
+      mockPrisma.asset.update.mockResolvedValue({ ...baseAsset, currentStatus: 'in_repair' });
+      mockPrisma.asset.findMany.mockResolvedValue([baseAsset]);
+      mockRateCard.findEffectiveAt.mockResolvedValue(null);
+
+      await service.create({ ...dto, repairCategory: 'hardware' } as any, 'user-1');
+
+      const createCall = mockPrisma.repairRequest.create.mock.calls[0][0];
+      expect(createCall.data.slaTargetAt).toBeNull();
+    });
+
+    it('throws BadRequestException when repairType is in_house but repairCategory is missing', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
+
+      await expect(
+        service.create({ ...dto, repairCategory: undefined } as any, 'user-1'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -308,5 +355,67 @@ describe('RepairService', () => {
         expect(mockPrisma.asset.update).not.toHaveBeenCalled();
       },
     );
+  });
+
+  describe('updateSla', () => {
+    it('throws NotFoundException if the repair request does not exist', async () => {
+      mockPrisma.repairRequest.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateSla('missing', { slaTargetAt: '2026-08-20T00:00:00.000Z' } as any, 'user-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it.each(['completed', 'cancelled'])(
+      'throws BadRequestException if the repair request is already %s',
+      async (status) => {
+        mockPrisma.repairRequest.findUnique.mockResolvedValue({
+          id: 'repair-1',
+          assetId: 'asset-1',
+          status,
+          slaTargetAt: null,
+        });
+
+        await expect(
+          service.updateSla(
+            'repair-1',
+            { slaTargetAt: '2026-08-20T00:00:00.000Z' } as any,
+            'user-1',
+          ),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
+
+    it('updates slaTargetAt and audit-logs the change', async () => {
+      mockPrisma.repairRequest.findUnique.mockResolvedValue({
+        id: 'repair-1',
+        assetId: 'asset-1',
+        status: 'sent',
+        slaTargetAt: null,
+      });
+      mockPrisma.repairRequest.update.mockImplementation(({ data }: any) => ({
+        id: 'repair-1',
+        assetId: 'asset-1',
+        status: 'sent',
+        ...data,
+      }));
+      mockPrisma.asset.findMany.mockResolvedValue([baseAsset]);
+
+      const newTarget = '2026-08-20T00:00:00.000Z';
+      const result = await service.updateSla(
+        'repair-1',
+        { slaTargetAt: newTarget, reason: 'OEM confirmed date' } as any,
+        'user-1',
+      );
+
+      expect(result.slaTargetAt).toEqual(new Date(newTarget));
+      expect(mockAudit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'repair.updateSla',
+          entity: 'RepairRequest',
+          entityId: 'repair-1',
+        }),
+      );
+    });
   });
 });

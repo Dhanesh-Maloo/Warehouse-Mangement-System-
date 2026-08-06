@@ -154,6 +154,20 @@ enum RepairStatus {
   cancelled
 }
 
+// Drives SLA computation (see RepairRequest.slaTargetAt) — OEM/warranty repairs
+// run on the OEM's own timeline, in-house repairs run on iValue's internal SLA.
+enum RepairType {
+  oem_warranty
+  in_house
+}
+
+// Only meaningful when repairType = in_house — software has a fixed internal
+// SLA, hardware depends on parts availability so has no fixed default.
+enum RepairCategory {
+  software
+  hardware
+}
+
 // Placeholder scope pending Esevel/Divya sign-off — see ResaleListing model comment.
 enum ResaleStatus {
   listed
@@ -622,10 +636,13 @@ model RepairRequest {
   serviceCenterName String       @map("service_center_name")
   estimateCostPaise BigInt?      @map("estimate_cost_paise")
   status            RepairStatus @default(pending)
+  repairType        RepairType   @default(in_house) @map("repair_type")
+  repairCategory    RepairCategory? @map("repair_category")
   notes             String?
   createdByUserId   String       @map("created_by_user_id")
   requestedAt       DateTime     @default(now()) @map("requested_at") @db.Timestamptz
   slaTargetAt       DateTime?    @map("sla_target_at") @db.Timestamptz
+  slaUpdatedAt      DateTime?    @map("sla_updated_at") @db.Timestamptz
   sentAt            DateTime?    @map("sent_at") @db.Timestamptz
   returnedAt        DateTime?    @map("returned_at") @db.Timestamptz
   completedAt       DateTime?    @map("completed_at") @db.Timestamptz

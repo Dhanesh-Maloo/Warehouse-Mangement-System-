@@ -22,6 +22,8 @@ interface InventoryAsset {
 }
 
 type RepairStatus = 'pending' | 'sent' | 'in_repair' | 'returned' | 'completed' | 'cancelled';
+type RepairType = 'oem_warranty' | 'in_house';
+type RepairCategory = 'software' | 'hardware';
 
 interface RepairRequest {
   id: string;
@@ -36,11 +38,23 @@ interface RepairRequest {
   // BigInt paise fields serialize as strings (or null) — see apps/api/src/main.ts
   estimateCostPaise: string | null;
   status: RepairStatus;
+  repairType: RepairType;
+  repairCategory: RepairCategory | null;
   notes?: string;
   requestedAt: string;
   slaTargetAt: string | null;
   isOverdue: boolean;
 }
+
+const REPAIR_TYPE_LABELS: Record<RepairType, string> = {
+  oem_warranty: 'OEM / Warranty',
+  in_house: 'In-House',
+};
+
+const REPAIR_CATEGORY_LABELS: Record<RepairCategory, string> = {
+  software: 'Software',
+  hardware: 'Hardware',
+};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -64,6 +78,8 @@ const STATUS_LABELS: Record<RepairStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+const REPAIR_TERMINAL_STATUSES = new Set<RepairStatus>(['completed', 'cancelled']);
+
 const NEXT_STATUSES: Partial<Record<RepairStatus, RepairStatus[]>> = {
   pending: ['sent', 'cancelled'],
   sent: ['in_repair', 'cancelled'],
@@ -85,6 +101,9 @@ const EMPTY_FORM = {
   assetId: '',
   serviceCenterName: '',
   estimateCost: '',
+  repairType: 'in_house' as RepairType,
+  repairCategory: '' as RepairCategory | '',
+  slaTargetAt: '',
   notes: '',
 };
 
@@ -106,6 +125,8 @@ export function RepairPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [selectedClientId, setSelectedClientId] = useState('');
+  const [editingSlaId, setEditingSlaId] = useState<string | null>(null);
+  const [slaDraft, setSlaDraft] = useState('');
 
   const effectiveClientId = isClientScoped ? (clientId ?? '') : selectedClientId;
 
@@ -159,6 +180,16 @@ export function RepairPage() {
     onError: (e: Error) => alert(e.message),
   });
 
+  const updateSlaMutation = useMutation({
+    mutationFn: ({ id, slaTargetAt }: { id: string; slaTargetAt: string }) =>
+      api.patch(`/repair/${id}/sla`, { slaTargetAt: new Date(slaTargetAt).toISOString() }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['repair-requests'] });
+      setEditingSlaId(null);
+    },
+    onError: (e: Error) => alert(e.message),
+  });
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function resetForm() {
@@ -181,6 +212,9 @@ export function RepairPage() {
       assetId: form.assetId,
       serviceCenterName: form.serviceCenterName,
       estimateCostPaise,
+      repairType: form.repairType,
+      repairCategory: form.repairType === 'in_house' ? form.repairCategory || undefined : undefined,
+      slaTargetAt: form.slaTargetAt ? new Date(form.slaTargetAt).toISOString() : undefined,
       notes: form.notes.trim() || undefined,
     });
   }
@@ -294,6 +328,74 @@ export function RepairPage() {
               </div>
             </div>
 
+            {/* Repair type + category */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Repair Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  value={form.repairType}
+                  onChange={(e) => {
+                    const repairType = e.target.value as RepairType;
+                    setField('repairType', repairType);
+                    if (repairType === 'oem_warranty') setField('repairCategory', '');
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                >
+                  <option value="in_house">In-House (iValue team)</option>
+                  <option value="oem_warranty">OEM / Warranty</option>
+                </select>
+              </div>
+              {form.repairType === 'in_house' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Repair Category <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={form.repairCategory}
+                    onChange={(e) => setField('repairCategory', e.target.value as RepairCategory)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  >
+                    <option value="">Select…</option>
+                    <option value="software">Software (default SLA: 3 business days)</option>
+                    <option value="hardware">Hardware (depends on parts availability)</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* SLA override */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                SLA Target Date{' '}
+                <span className="text-gray-400 font-normal">
+                  (optional —{' '}
+                  {form.repairType === 'oem_warranty'
+                    ? 'OEM-confirmed date, if known'
+                    : form.repairCategory === 'hardware'
+                      ? 'parts ETA, if known'
+                      : 'overrides the 3-business-day default'}
+                  )
+                </span>
+              </label>
+              <input
+                type="date"
+                value={form.slaTargetAt}
+                onChange={(e) => setField('slaTargetAt', e.target.value)}
+                className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+              />
+              {(form.repairType === 'oem_warranty' || form.repairCategory === 'hardware') &&
+                !form.slaTargetAt && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    No fixed SLA for this repair type — leave blank and set the target date later
+                    once known.
+                  </p>
+                )}
+            </div>
+
             {/* Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -342,6 +444,7 @@ export function RepairPage() {
               <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
                 <th className="text-left px-5 py-3">Asset</th>
                 <th className="text-left px-5 py-3">Service Center</th>
+                <th className="text-left px-5 py-3">Type</th>
                 <th className="text-left px-5 py-3">Estimate</th>
                 <th className="text-left px-5 py-3">Status</th>
                 <th className="text-left px-5 py-3">Requested</th>
@@ -376,6 +479,16 @@ export function RepairPage() {
 
                     {/* Service center */}
                     <td className="px-5 py-3.5 text-gray-800">{r.serviceCenterName}</td>
+
+                    {/* Repair type / category */}
+                    <td className="px-5 py-3.5 text-gray-700">
+                      <div>{REPAIR_TYPE_LABELS[r.repairType]}</div>
+                      {r.repairCategory && (
+                        <div className="text-xs text-gray-400">
+                          {REPAIR_CATEGORY_LABELS[r.repairCategory]}
+                        </div>
+                      )}
+                    </td>
 
                     {/* Estimate */}
                     <td className="px-5 py-3.5 text-gray-700">
@@ -421,19 +534,66 @@ export function RepairPage() {
 
                     {/* SLA target + overdue flag */}
                     <td className="px-5 py-3.5">
-                      {r.slaTargetAt ? (
+                      {editingSlaId === r.id ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-gray-600">
-                            {new Date(r.slaTargetAt).toLocaleDateString('en-IN')}
-                          </span>
-                          {r.isOverdue && (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                              Overdue
-                            </span>
-                          )}
+                          <input
+                            type="date"
+                            autoFocus
+                            value={slaDraft}
+                            onChange={(e) => setSlaDraft(e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                          />
+                          <button
+                            type="button"
+                            disabled={!slaDraft || updateSlaMutation.isPending}
+                            onClick={() =>
+                              updateSlaMutation.mutate({ id: r.id, slaTargetAt: slaDraft })
+                            }
+                            className="text-xs font-semibold text-[#E86F2C] hover:underline disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingSlaId(null)}
+                            className="text-xs text-gray-500 hover:underline"
+                          >
+                            Cancel
+                          </button>
                         </div>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <div className="flex items-center gap-2">
+                          {r.slaTargetAt ? (
+                            <>
+                              <span className="text-gray-600">
+                                {new Date(r.slaTargetAt).toLocaleDateString('en-IN')}
+                              </span>
+                              {r.isOverdue && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                                  Overdue
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-gray-400">Not set</span>
+                          )}
+                          {!REPAIR_TERMINAL_STATUSES.has(r.status) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingSlaId(r.id);
+                                setSlaDraft(
+                                  r.slaTargetAt
+                                    ? new Date(r.slaTargetAt).toISOString().slice(0, 10)
+                                    : '',
+                                );
+                              }}
+                              className="text-xs text-gray-400 hover:text-[#E86F2C] hover:underline"
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </div>
                       )}
                     </td>
 
@@ -443,7 +603,7 @@ export function RepairPage() {
               })}
               {repairs.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={8} className="px-5 py-12 text-center text-gray-400 text-sm">
                     No repair requests yet. Create one above.
                   </td>
                 </tr>
