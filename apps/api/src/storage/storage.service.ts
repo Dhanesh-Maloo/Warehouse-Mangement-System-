@@ -295,29 +295,11 @@ export class StorageService {
       }
     }
 
-    // Post COMMITMENT_ADJUSTMENT if total is below minimum commitment
-    if (!minimumCommitmentMet && totalDeviceCount > 0) {
-      const shortfallPaise = committedMonthlyAmountPaise - totalAmountPaise;
-      // Use the first available asset for the FK requirement
-      const anyAsset = await this.prisma.asset.findFirst({
-        where: { clientId, currentStatus: { in: ['in_storage', 'deployed', 'returning'] } },
-        select: { id: true },
-      });
-      if (anyAsset) {
-        await this.ledger.create({
-          eventType: 'COMMITMENT_ADJUSTMENT',
-          asset: { connect: { id: anyAsset.id } },
-          client: { connect: { id: clientId } },
-          quantity: 1,
-          unitRatePaise: shortfallPaise,
-          amountPaise: shortfallPaise,
-          occurredAt,
-          createdBy: 'system:storage-accrual',
-          referenceType: 'storage_accrual',
-          notes: `Minimum commitment adjustment: billed ${Number(totalAmountPaise) / 100} < minimum ${Number(committedMonthlyAmountPaise) / 100}`,
-        });
-      }
-    }
+    // NOTE: minimum-commitment billing (posting a COMMITMENT_ADJUSTMENT ledger
+    // event when totalAmountPaise falls short of committedMonthlyAmountPaise)
+    // is a Phase 3 feature left as an open decision in SPEC.md §6.4 (floor vs.
+    // pre-paid credit was never confirmed) — disabled until that's resolved.
+    // minimumCommitmentMet is still computed/recorded below for reporting.
 
     // Record the accrual run
     await this.prisma.storageAccrualRun.create({
