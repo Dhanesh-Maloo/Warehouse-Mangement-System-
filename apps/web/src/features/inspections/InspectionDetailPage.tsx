@@ -484,6 +484,13 @@ export function InspectionDetailPage() {
               This will mark the inspection as cancelled and return the asset to storage. This
               cannot be undone.
             </p>
+            {cancelMutation.isError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+                {cancelMutation.error instanceof Error
+                  ? cancelMutation.error.message
+                  : 'Failed to cancel inspection.'}
+              </p>
+            )}
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowCancelConfirm(false)}
@@ -493,8 +500,9 @@ export function InspectionDetailPage() {
               </button>
               <button
                 onClick={() => {
-                  setShowCancelConfirm(false);
-                  cancelMutation.mutate();
+                  cancelMutation.mutate(undefined, {
+                    onSuccess: () => setShowCancelConfirm(false),
+                  });
                 }}
                 disabled={cancelMutation.isPending}
                 className="px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-40"
