@@ -231,8 +231,9 @@ const MODULES: ModuleInfo[] = [
       'Bring a deployed device back into the warehouse - standard pickup, or full-cycle (retrieve + redeploy).',
     steps: [
       'Click "New Retrieval Request", pick the client and the deployed asset, then fill in pickup address and bundle type.',
+      'Check "Requires data wipe" if the client has confirmed the device needs wiping - this is optional and decided per retrieval, not automatic.',
       'Track status from pending → initiated → in transit → received → completed.',
-      'If "requires post-inspection" was checked, an inspection is auto-created once the device is received.',
+      'A diagnostic Inspection is always auto-created the moment a device is marked "received" - this cannot be skipped, since Esevel needs a diagnostic report on every retrieval.',
     ],
     roles:
       'Client user only views; Admin/Manager/Operator/Editor/Client admin can create and progress requests - scoped to their own client for Editor/Client admin.',
@@ -244,7 +245,8 @@ const MODULES: ModuleInfo[] = [
     summary:
       'End-of-life handling - non-certified wipe, certified data destruction (Blanco), or full ITAD (IT Asset Disposition).',
     steps: [
-      'Click "New Disposal Request", pick the client, the in-storage asset, and the disposal type.',
+      'Click "New Disposal Request", pick the client, the in-storage asset, and the disposal type: Non-Certified, Certified Data Destruction (Blanco), or Retrieval + ITAD Bundled.',
+      'For Non-Certified or ITAD Bundled requests, optionally add the Certification add-on (₹550 + GST) for a destruction certificate - Certified Blanco already includes certification, so the add-on isn’t offered on that type.',
       'A Manager, Admin, or the owning client’s Client admin approves the request.',
       'Once approved, mark it "in progress" and then "complete" - completing it marks the asset disposed permanently.',
     ],
@@ -256,14 +258,17 @@ const MODULES: ModuleInfo[] = [
     title: 'Repair',
     icon: Wrench,
     summary:
-      'Send an in-storage device to an external service center for repair and track its return.',
+      'Send an in-storage device to an external service center for repair and track its return, with an SLA target that adapts to how the repair is being handled.',
     steps: [
       'Click "New Repair Request", pick the client (auto-filled for client-scoped roles), the in-storage asset, and the service center name.',
+      'Choose the repair type: "OEM / Warranty" (handled by the manufacturer), or "In-House" - which then also asks for a category, Software or Hardware.',
       'Optionally add an estimate cost and notes, then submit.',
+      'The SLA target date is set automatically based on the repair type: In-House Software defaults to 3 business days (Mon-Sat, 09:00-18:00 IST, excluding holidays); OEM/Warranty and In-House Hardware have no fixed default since they depend on the OEM/parts timeline - enter or revise the target date once it becomes known.',
+      'A request past its SLA target is flagged "Overdue" wherever it’s listed. Requests with no target set yet are never flagged.',
       'Progress the request from pending → sent → in repair → returned → completed (or cancel at any point before completed) using the status dropdown.',
     ],
     roles:
-      'Client user only views; Admin/Manager/Operator/Editor/Client admin can file and progress requests - scoped to their own client for Editor/Client admin.',
+      'Client user only views; Admin/Manager/Operator/Editor/Client admin can file and progress requests, and revise the SLA target - scoped to their own client for Editor/Client admin.',
   },
   {
     id: 'resale',
@@ -273,6 +278,7 @@ const MODULES: ModuleInfo[] = [
     steps: [
       'Click "New Resale Listing", pick the client (auto-filled for client-scoped roles), the in-storage asset, and an optional listed price.',
       'Mark a listing "Sold" and optionally record the sold price, or "Cancel" it.',
+      'Marking a listing sold moves the underlying asset to a "Sold" status - it drops out of Inventory’s normal in-storage/deployed views but its full history is kept.',
     ],
     roles:
       'Client user only views; Admin/Manager/Operator/Editor/Client admin can create listings and update status - scoped to their own client for Editor/Client admin.',
