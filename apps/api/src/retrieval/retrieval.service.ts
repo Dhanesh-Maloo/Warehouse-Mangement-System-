@@ -5,6 +5,7 @@ import { LedgerService } from '../ledger/ledger.service';
 import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
 import { CourierZoneService } from '../logistics/courier-zone.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateRetrievalRequestDto } from './dto/create-retrieval-request.dto';
 import type { UpdateRetrievalStatusDto } from './dto/update-retrieval-status.dto';
 
@@ -16,6 +17,7 @@ export class RetrievalService {
     private readonly rateCard: RateCardService,
     private readonly audit: AuditService,
     private readonly courierZone: CourierZoneService,
+    private readonly assetStatusHistory: AssetStatusHistoryService,
   ) {}
 
   findAll(
@@ -134,6 +136,16 @@ export class RetrievalService {
         where: { id: dto.assetId },
         data: { currentStatus: 'returning' },
       });
+      await this.assetStatusHistory.record(
+        {
+          assetId: dto.assetId,
+          clientId: dto.clientId,
+          fromStatus: retrieval.asset.currentStatus,
+          toStatus: 'returning',
+          sourceModule: 'retrieval',
+        },
+        tx,
+      );
 
       await this.audit.log({
         userId: createdByUserId,
@@ -197,6 +209,16 @@ export class RetrievalService {
           where: { id: retrieval.assetId },
           data: { currentStatus: 'in_inspection' },
         });
+        await this.assetStatusHistory.record(
+          {
+            assetId: retrieval.assetId,
+            clientId: retrieval.clientId,
+            fromStatus: retrieval.asset.currentStatus,
+            toStatus: 'in_inspection',
+            sourceModule: 'retrieval',
+          },
+          tx,
+        );
         await tx.inspection.create({
           data: {
             assetId: retrieval.assetId,

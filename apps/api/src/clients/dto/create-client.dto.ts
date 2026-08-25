@@ -1,5 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsInt, Min, Matches, IsObject } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsEmail, IsOptional, Matches, IsObject } from 'class-validator';
 
 const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
@@ -30,10 +29,4 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   contactPhone?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Type(() => Number)
-  committedMonthlyAmountPaise?: number;
 }

@@ -2,6 +2,7 @@
    typing rather than duplicating full Prisma/service signatures */
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ResaleService } from './resale.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 
 describe('ResaleService', () => {
   let mockPrisma: any;
@@ -27,13 +28,20 @@ describe('ResaleService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      assetStatusHistory: {
+        create: jest.fn().mockResolvedValue({}),
+      },
       $transaction: jest.fn((arg: any) =>
         Array.isArray(arg) ? Promise.all(arg) : arg(mockPrisma),
       ),
     };
     mockAudit = { log: jest.fn().mockResolvedValue(undefined) };
 
-    service = new ResaleService(mockPrisma, mockAudit as any);
+    service = new ResaleService(
+      mockPrisma,
+      mockAudit as any,
+      new AssetStatusHistoryService(mockPrisma),
+    );
   });
 
   describe('create', () => {

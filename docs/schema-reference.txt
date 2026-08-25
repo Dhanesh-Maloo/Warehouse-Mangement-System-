@@ -1,0 +1,532 @@
+================================================================================
+WAREHOUSE MANAGEMENT SYSTEM — SCHEMA REFERENCE
+Generated from infra/prisma/schema.prisma
+================================================================================
+
+NON-NEGOTIABLE CONVENTIONS (see CLAUDE.md) — apply these to any new module:
+  - Every business table carries client_id — filter every query by it.
+  - Money is BigInt paise, never float. ₹1 = 100 paise.
+  - Timestamps are TIMESTAMPTZ, stored UTC, displayed in Asia/Kolkata.
+  - events_ledger is append-only — corrections are new rows, never updates.
+    (A Postgres trigger blocks UPDATE/DELETE on it at the DB level.)
+  - Rate changes create a new RateCardItem version, never edit in place.
+  - Naming: snake_case columns, camelCase Prisma fields, PascalCase models.
+
+================================================================================
+MODULE: IDENTITY & TENANCY
+Clients, staff/portal users, and end-user recipients
+================================================================================
+
+--- Client (table: clients) ---
+One row per warehouse client (Esevel, and every client added after)
+  id                              String    PK                                   client_id
+  name                            String
+  slug                            String    unique
+  gstin                           String?
+  billingAddress                  Json?                                          billing_address
+  contactName                     String?                                        contact_name
+  contactEmail                    String?                                        contact_email
+  contactPhone                    String?                                        contact_phone
+  isActive                        Boolean   default true                         is_active
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: users, assets, expectedDeliveries, ledgerEntries, endUsers,
+             deploymentOrders, retrievalRequests, disposalRequests,
+             storageAccrualRuns
+
+--- User (table: users) ---
+Staff and client-portal logins
+  id                              String    PK                                   user_id
+  email                           String    unique, lowercased
+  passwordHash                    String    Argon2id                             password_hash
+  fullName                        String                                         full_name
+  phone                           String?
+  role                            UserRole  enum
+  clientId                        String?   fk — set only when role=client_user  client_id
+  status                          UserStatus enum, default active
+  lastLoginAt                     DateTime? tz                                   last_login_at
+  failedLoginCount                Int       default 0                            failed_login_count
+  lockedUntil                     DateTime? tz                                   locked_until
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: client, receivedGRNs, inspectionsStarted, auditLogs,
+             createdDeployments, createdRetrievals, createdDisposals,
+             approvedDisposals, uploadedDocuments
+  Enums:
+    UserRole   = operator, manager, admin, client_user, editor, client_admin
+    UserStatus = active, suspended
+
+--- EndUser (table: end_users) ---
+The employee a device is deployed to (client's staff, not a login)
+  id                              String    PK                                   end_user_id
+  clientId                        String    fk                                   client_id
+  name                            String
+  email                           String?
+  employeeId                      String?                                       employee_id
+  phone                           String?
+  city                            String?
+  country                         String    default "India"
+  isActive                        Boolean   default true                        is_active
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: client, deploymentOrders, currentAssets
+
+================================================================================
+MODULE: INVENTORY CORE
+The asset record every process reads and writes
+================================================================================
+
+--- Asset (table: assets) ---
+One row per physical device — the spine of the whole app
+  id                              String    PK                                   asset_id
+  serialNumber                    String    unique                               serial_number
+  assetTag                        String?   unique                               asset_tag
+  model                           String
+  manufacturer                    String
+  category                        AssetCategory enum
+  clientId                        String    fk                                   client_id
+  currentStatus                   AssetStatus  enum, default receiving           current_status
+  currentLocationId               String?   fk, null when deployed/in transit    current_location_id
+  conditionGrade                  ConditionGrade? enum                           condition_grade
+  assetCondition                  AssetCondition? enum                           asset_condition
+  currentEndUserId                String?   fk                                   current_end_user_id
+  repairHandling                  Boolean?                                       repair_handling
+  repairServiceName                String?                                       repair_service_name
+  repairEstimateCost              Int?                                           repair_estimate_cost
+  awbNumber                       String?                                        awb_number
+  courierName                     String?                                        courier_name
+  deliveredAt                     DateTime? tz                                   delivered_at
+  disposalType                    String?                                        disposal_type
+  hasCertification                Boolean?                                       has_certification
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: client, currentLocation, grnAssets, inspections, ledgerEntries,
+             deploymentOrders, retrievalRequests, disposalRequests,
+             currentEndUser, documents
+  Enums:
+    AssetCategory  = laptop, monitor, peripheral
+    AssetStatus    = receiving -> in_inspection -> in_storage -> deployed ->
+                     returning -> disposed
+                     (side-branches, reachable only from in_storage:
+                      in_repair, for_resale, sold)
+    ConditionGrade = A, B, C, D
+    AssetCondition = new, used, dead, not_working
+
+--- Location (table: locations) ---
+A physical warehouse bin/shelf an asset can sit in
+  id                              String    PK                                   location_id
+  name                            String    unique
+  zoneCode                        String    unique with binCode                  zone_code
+  binCode                         String    unique with zoneCode                 bin_code
+  description                     String?
+  capacity                        Int?
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: assets, grns
+
+================================================================================
+MODULE: INBOUND
+Expected deliveries -> goods received -> assets created
+================================================================================
+
+--- ExpectedDelivery (table: expected_deliveries) ---
+A client's advance notice of an incoming shipment
+  id                              String    PK                                   delivery_id
+  clientId                        String    fk                                   client_id
+  purchaseOrderRef                String                                         purchase_order_ref
+  expectedArrivalDate             DateTime  date only                            expected_arrival_date
+  status                          DeliveryStatus enum, default pending
+  notes                           String?
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: client, items, grns
+  Enums: DeliveryStatus = pending, partially_received, completed, cancelled
+
+--- ExpectedDeliveryItem (table: expected_delivery_items) ---
+Line item: what's expected, by model/category/quantity
+  id                              String    PK                                   item_id
+  deliveryId                      String    fk                                   delivery_id
+  category                        AssetCategory enum
+  model                           String
+  manufacturer                    String
+  quantity                        Int
+  receivedQuantity                Int       default 0                           received_quantity
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: delivery
+
+--- GoodsReceivedNote (table: goods_received_notes) ---
+GRN — the actual receipt event, one per drop-off
+  id                              String    PK                                   grn_id
+  grnNumber                       String?   sequential, e.g. GRN-202607-0004     grn_number
+  expectedDeliveryId              String    fk                                   expected_delivery_id
+  receivedByUserId                String    fk                                   received_by_user_id
+  receivingLocationId             String    fk                                   receiving_location_id
+  courierRef                      String?                                        courier_ref
+  receivedAt                      DateTime  tz                                   received_at
+  deviceCount                     Int                                            device_count
+  notes                           String?
+  createdAt                       DateTime  tz
+  Relations: expectedDelivery, receivedByUser, receivingLocation,
+             assets (via GrnAsset)
+
+--- GrnAsset (table: grn_assets) ---
+Join row: which assets came in on which GRN
+  grnId                           String    PK part, fk                         grn_id
+  assetId                         String    PK part, fk                         asset_id
+  requiresInspection               Boolean   default false                      requires_inspection
+  Relations: grn, asset
+
+================================================================================
+MODULE: INSPECTIONS
+Diagnostic condition checks — inbound, outbound, or periodic
+================================================================================
+
+--- Inspection (table: inspections) ---
+One record per inspection pass, with the full checklist + diagnostics
+  id                              String    PK                                   inspection_id
+  assetId                         String    fk                                   asset_id
+  sourceRetrievalId               String?   set when auto-created by a retrieval source_retrieval_id
+  type                            InspectionType enum
+  status                          InspectionStatus enum, default in_progress
+  startedAt                       DateTime  tz                                   started_at
+  startedByUserId                 String    fk                                   started_by_user_id
+  assignedToUserId                String?   fk                                   assigned_to_user_id
+  completedAt                     DateTime? tz                                   completed_at
+  completedByUserId               String?   NO FK relation defined               completed_by_user_id
+  conditionGrade                  ConditionGrade? enum                           condition_grade
+  -- Job details (filled in at completion time) --
+  ticketNumber                    String?                                        ticket_number
+  contactPerson                   String?                                        contact_person
+  contactNumber                   String?                                        contact_number
+  -- Checklist: Physical appearance --
+  scratchesOnCasing               Boolean?                                       scratches_on_casing
+  lidClosingOk                    Boolean?                                       lid_closing_ok
+  scratchesOnScreen               Boolean?                                       scratches_on_screen
+  keyboardIssues                  Boolean?                                       keyboard_issues
+  missingFeet                     Boolean?                                       missing_feet
+  chargerDamage                   Boolean?                                       charger_damage
+  -- Checklist: Accessories (itemized) --
+  acAdapterPresent                Boolean?                                       ac_adapter_present
+  powerCablePresent               Boolean?                                       power_cable_present
+  headsetPresent                  Boolean?                                       headset_present
+  otherAccessories                String?   free text                           other_accessories
+  -- Checklist: Functional checks --
+  webcamOk                        Boolean?                                       webcam_ok
+  speakersOk                      Boolean?                                       speakers_ok
+  bluetoothOk                     Boolean?                                       bluetooth_ok
+  batteryCharges                  Boolean?                                       battery_charges
+  screenOk                        Boolean?                                       screen_ok
+  keyboardOk                      Boolean?                                       keyboard_ok
+  trackpadOk                      Boolean?                                       trackpad_ok
+  portsOk                         Boolean?                                       ports_ok
+  powersOnOk                      Boolean?                                       powers_on_ok
+  imagesUploaded                  Boolean?                                       images_uploaded
+  -- Checklist: Process (null = N/A) --
+  sanitization                    Boolean?
+  factoryReset                    Boolean?                                       factory_reset
+  -- Device diagnostics (mandatory at completion) --
+  operatingSystem                 String?                                        operating_system
+  cpu                             String?
+  ram                             String?
+  display                         String?
+  batteryHealth                   String?                                        battery_health
+  hardwareTestResult              String?                                        hardware_test_result
+  notes                           String?
+  slaMinutes                      Int?      business-hours minutes, IST         sla_minutes
+  slaTargetAt                     DateTime? tz                                   sla_target_at
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: asset, startedByUser, photos, documents
+  Enums:
+    InspectionType   = inbound, outbound, periodic
+    InspectionStatus = in_progress, completed, failed, cancelled
+
+--- InspectionPhoto (table: inspection_photos) ---
+One row per uploaded photo (flat list — no category field)
+  id                              String    PK                                   photo_id
+  inspectionId                    String    fk                                   inspection_id
+  s3Key                           String    R2 object key                       s3_key
+  createdAt                       DateTime  tz
+  Relations: inspection
+
+================================================================================
+MODULE: LIFECYCLE OPERATIONS
+Deploy -> retrieve -> repair / resell / dispose
+================================================================================
+
+--- DeploymentOrder (table: deployment_orders) ---
+Ship a device out to an end user
+  id                              String    PK                                   order_id
+  clientId                        String    fk                                   client_id
+  assetId                         String    fk                                   asset_id
+  endUserId                       String?   fk                                   end_user_id
+  bundleType                      DeploymentBundleType enum, default standard    bundle_type
+  deliveryAddress                 Json                                           delivery_address
+  contactName                     String                                         contact_name
+  contactPhone                    String                                         contact_phone
+  courierZone                     CourierZone enum, auto-resolved from pincode   courier_zone
+  trackingNumber                  String?                                        tracking_number
+  courierName                     String?                                        courier_name
+  actualCarrierCostPaise          BigInt?   money                                actual_carrier_cost_paise
+  requiresLabeling                Boolean   default false                        requires_labeling
+  requiresRepacking               Boolean   default false                        requires_repacking
+  status                          DeploymentOrderStatus enum, default pending
+  requestedAt                     DateTime  tz                                   requested_at
+  processedAt                     DateTime? tz                                   processed_at
+  dispatchedAt                    DateTime? tz                                   dispatched_at
+  deliveredAt                     DateTime? tz                                   delivered_at
+  createdByUserId                 String    fk                                   created_by_user_id
+  notes                           String?
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: client, asset, endUser, createdByUser
+  Enums:
+    DeploymentBundleType  = standard, full_prep
+    DeploymentOrderStatus = pending, in_transit, delivered, cancelled
+    CourierZone           = intra_state, inter_state, rural
+
+--- RetrievalRequest (table: retrieval_requests) ---
+Bring a device back from an end user
+  id                              String    PK                                   retrieval_id
+  clientId                        String    fk                                   client_id
+  assetId                         String    fk                                   asset_id
+  bundleType                      RetrievalBundleType enum, default standard     bundle_type
+  pickupAddress                   Json                                           pickup_address
+  contactName                     String                                         contact_name
+  contactPhone                    String                                         contact_phone
+  courierZone                     CourierZone enum                               courier_zone
+  trackingNumber                  String?                                        tracking_number
+  requiresPostInspection          Boolean   default false — diagnostic           requires_post_inspection
+                                             inspection ALWAYS runs regardless
+  requiresWipe                    Boolean   default false, per-retrieval         requires_wipe
+                                             client decision
+  requiresRedeploySetup           Boolean   only meaningful for full_cycle       requires_redeploy_setup
+  redeployEndUserId               String?   fk-shaped, no relation               redeploy_end_user_id
+  redeployDeliveryAddress         Json?     required if bundleType=full_cycle    redeploy_delivery_address
+  redeployContactName             String?                                        redeploy_contact_name
+  redeployContactPhone            String?                                        redeploy_contact_phone
+  damageFound                     Boolean?  set when post-inspection completes   damage_found
+  status                          RetrievalStatus enum, default pending
+  requestedAt                     DateTime  tz                                   requested_at
+  initiatedAt                     DateTime? tz                                   initiated_at
+  receivedAt                      DateTime? tz                                   received_at
+  completedAt                     DateTime? tz                                   completed_at
+  createdByUserId                 String    fk                                   created_by_user_id
+  notes                           String?
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: client, asset, createdByUser
+  Enums:
+    RetrievalBundleType = standard, full_cycle
+    RetrievalStatus     = pending, initiated, in_transit, received, completed,
+                          cancelled
+
+--- DisposalRequest (table: disposal_requests) ---
+End-of-life: wipe/destroy/ITAD, with optional certification
+  id                              String    PK                                   disposal_id
+  clientId                        String    fk                                   client_id
+  assetId                         String    fk                                   asset_id
+  disposalType                    DisposalType enum                             disposal_type
+  requiresCertification           Boolean   default false, billed add-on unless  requires_certification
+                                             disposalType=certified_blanco
+  status                          DisposalStatus enum, default pending
+  approvedAt                      DateTime? tz                                   approved_at
+  initiatedAt                     DateTime? tz                                   initiated_at
+  completedAt                     DateTime? tz                                   completed_at
+  certificateS3Key                String?                                        certificate_s3_key
+  approvedByUserId                String?   fk                                   approved_by_user_id
+  createdByUserId                 String    fk                                   created_by_user_id
+  notes                           String?
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: client, asset, createdBy, approvedBy
+  Enums:
+    DisposalType   = non_certified, certified_blanco, itad_bundled
+    DisposalStatus = pending, approved, in_progress, completed, cancelled
+
+--- RepairRequest (table: repair_requests) ---
+Send a device to a service center — MVP scope, fk-shaped fields only
+  id                              String    PK                                   repair_id
+  clientId                        String    NO FK relation defined               client_id
+  assetId                         String    NO FK relation defined               asset_id
+  serviceCenterName               String    free text, not master data           service_center_name
+  estimateCostPaise               BigInt?   money                                estimate_cost_paise
+  status                          RepairStatus enum, default pending
+  notes                           String?
+  createdByUserId                 String    NO FK relation defined               created_by_user_id
+  requestedAt                     DateTime  tz                                   requested_at
+  slaTargetAt                     DateTime? 5 business days from requestedAt     sla_target_at
+                                             by default
+  sentAt                          DateTime? tz                                   sent_at
+  returnedAt                      DateTime? tz                                   returned_at
+  completedAt                     DateTime? tz                                   completed_at
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: none declared — all FK-shaped columns, resolved in application code
+  Enums: RepairStatus = pending, sent, in_repair, returned, completed, cancelled
+
+--- ResaleListing (table: resale_listings) ---
+List a device for resale instead of redeploying — MVP scope
+  id                              String    PK                                   resale_id
+  clientId                        String    NO FK relation defined               client_id
+  assetId                         String    NO FK relation defined               asset_id
+  listedPricePaise                BigInt?   money                                listed_price_paise
+  status                          ResaleStatus enum, default listed
+  soldPricePaise                  BigInt?   money                                sold_price_paise
+  soldAt                          DateTime? tz — asset.currentStatus flips to     sold_at
+                                             'sold' here too
+  notes                           String?
+  createdByUserId                 String    NO FK relation defined               created_by_user_id
+  listedAt                        DateTime  tz                                   listed_at
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: none declared — all FK-shaped columns, resolved in application code
+  Enums: ResaleStatus = listed, sold, cancelled
+
+================================================================================
+MODULE: BILLING & LEDGER
+Rate cards, the append-only event ledger, monthly accrual
+================================================================================
+
+--- RateCardItem (table: rate_card_items) ---
+Versioned pricing — editing creates a new row, never updates
+  id                              String    PK                                   rate_item_id
+  code                             String    e.g. INGEST_LAPTOP, INSPECT,
+                                             COURIER_RURAL
+  description                     String
+  basis                           RateBasis enum
+  categoryApplies                 RateCategoryApplies enum                       category_applies
+  unitRatePaise                   BigInt    money                                unit_rate_paise
+  effectiveFrom                   DateTime  date only                            effective_from
+  effectiveTo                     DateTime? date only, null = current version    effective_to
+  isBundle                        Boolean   default false                        is_bundle
+  bundleComponentCodes             Json      default []                          bundle_component_codes
+  createdAt                       DateTime  tz
+  updatedAt                       DateTime  tz
+  Relations: none — looked up by code + effective date range
+  Enums:
+    RateBasis            = per_device, per_shipment, monthly_per_device,
+                            per_label
+    RateCategoryApplies  = laptop, monitor, peripheral, any
+
+--- EventLedger (table: events_ledger) ---
+Append-only. Postgres trigger blocks UPDATE/DELETE at the DB level.
+  id                              String    PK                                   event_id
+  eventType                       String    e.g. INGEST, INSPECT, RETRIEVAL,     event_type
+                                             COURIER_RURAL
+  assetId                         String    fk                                   asset_id
+  clientId                        String    fk                                   client_id
+  locationId                      String?                                        location_id
+  quantity                        Int       default 1, negative = correction
+  unitRatePaise                   BigInt    money                                unit_rate_paise
+  amountPaise                     BigInt    money                                amount_paise
+  occurredAt                      DateTime  tz — rate looked up as-of this date   occurred_at
+  createdBy                       String    snapshot string, NOT a FK             created_by
+  referenceId                     String?   points at the source record (grn,     reference_id
+                                             inspection, retrieval...)
+  referenceType                   String?                                        reference_type
+  notes                           String?
+  createdAt                       DateTime  tz
+  Relations: asset, client
+
+--- StorageAccrualRun (table: storage_accrual_runs) ---
+One row per monthly storage-fee calculation run, per client
+  id                              String    PK                                   run_id
+  clientId                        String    fk                                   client_id
+  periodStart                     DateTime  date only                            period_start
+  periodEnd                       DateTime  date only                            period_end
+  laptopCount                     Int                                            laptop_count
+  peripheralCount                 Int                                            peripheral_count
+  totalDeviceCount                Int                                            total_device_count
+  laptopAmountPaise                BigInt    money                              laptop_amount_paise
+  peripheralAmountPaise            BigInt    money                              peripheral_amount_paise
+  totalAmountPaise                 BigInt    money                              total_amount_paise
+  createdAt                       DateTime  tz
+  Relations: client
+
+--- EventSuppression (table: event_suppressions) ---
+Marks a ledger event as superseded by a correction, without deleting it
+  id                              String    PK                                   suppression_id
+  suppressedEventId               String    unique                              suppressed_event_id
+  suppressedByEventId             String                                        suppressed_by_event_id
+  assetId                         String                                        asset_id
+  clientId                        String                                        client_id
+  createdAt                       DateTime  tz
+  Relations: none declared
+
+================================================================================
+MODULE: LOGISTICS & CONFIG
+Small admin-maintained reference tables
+================================================================================
+
+--- Holiday (table: holidays) ---
+Indian public holidays — excluded from business-hours SLA math
+  id                              String    PK                                   holiday_id
+  date                            DateTime  unique, date only
+  name                            String
+  year                            Int
+  createdAt                       DateTime  tz
+  Relations: none declared
+
+--- RuralPincode (table: rural_pincodes) ---
+Pincodes couriers classify as rural, for courier-zone/pricing resolution
+  id                              String    PK                                   rural_pincode_id
+  pincode                         String    unique
+  note                            String?
+  createdAt                       DateTime  tz
+  createdByUser                   String?   NO FK relation defined               created_by_user_id
+  Relations: none declared
+
+================================================================================
+MODULE: DOCUMENTS & AUDIT
+Uploaded/generated files, and the immutable action trail
+================================================================================
+
+--- AssetDocument (table: asset_documents) ---
+Any file attached to an asset — condition reports, uploads, evidence
+  id                              String    PK                                   document_id
+  assetId                         String    fk                                   asset_id
+  inspectionId                    String?   fk                                   inspection_id
+  clientId                        String                                        client_id
+  originalName                    String                                        original_name
+  storagePath                     String    R2/S3 key                           storage_path
+  mimeType                        String                                        mime_type
+  sizeBytes                       Int                                           size_bytes
+  uploadedByUserId                 String    fk                                 uploaded_by_user_id
+  uploadedAt                      DateTime  tz                                   uploaded_at
+  Relations: asset, inspection, uploadedBy
+
+--- AuditLog (table: audit_log) ---
+Append-only action trail — who did what, before/after values
+  id                              String    PK                                   log_id
+  userId                          String    fk                                   user_id
+  action                          String    e.g. resale.updateStatus,
+                                             inspection.complete
+  entity                          String
+  entityId                        String                                        entity_id
+  oldValue                        Json?                                         old_value
+  newValue                        Json?                                         new_value
+  occurredAt                      DateTime  tz                                   occurred_at
+  ipAddress                       String?                                        ip_address
+  Relations: user
+
+================================================================================
+NOTES FOR ADDING A NEW CLIENT INVENTORY PROCESS
+================================================================================
+  - Asset (assets) is the spine everything else hangs off — clientId,
+    currentStatus, currentLocationId, and the category/condition fields.
+    A new process will almost certainly read/write this table.
+  - AssetStatus is a single shared enum. If the new process needs a
+    genuinely new state, that's a schema decision (migration + every place
+    that switches on status), not just a new module.
+  - RepairRequest and ResaleListing don't have Prisma relations on their
+    clientId/assetId/createdByUserId fields — FK-shaped columns resolved
+    manually in the service layer. Decide up front whether the new
+    process should follow that pattern or use proper relations.
+  - Every business table needs client_id, money is BigInt paise, timestamps
+    are TIMESTAMPTZ/displayed IST, and events_ledger is append-only.
+
+================================================================================
+END OF REFERENCE — 31 models, 9 module groups
+================================================================================

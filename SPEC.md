@@ -47,7 +47,6 @@ All tables include standard audit columns (`id`, `created_at`, `updated_at`) unl
 ### `clients`
 - `client_id` (PK), `name`, `gstin`, `billing_address` (json), `registered_address` (json)
 - `contact_name`, `contact_email`, `contact_phone`
-- `committed_monthly_amount_paise` (bigint, default 4275000)
 - `contract_start_date`, `contract_end_date`
 - `status` (`active` | `inactive`)
 
@@ -154,7 +153,6 @@ All tables include standard audit columns (`id`, `created_at`, `updated_at`) unl
 **US-CLI-01 — Manage clients**
 - Admin can create and edit clients.
 - GSTIN validated against the standard 15-character pattern.
-- Committed monthly amount defaults to 42,750 INR (4,275,000 paise) but is editable per client.
 - All changes audit-logged.
 
 **US-LOC-01 — Manage warehouse locations**
@@ -351,21 +349,12 @@ stories below capture the requirements clarified with Esevel via email
 - Monthly rate: 11,400 paise (laptops/monitors), 2,800 paise (peripherals).
 - One `STORAGE_MONTHLY` event per asset per month.
 
-### 6.4 Commitment reconciliation (Phase 3)
-- For each client at month end:
-  - `activity_total` = sum of non-suppressed, non-storage ledger entries.
-  - `storage_total` = sum of `STORAGE_MONTHLY` events.
-  - `billed = max(activity_total + storage_total, committed_monthly_amount)`.
-  - If commitment binds, post one `COMMITMENT_ADJUSTMENT` event for the difference.
-
-> **OPEN DECISION:** confirm whether commitment is a floor (default above) or a pre-paid credit consumed by activity. Affects Phase 3.
-
-### 6.5 SLA timers
+### 6.4 SLA timers
 - Business hours: Mon–Sat, 09:00–18:00 IST (warehouse operates Mon–Sat; confirmed 2026-08-06). Exclude holidays from `holidays` table.
 - Statuses: `on_track` (>20% time remaining), `at_risk` (5–20%), `breached` (≤0%).
 - Phase 1: surface in inspection list. Phase 3: full SLA dashboard.
 
-### 6.6 Multi-tenancy enforcement
+### 6.5 Multi-tenancy enforcement
 - Every query that returns business data filters by `client_id`.
 - Internal users (operator, manager, admin) can see all clients.
 - `client_user` can only see records where `client_id` matches their assignment.
@@ -389,7 +378,7 @@ stories below capture the requirements clarified with Esevel via email
 |-------|-------|-------|
 | 1 (current) | Foundation | Auth, clients, master data, rate card, Inbound, Inspection, Inventory, Ledger, minimal client portal view |
 | 2 | Movement | Deployment, Retrieval, Shipping (manual tracking entry), bundles for Full Prep and Retrieval+Redeployment |
-| 3 | Billing & SLA | Billing engine, storage accrual, commitment reconciliation, Zoho Books push, SLA dashboard |
+| 3 | Billing & SLA | Billing engine, storage accrual, SLA dashboard |
 | 4 | Client & ITAD | Full client portal (request forms), Disposal/ITAD with certificates, audit reports, optional courier API |
 
 ---
@@ -398,6 +387,5 @@ stories below capture the requirements clarified with Esevel via email
 
 | Decision | Detail |
 |----------|--------|
-| Commitment netting | Floor vs pre-paid credit. Default assumed: floor. Confirm before Phase 3. |
 | Client portal in P1 | Minimal read-only view is in P1; raise-request forms are P4. |
 | Courier API | Manual tracking-number entry through P3; optional one-carrier integration in P4. |

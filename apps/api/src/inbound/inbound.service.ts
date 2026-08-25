@@ -9,6 +9,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateExpectedDeliveryDto } from './dto/create-expected-delivery.dto';
 import type { ReceiveDevicesDto } from './dto/receive-devices.dto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
@@ -20,6 +21,7 @@ export class InboundService {
     private readonly prisma: PrismaService,
     private readonly rateCard: RateCardService,
     private readonly audit: AuditService,
+    private readonly assetStatusHistory: AssetStatusHistoryService,
   ) {}
 
   findAllDeliveries(
@@ -175,6 +177,16 @@ export class InboundService {
           },
         });
         assetEntries.push({ assetId: asset.id, category: device.category });
+        await this.assetStatusHistory.record(
+          {
+            assetId: asset.id,
+            clientId: delivery.clientId,
+            fromStatus: null,
+            toStatus: asset.currentStatus,
+            sourceModule: 'inbound',
+          },
+          tx,
+        );
 
         if (device.requiresInspection) {
           await tx.inspection.create({

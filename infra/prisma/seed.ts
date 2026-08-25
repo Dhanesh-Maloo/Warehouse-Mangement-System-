@@ -62,7 +62,6 @@ async function seedClient(): Promise<void> {
       contactName: 'Esevel Operations',
       contactEmail: 'ops@esevel.com',
       contactPhone: '+6500000000',
-      committedMonthlyAmountPaise: BigInt(4_275_000),
       isActive: true,
     },
   });

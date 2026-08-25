@@ -12,6 +12,7 @@ import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
 import { DeploymentService } from '../deployment/deployment.service';
 import { R2Service } from '../r2/r2.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateInspectionDto } from './dto/create-inspection.dto';
 import type { CompleteInspectionDto } from './dto/complete-inspection.dto';
 import type { CreateDeploymentOrderDto } from '../deployment/dto/create-deployment-order.dto';
@@ -100,6 +101,7 @@ export class InspectionsService {
     private readonly audit: AuditService,
     private readonly deployment: DeploymentService,
     private readonly r2: R2Service,
+    private readonly assetStatusHistory: AssetStatusHistoryService,
   ) {}
 
   /**
@@ -304,6 +306,16 @@ export class InspectionsService {
         where: { id: inspection.assetId },
         data: { currentStatus: 'in_storage' },
       });
+      await this.assetStatusHistory.record(
+        {
+          assetId: inspection.assetId,
+          clientId: inspection.asset.clientId,
+          fromStatus: inspection.asset.currentStatus,
+          toStatus: 'in_storage',
+          sourceModule: 'inspections',
+        },
+        tx,
+      );
 
       await this.audit.log({
         userId: cancelledByUserId,
@@ -399,6 +411,16 @@ export class InspectionsService {
         where: { id: inspection.assetId },
         data: { conditionGrade: dto.conditionGrade, currentStatus: 'in_storage' },
       });
+      await this.assetStatusHistory.record(
+        {
+          assetId: inspection.assetId,
+          clientId: inspection.asset.clientId,
+          fromStatus: inspection.asset.currentStatus,
+          toStatus: 'in_storage',
+          sourceModule: 'inspections',
+        },
+        tx,
+      );
 
       await this.ledger.create({
         eventType: 'INSPECT',

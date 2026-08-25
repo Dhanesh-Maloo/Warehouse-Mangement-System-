@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InspectionsService } from './inspections.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CompleteInspectionDto } from './dto/complete-inspection.dto';
 import type { CreateInspectionDto } from './dto/create-inspection.dto';
 
@@ -16,6 +17,7 @@ describe('InspectionsService', () => {
     retrievalRequest: { update: jest.Mock };
     user: { findUnique: jest.Mock };
     assetDocument: { findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
+    assetStatusHistory: { create: jest.Mock };
     $transaction: jest.Mock;
   };
   let mockLedger: { create: jest.Mock };
@@ -31,7 +33,7 @@ describe('InspectionsService', () => {
     status: 'in_progress',
     startedAt: new Date('2026-07-01T05:00:00.000Z'),
     sourceRetrievalId: null as string | null,
-    asset: { id: 'asset-1', clientId: 'client-1' },
+    asset: { id: 'asset-1', clientId: 'client-1', currentStatus: 'in_inspection' },
     photos: [],
   };
 
@@ -124,6 +126,9 @@ describe('InspectionsService', () => {
         create: jest.fn().mockResolvedValue({}),
         update: jest.fn().mockResolvedValue({}),
       },
+      assetStatusHistory: {
+        create: jest.fn().mockResolvedValue({}),
+      },
       $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(mockPrisma)),
     };
     mockLedger = { create: jest.fn().mockResolvedValue({}) };
@@ -143,6 +148,9 @@ describe('InspectionsService', () => {
       mockAudit as unknown as ConstructorParameters<typeof InspectionsService>[3],
       mockDeployment as unknown as ConstructorParameters<typeof InspectionsService>[4],
       mockR2 as unknown as ConstructorParameters<typeof InspectionsService>[5],
+      new AssetStatusHistoryService(
+        mockPrisma as unknown as ConstructorParameters<typeof AssetStatusHistoryService>[0],
+      ),
     );
   });
 

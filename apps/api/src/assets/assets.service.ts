@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
+import { LedgerService } from '../ledger/ledger.service';
 import type {
   Asset,
   AssetCategory,
@@ -9,6 +11,7 @@ import type {
   Prisma,
   DisposalRequest,
   DeploymentOrder,
+  EventLedger,
 } from '@prisma/client';
 
 export interface AssetFilter {
@@ -24,11 +27,23 @@ export interface AssetFilter {
 
 @Injectable()
 export class AssetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly assetStatusHistory: AssetStatusHistoryService,
+    private readonly ledger: LedgerService,
+  ) {}
 
-  async findAll(
-    filter: AssetFilter,
-  ): Promise<{ data: (Asset & { disposalRequests: Pick<DisposalRequest, 'disposalType' | 'certificateS3Key' | 'status'>[]; deploymentOrders: Pick<DeploymentOrder, 'dispatchedAt' | 'deliveredAt' | 'trackingNumber' | 'courierName'>[]; currentLocation: { id: string; name: string } | null })[]; total: number }> {
+  async findAll(filter: AssetFilter): Promise<{
+    data: (Asset & {
+      disposalRequests: Pick<DisposalRequest, 'disposalType' | 'certificateS3Key' | 'status'>[];
+      deploymentOrders: Pick<
+        DeploymentOrder,
+        'dispatchedAt' | 'deliveredAt' | 'trackingNumber' | 'courierName'
+      >[];
+      currentLocation: { id: string; name: string } | null;
+    })[];
+    total: number;
+  }> {
     const where = {
       ...(filter.clientId ? { clientId: filter.clientId } : {}),
       ...(filter.category ? { category: filter.category } : {}),
@@ -57,7 +72,12 @@ export class AssetsService {
             take: 1,
           },
           deploymentOrders: {
-            select: { dispatchedAt: true, deliveredAt: true, trackingNumber: true, courierName: true },
+            select: {
+              dispatchedAt: true,
+              deliveredAt: true,
+              trackingNumber: true,
+              courierName: true,
+            },
             orderBy: { createdAt: 'desc' },
             take: 1,
           },
@@ -126,7 +146,7 @@ export class AssetsService {
       hasCertification?: boolean;
     },
   ): Promise<Asset> {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
     const { currentLocationId, category, deliveredAt, ...rest } = data;
     const updateData: Prisma.AssetUpdateInput = {
       ...rest,
@@ -140,7 +160,22 @@ export class AssetsService {
           }
         : {}),
     };
-    return this.prisma.asset.update({ where: { id }, data: updateData });
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.asset.update({ where: { id }, data: updateData });
+      if (data.currentStatus && data.currentStatus !== existing.currentStatus) {
+        await this.assetStatusHistory.record(
+          {
+            assetId: id,
+            clientId: existing.clientId,
+            fromStatus: existing.currentStatus,
+            toStatus: data.currentStatus,
+            sourceModule: 'assets',
+          },
+          tx,
+        );
+      }
+      return updated;
+    });
   }
 
   async create(data: {
@@ -166,8 +201,91 @@ export class AssetsService {
     const existing = await this.findBySerial(data.serialNumber);
     if (existing) throw new ConflictException(`Serial number ${data.serialNumber} already exists`);
     const { deliveredAt, ...rest } = data;
-    return this.prisma.asset.create({
-      data: { ...rest, ...(deliveredAt ? { deliveredAt: new Date(deliveredAt) } : {}) },
+    return this.prisma.$transaction(async (tx) => {
+      const asset = await tx.asset.create({
+        data: { ...rest, ...(deliveredAt ? { deliveredAt: new Date(deliveredAt) } : {}) },
+      });
+      await this.assetStatusHistory.record(
+        {
+          assetId: asset.id,
+          clientId: asset.clientId,
+          fromStatus: null,
+          toStatus: asset.currentStatus,
+          sourceModule: 'assets',
+        },
+        tx,
+      );
+      return asset;
     });
+  }
+
+  /**
+   * Everything billing-relevant for one asset over one calendar month:
+   * every ledger charge against it (what was done, what it cost) plus how
+   * many days it spent in_storage during that month. Days-in-storage only
+   * reflects transitions recorded since asset_status_history was introduced
+   * (2026-08-25) — it undercounts for assets whose storage period started
+   * earlier and has no recorded entry event.
+   */
+  async getBillingSummary(
+    id: string,
+    month: string,
+  ): Promise<{
+    asset: Pick<
+      Asset,
+      'id' | 'serialNumber' | 'assetTag' | 'model' | 'manufacturer' | 'category' | 'currentStatus'
+    >;
+    month: string;
+    periodStart: Date;
+    periodEnd: Date;
+    daysInStorage: number;
+    totalChargesPaise: string;
+    ledgerEntries: EventLedger[];
+  }> {
+    const asset = await this.findOne(id);
+
+    const [yearStr, monthStr] = month.split('-');
+    const year = Number(yearStr);
+    const monthIndex = Number(monthStr) - 1;
+    if (
+      !Number.isInteger(year) ||
+      !Number.isInteger(monthIndex) ||
+      monthIndex < 0 ||
+      monthIndex > 11
+    ) {
+      throw new NotFoundException(`Invalid month '${month}', expected format YYYY-MM`);
+    }
+    const periodStart = new Date(year, monthIndex, 1);
+    const now = new Date();
+    const periodEnd =
+      new Date(year, monthIndex + 1, 1) < now ? new Date(year, monthIndex + 1, 1) : now;
+
+    const [ledgerEntries, daysInStorage] = await Promise.all([
+      this.ledger.findMany({
+        where: { assetId: id, occurredAt: { gte: periodStart, lt: periodEnd } },
+        orderBy: { occurredAt: 'desc' },
+      }),
+      this.assetStatusHistory.getDaysInStatus(id, 'in_storage', periodStart, periodEnd),
+    ]);
+
+    const totalChargesPaise = ledgerEntries.reduce((sum, e) => sum + e.amountPaise, BigInt(0));
+
+    return {
+      asset: {
+        id: asset.id,
+        serialNumber: asset.serialNumber,
+        assetTag: asset.assetTag,
+        model: asset.model,
+        manufacturer: asset.manufacturer,
+        category: asset.category,
+        currentStatus: asset.currentStatus,
+      },
+      month,
+      periodStart,
+      periodEnd,
+      daysInStorage,
+      totalChargesPaise: totalChargesPaise.toString(),
+      ledgerEntries,
+    };
   }
 }

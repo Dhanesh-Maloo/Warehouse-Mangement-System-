@@ -5,9 +5,10 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { LedgerModule } from '../ledger/ledger.module';
 import { RateCardModule } from '../rate-card/rate-card.module';
 import { AuditModule } from '../audit/audit.module';
+import { AssetStatusHistoryModule } from '../asset-status-history/asset-status-history.module';
 
 @Module({
-  imports: [PrismaModule, LedgerModule, RateCardModule, AuditModule],
+  imports: [PrismaModule, LedgerModule, RateCardModule, AuditModule, AssetStatusHistoryModule],
   providers: [RepairService],
   controllers: [RepairController],
   exports: [RepairService],

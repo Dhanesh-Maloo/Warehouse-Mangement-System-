@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import type { Asset, ResaleListing } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateResaleListingDto } from './dto/create-resale-listing.dto';
 import type { UpdateResaleStatusDto } from './dto/update-resale-status.dto';
 
@@ -22,6 +23,7 @@ export class ResaleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly assetStatusHistory: AssetStatusHistoryService,
   ) {}
 
   async findAll(clientId?: string): Promise<ResaleListingWithAsset[]> {
@@ -69,8 +71,8 @@ export class ResaleService {
 
     // Non-billable inventory movement (same philosophy as US-INV-03 location
     // moves): no ledger event is posted here, unlike disposal/retrieval/deployment.
-    const [listing, updatedAsset] = await this.prisma.$transaction([
-      this.prisma.resaleListing.create({
+    const [listing, updatedAsset] = await this.prisma.$transaction(async (tx) => {
+      const createdListing = await tx.resaleListing.create({
         data: {
           clientId: dto.clientId,
           assetId: dto.assetId,
@@ -80,12 +82,23 @@ export class ResaleService {
           status: 'listed',
           createdByUserId,
         },
-      }),
-      this.prisma.asset.update({
+      });
+      const asset = await tx.asset.update({
         where: { id: dto.assetId },
         data: { currentStatus: 'for_resale' },
-      }),
-    ]);
+      });
+      await this.assetStatusHistory.record(
+        {
+          assetId: dto.assetId,
+          clientId: dto.clientId,
+          fromStatus: 'in_storage',
+          toStatus: 'for_resale',
+          sourceModule: 'resale',
+        },
+        tx,
+      );
+      return [createdListing, asset] as const;
+    });
 
     await this.audit.log({
       userId: createdByUserId,
@@ -134,16 +147,38 @@ export class ResaleService {
       // resale attempt was abandoned.
       let updatedAsset = await tx.asset.findUnique({ where: { id: listing.assetId } });
       if (dto.status === 'sold') {
+        const fromStatus = updatedAsset?.currentStatus ?? null;
         updatedAsset = await tx.asset.update({
           where: { id: listing.assetId },
           data: { currentStatus: 'sold' },
         });
+        await this.assetStatusHistory.record(
+          {
+            assetId: listing.assetId,
+            clientId: listing.clientId,
+            fromStatus,
+            toStatus: 'sold',
+            sourceModule: 'resale',
+          },
+          tx,
+        );
       }
       if (dto.status === 'cancelled') {
+        const fromStatus = updatedAsset?.currentStatus ?? null;
         updatedAsset = await tx.asset.update({
           where: { id: listing.assetId },
           data: { currentStatus: 'in_storage' },
         });
+        await this.assetStatusHistory.record(
+          {
+            assetId: listing.assetId,
+            clientId: listing.clientId,
+            fromStatus,
+            toStatus: 'in_storage',
+            sourceModule: 'resale',
+          },
+          tx,
+        );
       }
       if (!updatedAsset) throw new NotFoundException(`Asset ${listing.assetId} not found`);
 

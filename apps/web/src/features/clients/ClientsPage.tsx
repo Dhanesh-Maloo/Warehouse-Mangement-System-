@@ -10,7 +10,6 @@ interface Client {
   slug: string;
   gstin: string | null;
   isActive: boolean;
-  committedMonthlyAmountPaise: string | null;
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;

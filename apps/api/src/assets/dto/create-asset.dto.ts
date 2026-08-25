@@ -1,4 +1,13 @@
-import { IsString, IsEnum, IsOptional, IsUUID, IsBoolean, IsInt, Min, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsUUID,
+  IsBoolean,
+  IsInt,
+  Min,
+  IsDateString,
+} from 'class-validator';
 
 export class CreateAssetDto {
   @IsString()

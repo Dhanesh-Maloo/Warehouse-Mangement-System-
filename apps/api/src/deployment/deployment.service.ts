@@ -5,6 +5,7 @@ import { LedgerService } from '../ledger/ledger.service';
 import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
 import { CourierZoneService } from '../logistics/courier-zone.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateDeploymentOrderDto } from './dto/create-deployment-order.dto';
 import type { UpdateDeploymentStatusDto } from './dto/update-deployment-status.dto';
 
@@ -16,6 +17,7 @@ export class DeploymentService {
     private readonly rateCard: RateCardService,
     private readonly audit: AuditService,
     private readonly courierZone: CourierZoneService,
+    private readonly assetStatusHistory: AssetStatusHistoryService,
   ) {}
 
   /**
@@ -140,6 +142,16 @@ export class DeploymentService {
           ...(dto.endUserId ? { currentEndUserId: dto.endUserId } : {}),
         },
       });
+      await this.assetStatusHistory.record(
+        {
+          assetId: dto.assetId,
+          clientId: dto.clientId,
+          fromStatus: order.asset.currentStatus,
+          toStatus: 'deployed',
+          sourceModule: 'deployment',
+        },
+        tx,
+      );
 
       // Post bundle ledger event (FULL_PREP or PICK_PACK)
       const bundleEvent = await this.ledger.create({

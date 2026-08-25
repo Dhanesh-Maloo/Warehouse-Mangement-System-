@@ -106,6 +106,25 @@ export class AssetsController {
     return this.assetsService.findOne(id);
   }
 
+  /**
+   * GET /assets/:id/billing-summary?month=YYYY-MM
+   * Every ledger charge against this asset in the given month, plus days
+   * spent in_storage that month. Defaults to the current month if omitted.
+   */
+  @Get(':id/billing-summary')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
+  async billingSummary(
+    @Param('id') id: string,
+    @Query('month') month: string | undefined,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<AssetsService['getBillingSummary']> {
+    await this.assertOwnsAsset(id, user);
+    const now = new Date();
+    const effectiveMonth =
+      month ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return this.assetsService.getBillingSummary(id, effectiveMonth);
+  }
+
   @Patch(':id')
   @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
   async update(

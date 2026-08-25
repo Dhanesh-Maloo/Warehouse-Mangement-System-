@@ -2,6 +2,7 @@
    typing rather than duplicating full Prisma/service signatures */
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { DisposalService } from './disposal.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 
 describe('DisposalService', () => {
   let mockPrisma: any;
@@ -31,6 +32,9 @@ describe('DisposalService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      assetStatusHistory: {
+        create: jest.fn().mockResolvedValue({}),
+      },
       $transaction: jest.fn((cb) => cb(mockPrisma)),
     };
     mockLedger = { create: jest.fn().mockResolvedValue({ id: 'ledger-1' }) };
@@ -42,6 +46,7 @@ describe('DisposalService', () => {
       mockLedger as any,
       mockRateCard as any,
       mockAudit as any,
+      new AssetStatusHistoryService(mockPrisma),
     );
   });
 

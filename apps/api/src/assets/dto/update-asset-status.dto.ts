@@ -1,4 +1,13 @@
-import { IsEnum, IsOptional, IsString, IsUUID, IsBoolean, IsInt, Min, IsDateString } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsBoolean,
+  IsInt,
+  Min,
+  IsDateString,
+} from 'class-validator';
 import { AssetStatus, ConditionGrade } from '@prisma/client';
 
 export class UpdateAssetStatusDto {

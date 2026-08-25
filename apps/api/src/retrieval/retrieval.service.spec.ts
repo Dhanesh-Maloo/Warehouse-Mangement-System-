@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RetrievalService } from './retrieval.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateRetrievalRequestDto } from './dto/create-retrieval-request.dto';
 import type { UpdateRetrievalStatusDto } from './dto/update-retrieval-status.dto';
 
@@ -8,6 +9,7 @@ describe('RetrievalService', () => {
     retrievalRequest: { create: jest.Mock; update: jest.Mock; findUnique: jest.Mock };
     asset: { findUnique: jest.Mock; update: jest.Mock };
     inspection: { create: jest.Mock };
+    assetStatusHistory: { create: jest.Mock };
     $transaction: jest.Mock;
   };
   let mockLedger: { create: jest.Mock };
@@ -40,12 +42,16 @@ describe('RetrievalService', () => {
     status: 'pending',
     createdByUserId: 'user-1',
     requiresPostInspection: false,
+    asset: { id: 'asset-1', clientId: 'client-1', currentStatus: 'returning' },
   };
 
   beforeEach(() => {
     mockPrisma = {
       retrievalRequest: {
-        create: jest.fn().mockResolvedValue({ id: 'retrieval-1' }),
+        create: jest.fn().mockResolvedValue({
+          id: 'retrieval-1',
+          asset: { id: 'asset-1', clientId: 'client-1', currentStatus: 'in_storage' },
+        }),
         update: jest.fn().mockImplementation((args) => Promise.resolve({ id: args.where.id })),
         findUnique: jest.fn(),
       },
@@ -54,6 +60,9 @@ describe('RetrievalService', () => {
         update: jest.fn().mockResolvedValue({}),
       },
       inspection: { create: jest.fn().mockResolvedValue({}) },
+      assetStatusHistory: {
+        create: jest.fn().mockResolvedValue({}),
+      },
       $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(mockPrisma)),
     };
     mockLedger = { create: jest.fn().mockResolvedValue({}) };
@@ -67,6 +76,9 @@ describe('RetrievalService', () => {
       mockRateCard as unknown as ConstructorParameters<typeof RetrievalService>[2],
       mockAudit as unknown as ConstructorParameters<typeof RetrievalService>[3],
       mockCourierZone as unknown as ConstructorParameters<typeof RetrievalService>[4],
+      new AssetStatusHistoryService(
+        mockPrisma as unknown as ConstructorParameters<typeof AssetStatusHistoryService>[0],
+      ),
     );
   });
 

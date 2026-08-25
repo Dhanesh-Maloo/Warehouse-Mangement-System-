@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import { addBusinessMinutes } from '../common/business-hours.util';
 import type { CreateRepairRequestDto } from './dto/create-repair-request.dto';
 import type { UpdateRepairStatusDto } from './dto/update-repair-status.dto';
@@ -56,6 +57,7 @@ export class RepairService {
     private readonly ledger: LedgerService,
     private readonly rateCard: RateCardService,
     private readonly audit: AuditService,
+    private readonly assetStatusHistory: AssetStatusHistoryService,
   ) {}
 
   // Holiday calendar lookup is not wired up yet (see Holiday model) — mirrors
@@ -164,6 +166,16 @@ export class RepairService {
         where: { id: dto.assetId },
         data: { currentStatus: 'in_repair' },
       });
+      await this.assetStatusHistory.record(
+        {
+          assetId: dto.assetId,
+          clientId: dto.clientId,
+          fromStatus: 'in_storage',
+          toStatus: 'in_repair',
+          sourceModule: 'repair',
+        },
+        tx,
+      );
 
       return created;
     });
@@ -235,6 +247,16 @@ export class RepairService {
           where: { id: repair.assetId },
           data: { currentStatus: 'in_storage' },
         });
+        await this.assetStatusHistory.record(
+          {
+            assetId: repair.assetId,
+            clientId: repair.clientId,
+            fromStatus: 'in_repair',
+            toStatus: 'in_storage',
+            sourceModule: 'repair',
+          },
+          tx,
+        );
       }
 
       return result;

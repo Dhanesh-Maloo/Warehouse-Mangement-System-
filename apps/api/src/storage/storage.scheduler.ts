@@ -18,9 +18,7 @@ export class StorageScheduler {
     this.logger.log('Daily storage accrual triggered by cron schedule');
     try {
       const result = await this.storageService.runMonthlyAccrual();
-      this.logger.log(
-        `Storage accrual complete — ${result.totalClients} client(s) processed, ${result.clientsBelowCommitment} below minimum commitment.`,
-      );
+      this.logger.log(`Storage accrual complete — ${result.totalClients} client(s) processed.`);
     } catch (err) {
       this.logger.error(`Storage accrual job failed: ${String(err)}`);
     }

@@ -12,7 +12,6 @@ export interface ClientAccrualResult {
   laptopAmountPaise: bigint;
   peripheralAmountPaise: bigint;
   totalAmountPaise: bigint;
-  minimumCommitmentMet: boolean;
   skipped: boolean;
   skipReason?: string;
 }
@@ -22,7 +21,6 @@ export interface AccrualRunResult {
   periodEnd: Date;
   clientResults: ClientAccrualResult[];
   totalClients: number;
-  clientsBelowCommitment: number;
 }
 
 @Injectable()
@@ -52,7 +50,7 @@ export class StorageService {
 
     const clients = await this.prisma.client.findMany({
       where: { isActive: true },
-      select: { id: true, name: true, committedMonthlyAmountPaise: true },
+      select: { id: true, name: true },
     });
 
     const laptopRate = await this.rateCard.findEffectiveAt('STORAGE_LAPTOP', periodStart);
@@ -72,16 +70,8 @@ export class StorageService {
           now,
           laptopRatePaise,
           peripheralRatePaise,
-          client.committedMonthlyAmountPaise,
         );
         clientResults.push(result);
-
-        if (!result.minimumCommitmentMet && !result.skipped) {
-          this.logger.warn(
-            `Client ${client.name} (${client.id}) is below minimum commitment: ` +
-              `charged ${result.totalAmountPaise} paise, minimum is ${client.committedMonthlyAmountPaise} paise`,
-          );
-        }
       } catch (err) {
         this.logger.error(`Failed to process accrual for client ${client.id}: ${String(err)}`);
         clientResults.push({
@@ -93,7 +83,6 @@ export class StorageService {
           laptopAmountPaise: 0n,
           peripheralAmountPaise: 0n,
           totalAmountPaise: 0n,
-          minimumCommitmentMet: false,
           skipped: true,
           skipReason: `Error: ${String(err)}`,
         });
@@ -107,8 +96,6 @@ export class StorageService {
       periodEnd,
       clientResults,
       totalClients: clientResults.length,
-      clientsBelowCommitment: clientResults.filter((r) => !r.minimumCommitmentMet && !r.skipped)
-        .length,
     };
   }
 
@@ -124,7 +111,6 @@ export class StorageService {
     occurredAt: Date,
     laptopRatePaise: bigint,
     peripheralRatePaise: bigint,
-    committedMonthlyAmountPaise: bigint,
   ): Promise<ClientAccrualResult> {
     // Find any existing run for this calendar month so we can reverse its ledger entries before re-posting
     const monthStart = new Date(periodStart.getFullYear(), periodStart.getMonth(), 1);
@@ -204,7 +190,6 @@ export class StorageService {
     const laptopAmountPaise = BigInt(laptopCount) * laptopRatePaise;
     const peripheralAmountPaise = BigInt(peripheralCount) * peripheralRatePaise;
     const totalAmountPaise = laptopAmountPaise + peripheralAmountPaise;
-    const minimumCommitmentMet = totalAmountPaise >= committedMonthlyAmountPaise;
     const totalDeviceCount = laptopCount + peripheralCount;
 
     if (totalDeviceCount === 0) {
@@ -220,8 +205,6 @@ export class StorageService {
           laptopAmountPaise: 0n,
           peripheralAmountPaise: 0n,
           totalAmountPaise: 0n,
-          minimumCommitmentPaise: committedMonthlyAmountPaise,
-          minimumCommitmentMet: false,
         },
       });
 
@@ -234,7 +217,6 @@ export class StorageService {
         laptopAmountPaise: 0n,
         peripheralAmountPaise: 0n,
         totalAmountPaise: 0n,
-        minimumCommitmentMet: false,
         skipped: true,
         skipReason: 'No devices in storage',
       };
@@ -295,12 +277,6 @@ export class StorageService {
       }
     }
 
-    // NOTE: minimum-commitment billing (posting a COMMITMENT_ADJUSTMENT ledger
-    // event when totalAmountPaise falls short of committedMonthlyAmountPaise)
-    // is a Phase 3 feature left as an open decision in SPEC.md §6.4 (floor vs.
-    // pre-paid credit was never confirmed) — disabled until that's resolved.
-    // minimumCommitmentMet is still computed/recorded below for reporting.
-
     // Record the accrual run
     await this.prisma.storageAccrualRun.create({
       data: {
@@ -313,8 +289,6 @@ export class StorageService {
         laptopAmountPaise,
         peripheralAmountPaise,
         totalAmountPaise,
-        minimumCommitmentPaise: committedMonthlyAmountPaise,
-        minimumCommitmentMet,
       },
     });
 
@@ -327,7 +301,6 @@ export class StorageService {
       laptopAmountPaise,
       peripheralAmountPaise,
       totalAmountPaise,
-      minimumCommitmentMet,
       skipped: false,
     };
   }
@@ -359,16 +332,12 @@ export class StorageService {
     laptopProjectedPaise: string;
     peripheralProjectedPaise: string;
     totalProjectedPaise: string;
-    minimumCommitmentPaise: string;
-    minimumCommitmentMet: boolean;
-    shortfallPaise: string | null;
     rates: { laptopPerDevicePaise: string; peripheralPerDevicePaise: string };
     lastAccrualRun: {
       id: string;
       periodStart: Date;
       periodEnd: Date;
       totalAmountPaise: string;
-      minimumCommitmentMet: boolean;
       createdAt: Date;
     } | null;
   }> {
@@ -389,7 +358,7 @@ export class StorageService {
       }),
       this.prisma.client.findUnique({
         where: { id: clientId },
-        select: { id: true, name: true, committedMonthlyAmountPaise: true },
+        select: { id: true, name: true },
       }),
     ]);
 
@@ -403,8 +372,6 @@ export class StorageService {
     const laptopAmountPaise = BigInt(laptopCount) * laptopRatePaise;
     const peripheralAmountPaise = BigInt(peripheralCount) * peripheralRatePaise;
     const projectedTotalPaise = laptopAmountPaise + peripheralAmountPaise;
-    const commitmentAmount = client?.committedMonthlyAmountPaise ?? BigInt(4275000);
-    const minimumCommitmentMet = projectedTotalPaise >= commitmentAmount;
 
     // Last run for this client
     const lastRun = await this.prisma.storageAccrualRun.findFirst({
@@ -420,13 +387,6 @@ export class StorageService {
       laptopProjectedPaise: laptopAmountPaise.toString(),
       peripheralProjectedPaise: peripheralAmountPaise.toString(),
       totalProjectedPaise: projectedTotalPaise.toString(),
-      minimumCommitmentPaise: (client?.committedMonthlyAmountPaise ?? BigInt(4275000)).toString(),
-      minimumCommitmentMet,
-      shortfallPaise: minimumCommitmentMet
-        ? null
-        : (
-            (client?.committedMonthlyAmountPaise ?? BigInt(4275000)) - projectedTotalPaise
-          ).toString(),
       rates: {
         laptopPerDevicePaise: laptopRatePaise.toString(),
         peripheralPerDevicePaise: peripheralRatePaise.toString(),
@@ -437,7 +397,6 @@ export class StorageService {
             periodStart: lastRun.periodStart,
             periodEnd: lastRun.periodEnd,
             totalAmountPaise: lastRun.totalAmountPaise.toString(),
-            minimumCommitmentMet: lastRun.minimumCommitmentMet,
             createdAt: lastRun.createdAt,
           }
         : null,

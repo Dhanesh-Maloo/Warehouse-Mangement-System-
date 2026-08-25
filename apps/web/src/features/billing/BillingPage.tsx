@@ -4,7 +4,6 @@ import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
 import {
   CheckCircle,
-  AlertTriangle,
   HardDrive,
   Package,
   Building2,
@@ -13,6 +12,9 @@ import {
   CalendarDays,
   TrendingUp,
   Receipt,
+  Search,
+  X,
+  Warehouse,
 } from 'lucide-react';
 
 // ─── Types (matching actual API response) ────────────────────────────────────
@@ -31,16 +33,12 @@ interface StorageSummary {
   laptopProjectedPaise: string;
   peripheralProjectedPaise: string;
   totalProjectedPaise: string;
-  minimumCommitmentPaise: string;
-  minimumCommitmentMet: boolean;
-  shortfallPaise: string | null;
   rates: { laptopPerDevicePaise: string; peripheralPerDevicePaise: string };
   lastAccrualRun: {
     id: string;
     periodStart: string;
     periodEnd: string;
     totalAmountPaise: string;
-    minimumCommitmentMet: boolean;
     createdAt: string;
   } | null;
 }
@@ -55,15 +53,12 @@ interface AccrualRun {
   laptopAmountPaise: string;
   peripheralAmountPaise: string;
   totalAmountPaise: string;
-  minimumCommitmentPaise: string;
-  minimumCommitmentMet: boolean;
   createdAt: string;
   client: { id: string; name: string; slug: string };
 }
 
 interface AccrualRunResult {
   totalClients: number;
-  clientsBelowCommitment: number;
   periodStart: string;
   periodEnd: string;
   clientResults: {
@@ -71,7 +66,6 @@ interface AccrualRunResult {
     clientName: string;
     totalDeviceCount: number;
     totalAmountPaise: string;
-    minimumCommitmentMet: boolean;
     skipped: boolean;
     skipReason?: string;
   }[];
@@ -87,6 +81,34 @@ interface LedgerEntry {
   referenceType: string | null;
   notes: string | null;
   asset: { id: string; serialNumber: string; assetTag: string | null; model: string };
+}
+
+interface AssetSearchResult {
+  id: string;
+  serialNumber: string;
+  assetTag: string | null;
+  model: string;
+  manufacturer: string;
+  category: string;
+  currentStatus: string;
+}
+
+interface AssetBillingSummary {
+  asset: {
+    id: string;
+    serialNumber: string;
+    assetTag: string | null;
+    model: string;
+    manufacturer: string;
+    category: string;
+    currentStatus: string;
+  };
+  month: string;
+  periodStart: string;
+  periodEnd: string;
+  daysInStorage: number;
+  totalChargesPaise: string;
+  ledgerEntries: LedgerEntry[];
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -109,7 +131,6 @@ const EVENT_LABELS: Record<string, string> = {
   STORAGE_PERIPHERAL: 'Storage - Peripheral',
   STORAGE_LAPTOP_REVERSAL: 'Storage Reversal - Laptop',
   STORAGE_PERIPHERAL_REVERSAL: 'Storage Reversal - Peripheral',
-  COMMITMENT_ADJUSTMENT: 'Commitment Adjustment',
 };
 
 const EVENT_CATEGORY: Record<string, string> = {
@@ -132,7 +153,6 @@ const EVENT_CATEGORY: Record<string, string> = {
   STORAGE_PERIPHERAL: 'Storage',
   STORAGE_LAPTOP_REVERSAL: 'Storage',
   STORAGE_PERIPHERAL_REVERSAL: 'Storage',
-  COMMITMENT_ADJUSTMENT: 'Storage',
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -300,6 +320,43 @@ export function BillingPage() {
     onError: (e: Error) => setAccrualError(e.message),
   });
 
+  // ── Asset billing lookup: find one asset and see everything billed
+  // against it — actions taken, charges, and days in storage — for a
+  // chosen month.
+  const [assetSearch, setAssetSearch] = useState('');
+  const [selectedAsset, setSelectedAsset] = useState<AssetSearchResult | null>(null);
+  const [billingMonth, setBillingMonth] = useState(
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+  );
+
+  const { data: assetSearchResults = [], isFetching: assetSearchLoading } = useQuery({
+    queryKey: ['asset-search', effectiveClientId, assetSearch],
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (effectiveClientId) p.set('clientId', effectiveClientId);
+      p.set('search', assetSearch);
+      p.set('take', '8');
+      return api
+        .get<{ data: AssetSearchResult[] }>(`/assets?${p.toString()}`)
+        .then((r) => r.data);
+    },
+    enabled: assetSearch.trim().length >= 2 && !selectedAsset,
+    staleTime: 10_000,
+  });
+
+  const {
+    data: assetBillingSummary,
+    isLoading: assetBillingLoading,
+    error: assetBillingError,
+  } = useQuery({
+    queryKey: ['asset-billing-summary', selectedAsset?.id, billingMonth],
+    queryFn: () =>
+      api.get<AssetBillingSummary>(
+        `/assets/${selectedAsset?.id}/billing-summary?month=${billingMonth}`,
+      ),
+    enabled: !!selectedAsset,
+  });
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -450,9 +507,6 @@ export function BillingPage() {
                 <p className="text-3xl font-bold text-gray-900 tabular-nums">
                   {formatINR(summary.totalProjectedPaise)}
                 </p>
-                <p className="text-xs text-gray-400">
-                  Min. commitment: {formatINR(summary.minimumCommitmentPaise)}/mo
-                </p>
               </div>
 
             </div>
@@ -469,16 +523,6 @@ export function BillingPage() {
                 <span className="font-semibold text-gray-900 tabular-nums">
                   {formatINR(summary.lastAccrualRun.totalAmountPaise)}
                 </span>
-                <span className="text-gray-400">·</span>
-                {summary.lastAccrualRun.minimumCommitmentMet ? (
-                  <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                    <CheckCircle size={11} /> Commitment met
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                    <AlertTriangle size={11} /> Below minimum
-                  </span>
-                )}
                 <span className="ml-auto text-xs text-gray-400">
                   {new Date(summary.lastAccrualRun.createdAt).toLocaleString('en-IN', {
                     timeZone: 'Asia/Kolkata',
@@ -527,7 +571,6 @@ export function BillingPage() {
                       <th className="text-right px-5 py-3">Laptop billing</th>
                       <th className="text-right px-5 py-3">Peripheral billing</th>
                       <th className="text-right px-5 py-3">Total billed</th>
-                      <th className="text-center px-5 py-3">Min. commitment</th>
                       <th className="text-left px-5 py-3">Run at</th>
                     </tr>
                   </thead>
@@ -552,17 +595,6 @@ export function BillingPage() {
                         </td>
                         <td className="px-5 py-3 text-right font-semibold tabular-nums text-gray-900">
                           {formatINR(run.totalAmountPaise)}
-                        </td>
-                        <td className="px-5 py-3 text-center">
-                          {run.minimumCommitmentMet ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2.5 py-0.5 rounded-full">
-                              <CheckCircle size={11} /> Met
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-100 px-2.5 py-0.5 rounded-full">
-                              <AlertTriangle size={11} /> Below
-                            </span>
-                          )}
                         </td>
                         <td className="px-5 py-3 text-gray-500 text-xs whitespace-nowrap">
                           {new Date(run.createdAt).toLocaleString('en-IN', {
@@ -711,6 +743,192 @@ export function BillingPage() {
             </div>
           </>
         )}
+      </section>
+
+      {/* Section 4 — Asset Billing Lookup */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Search size={16} className="text-gray-500" />
+          <h2 className="text-base font-semibold text-gray-700">Asset Billing Lookup</h2>
+        </div>
+        <p className="text-sm text-gray-500 -mt-2">
+          Find one device and see everything billed against it — what was done (inspection,
+          retrieval, repair, etc.), what it cost, and how many days it sat in storage for a chosen
+          month.
+        </p>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
+          {!selectedAsset ? (
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={assetSearch}
+                onChange={(e) => setAssetSearch(e.target.value)}
+                placeholder="Search by serial number, asset tag, or model…"
+                className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+              />
+              {assetSearch.trim().length >= 2 && (
+                <div className="mt-2 border border-gray-100 rounded-lg divide-y divide-gray-50 overflow-hidden">
+                  {assetSearchLoading ? (
+                    <div className="px-4 py-3 text-sm text-gray-400">Searching…</div>
+                  ) : assetSearchResults.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-gray-400">No matching assets found.</div>
+                  ) : (
+                    assetSearchResults.map((a) => (
+                      <button
+                        key={a.id}
+                        onClick={() => {
+                          setSelectedAsset(a);
+                          setAssetSearch('');
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center justify-between gap-3"
+                      >
+                        <div>
+                          <p className="text-sm font-mono font-semibold text-[#E86F2C]">
+                            {a.serialNumber}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {a.model} · {a.manufacturer}
+                            {a.assetTag ? ` · Tag: ${a.assetTag}` : ''}
+                          </p>
+                        </div>
+                        <span className="text-xs text-gray-500 capitalize">
+                          {a.currentStatus.replace(/_/g, ' ')}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-sm font-mono font-semibold text-[#E86F2C]">
+                    {selectedAsset.serialNumber}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {selectedAsset.model} · {selectedAsset.manufacturer}
+                    {selectedAsset.assetTag ? ` · Tag: ${selectedAsset.assetTag}` : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="month"
+                    value={billingMonth}
+                    onChange={(e) => setBillingMonth(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                  <button
+                    onClick={() => setSelectedAsset(null)}
+                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2.5 py-1.5"
+                  >
+                    <X size={13} /> Change asset
+                  </button>
+                </div>
+              </div>
+
+              {assetBillingLoading ? (
+                <div className="text-sm text-gray-400 py-6">Loading billing detail…</div>
+              ) : assetBillingError ? (
+                <div className="text-sm text-red-500 py-2">Failed to load billing detail.</div>
+              ) : assetBillingSummary ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-gray-500 text-xs">
+                        <Warehouse size={14} /> Days in storage this month
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
+                        {assetBillingSummary.daysInStorage}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-gray-500 text-xs">
+                        <Receipt size={14} /> Total charged this month
+                      </div>
+                      <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
+                        {formatINR(assetBillingSummary.totalChargesPaise)}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-gray-500 text-xs">
+                        <CalendarDays size={14} /> Current status
+                      </div>
+                      <p className="text-lg font-semibold text-gray-900 mt-1.5 capitalize">
+                        {assetBillingSummary.asset.currentStatus.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-100 rounded-lg overflow-hidden">
+                    {assetBillingSummary.ledgerEntries.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-gray-400 text-sm">
+                        No charges against this asset in{' '}
+                        {periodLabel(assetBillingSummary.periodStart)}.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
+                              <th className="text-left px-4 py-2.5">Action</th>
+                              <th className="text-right px-4 py-2.5">Qty</th>
+                              <th className="text-right px-4 py-2.5">Unit rate</th>
+                              <th className="text-right px-4 py-2.5">Amount</th>
+                              <th className="text-left px-4 py-2.5">Date (IST)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {assetBillingSummary.ledgerEntries.map((e) => {
+                              const cat = EVENT_CATEGORY[e.eventType] ?? 'Other';
+                              const chipCls = CATEGORY_COLORS[cat] ?? 'bg-gray-100 text-gray-600';
+                              const amt = paise(e.amountPaise);
+                              return (
+                                <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50/40">
+                                  <td className="px-4 py-2.5 whitespace-nowrap">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${chipCls}`}
+                                    >
+                                      {EVENT_LABELS[e.eventType] ?? e.eventType}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-700 text-xs">
+                                    {e.quantity > 0 ? `+${e.quantity}` : e.quantity}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-600 text-xs">
+                                    {formatINR(e.unitRatePaise)}
+                                  </td>
+                                  <td
+                                    className={`px-4 py-2.5 text-right tabular-nums font-semibold text-xs ${amt < 0n ? 'text-red-600' : 'text-gray-900'}`}
+                                  >
+                                    {formatINR(e.amountPaise)}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-gray-500 text-xs whitespace-nowrap">
+                                    {new Date(e.occurredAt).toLocaleString('en-IN', {
+                                      timeZone: 'Asia/Kolkata',
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </>
+          )}
+        </div>
       </section>
     </div>
   );

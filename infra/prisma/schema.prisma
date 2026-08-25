@@ -186,8 +186,6 @@ model Client {
   contactName                 String?      @map("contact_name")
   contactEmail                String?      @map("contact_email")
   contactPhone                String?      @map("contact_phone")
-  // Stored in paise (₹1 = 100 paise) as bigint — never float.
-  committedMonthlyAmountPaise BigInt       @default(4275000) @map("committed_monthly_amount_paise")
   isActive                    Boolean      @default(true) @map("is_active")
   createdAt                   DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                   DateTime     @updatedAt @map("updated_at") @db.Timestamptz
@@ -201,6 +199,7 @@ model Client {
   retrievalRequests  RetrievalRequest[]
   disposalRequests   DisposalRequest[]
   storageAccrualRuns StorageAccrualRun[]
+  assetStatusHistory AssetStatusHistory[]
 
   @@map("clients")
 }
@@ -307,8 +306,29 @@ model Asset {
   disposalRequests  DisposalRequest[]
   currentEndUser    EndUser?      @relation("CurrentAssets", fields: [currentEndUserId], references: [id])
   documents         AssetDocument[] @relation("AssetDocuments")
+  statusHistory     AssetStatusHistory[]
 
   @@map("assets")
+}
+
+// One row per Asset.currentStatus transition. Written alongside every status
+// change (never edited) so billing/reporting can reconstruct how long an
+// asset spent in any given status over an arbitrary period — e.g. days in
+// in_storage during a given month.
+model AssetStatusHistory {
+  id           String       @id @default(uuid()) @map("history_id")
+  assetId      String       @map("asset_id")
+  clientId     String       @map("client_id")
+  fromStatus   AssetStatus? @map("from_status")
+  toStatus     AssetStatus  @map("to_status")
+  changedAt    DateTime     @default(now()) @map("changed_at") @db.Timestamptz
+  sourceModule String       @map("source_module")
+
+  asset  Asset  @relation(fields: [assetId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@index([assetId, changedAt])
+  @@map("asset_status_history")
 }
 
 model ExpectedDelivery {
@@ -685,8 +705,6 @@ model StorageAccrualRun {
   laptopAmountPaise      BigInt   @map("laptop_amount_paise")
   peripheralAmountPaise  BigInt   @map("peripheral_amount_paise")
   totalAmountPaise       BigInt   @map("total_amount_paise")
-  minimumCommitmentPaise BigInt   @map("minimum_commitment_paise")
-  minimumCommitmentMet   Boolean  @map("minimum_commitment_met")
   createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   client Client @relation(fields: [clientId], references: [id])

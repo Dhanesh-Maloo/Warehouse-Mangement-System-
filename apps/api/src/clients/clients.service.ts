@@ -36,7 +36,6 @@ export class ClientsService {
         contactName: dto.contactName,
         contactEmail: dto.contactEmail,
         contactPhone: dto.contactPhone,
-        committedMonthlyAmountPaise: BigInt(dto.committedMonthlyAmountPaise ?? 4_275_000),
       },
     });
     await this.audit.log({
@@ -51,16 +50,13 @@ export class ClientsService {
 
   async update(id: string, dto: Partial<CreateClientDto>): Promise<Client> {
     await this.findOne(id);
-    const { billingAddress, committedMonthlyAmountPaise, ...rest } = dto;
+    const { billingAddress, ...rest } = dto;
     const client = await this.prisma.client.update({
       where: { id },
       data: {
         ...rest,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ...(billingAddress !== undefined ? { billingAddress: billingAddress as any } : {}),
-        ...(committedMonthlyAmountPaise !== undefined
-          ? { committedMonthlyAmountPaise: BigInt(committedMonthlyAmountPaise) }
-          : {}),
       },
     });
     await this.audit.log({

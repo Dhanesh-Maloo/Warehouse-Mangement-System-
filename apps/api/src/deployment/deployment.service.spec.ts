@@ -2,6 +2,7 @@
    typing rather than duplicating full Prisma/service signatures */
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { DeploymentService } from './deployment.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateDeploymentOrderDto } from './dto/create-deployment-order.dto';
 
 describe('DeploymentService', () => {
@@ -44,7 +45,9 @@ describe('DeploymentService', () => {
         findUnique: jest.fn(),
         create: jest
           .fn()
-          .mockImplementation((args) => Promise.resolve({ id: 'order-1', ...args.data })),
+          .mockImplementation((args) =>
+            Promise.resolve({ id: 'order-1', ...args.data, asset: baseAsset, endUser: null }),
+          ),
         update: jest.fn(),
       },
       eventLedger: {
@@ -52,6 +55,9 @@ describe('DeploymentService', () => {
       },
       eventSuppression: {
         create: jest.fn().mockReturnValue({ catch: jest.fn() }),
+      },
+      assetStatusHistory: {
+        create: jest.fn().mockResolvedValue({}),
       },
       $transaction: jest.fn((cb) => cb(mockPrisma)),
     };
@@ -66,6 +72,7 @@ describe('DeploymentService', () => {
       mockRateCard as any,
       mockAudit as any,
       mockCourierZone as any,
+      new AssetStatusHistoryService(mockPrisma),
     );
   });
 

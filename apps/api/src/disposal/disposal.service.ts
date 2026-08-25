@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
+import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateDisposalRequestDto } from './dto/create-disposal-request.dto';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class DisposalService {
     private readonly ledger: LedgerService,
     private readonly rateCard: RateCardService,
     private readonly audit: AuditService,
+    private readonly assetStatusHistory: AssetStatusHistoryService,
   ) {}
 
   findAll(
@@ -216,6 +218,16 @@ export class DisposalService {
         where: { id: disposal.assetId },
         data: { currentStatus: 'disposed' },
       });
+      await this.assetStatusHistory.record(
+        {
+          assetId: disposal.assetId,
+          clientId: disposal.clientId,
+          fromStatus: disposal.asset.currentStatus,
+          toStatus: 'disposed',
+          sourceModule: 'disposal',
+        },
+        tx,
+      );
       return result;
     });
 
