@@ -22,20 +22,47 @@ export class RetrievalService {
 
   findAll(
     clientId?: string,
-  ): Prisma.PrismaPromise<Prisma.RetrievalRequestGetPayload<{ include: { asset: true } }>[]> {
+    filters?: { status?: string; ownerId?: string; fromDate?: string; toDate?: string },
+  ): Prisma.PrismaPromise<
+    Prisma.RetrievalRequestGetPayload<{
+      include: { asset: true; createdByUser: { select: { id: true; fullName: true } } };
+    }>[]
+  > {
+    const toDateFilter = filters?.toDate
+      ? (() => {
+          const d = new Date(filters.toDate as string);
+          if (!(filters.toDate as string).includes('T')) d.setDate(d.getDate() + 1);
+          return d;
+        })()
+      : null;
+
     return this.prisma.retrievalRequest.findMany({
-      where: clientId ? { clientId } : {},
-      include: { asset: true },
+      where: {
+        ...(clientId ? { clientId } : {}),
+        ...(filters?.status ? { status: filters.status as never } : {}),
+        ...(filters?.ownerId ? { createdByUserId: filters.ownerId } : {}),
+        ...(filters?.fromDate || toDateFilter
+          ? {
+              requestedAt: {
+                ...(filters?.fromDate ? { gte: new Date(filters.fromDate) } : {}),
+                ...(toDateFilter ? { lt: toDateFilter } : {}),
+              },
+            }
+          : {}),
+      },
+      include: { asset: true, createdByUser: { select: { id: true, fullName: true } } },
       orderBy: { requestedAt: 'desc' },
     });
   }
 
-  async findOne(
-    id: string,
-  ): Promise<Prisma.RetrievalRequestGetPayload<{ include: { asset: true } }>> {
+  async findOne(id: string): Promise<
+    Prisma.RetrievalRequestGetPayload<{
+      include: { asset: true; createdByUser: { select: { id: true; fullName: true } } };
+    }>
+  > {
     const retrieval = await this.prisma.retrievalRequest.findUnique({
       where: { id },
-      include: { asset: true },
+      include: { asset: true, createdByUser: { select: { id: true, fullName: true } } },
     });
     if (!retrieval) throw new NotFoundException(`Retrieval request ${id} not found`);
     return retrieval;
@@ -47,6 +74,13 @@ export class RetrievalService {
   ): Promise<Prisma.RetrievalRequestGetPayload<{ include: { asset: true } }>> {
     const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } });
     if (!asset) throw new NotFoundException(`Asset ${dto.assetId} not found`);
+
+    // createdByUserId doubles as the "owner" — the person credited with
+    // handling this retrieval. Usually the logged-in user, but overridable
+    // via dto.ownerId (see controller), so validate it explicitly here
+    // rather than surfacing a raw FK-constraint error.
+    const owner = await this.prisma.user.findUnique({ where: { id: createdByUserId } });
+    if (!owner) throw new NotFoundException(`User ${createdByUserId} not found`);
 
     if (asset.clientId !== dto.clientId) {
       throw new BadRequestException(

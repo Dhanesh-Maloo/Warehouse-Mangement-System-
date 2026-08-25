@@ -8,6 +8,7 @@ describe('RetrievalService', () => {
   let mockPrisma: {
     retrievalRequest: { create: jest.Mock; update: jest.Mock; findUnique: jest.Mock };
     asset: { findUnique: jest.Mock; update: jest.Mock };
+    user: { findUnique: jest.Mock };
     inspection: { create: jest.Mock };
     assetStatusHistory: { create: jest.Mock };
     $transaction: jest.Mock;
@@ -58,6 +59,9 @@ describe('RetrievalService', () => {
       asset: {
         findUnique: jest.fn().mockResolvedValue({ id: 'asset-1', clientId: 'client-1' }),
         update: jest.fn().mockResolvedValue({}),
+      },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'user-1' }),
       },
       inspection: { create: jest.fn().mockResolvedValue({}) },
       assetStatusHistory: {

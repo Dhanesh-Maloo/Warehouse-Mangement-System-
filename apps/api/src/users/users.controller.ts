@@ -44,6 +44,21 @@ export class UsersController {
     );
   }
 
+  /**
+   * GET /users/directory — id/fullName/role only, for "who handled this"
+   * pickers (e.g. retrieval owner). Broader role access than the full user
+   * list since it carries no sensitive fields.
+   */
+  @Get('directory')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  findDirectory(@CurrentUser() user: JwtPayload): ReturnType<UsersService['findDirectory']> {
+    const callerClientId =
+      user.role === 'editor' || user.role === 'client_admin'
+        ? (user.clientId ?? undefined)
+        : undefined;
+    return this.usersService.findDirectory(callerClientId);
+  }
+
   @Get(':id')
   @Roles('admin', 'manager', 'client_admin')
   async findOne(

@@ -104,4 +104,11 @@ export class CreateRetrievalRequestDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  // Who physically handled/is handling this retrieval. Defaults to the
+  // logged-in user when omitted; overridable (e.g. an admin logging a
+  // retrieval on a field operator's behalf).
+  @IsOptional()
+  @IsUUID()
+  ownerId?: string;
 }

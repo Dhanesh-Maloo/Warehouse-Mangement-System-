@@ -39,13 +39,17 @@ export class RetrievalController {
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(
     @Query('clientId') clientId?: string,
+    @Query('status') status?: string,
+    @Query('ownerId') ownerId?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<RetrievalService['findAll']> {
     const effectiveClientId =
       user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
-    return this.retrievalService.findAll(effectiveClientId);
+    return this.retrievalService.findAll(effectiveClientId, { status, ownerId, fromDate, toDate });
   }
 
   @Get('asset/:assetId')
@@ -80,7 +84,9 @@ export class RetrievalController {
     if ((user.role === 'editor' || user.role === 'client_admin') && user.clientId) {
       dto.clientId = user.clientId;
     }
-    return this.retrievalService.create(dto, user.sub);
+    // Owner defaults to whoever is logged in, but can be reassigned (e.g. an
+    // admin logging a retrieval a field operator physically handled).
+    return this.retrievalService.create(dto, dto.ownerId ?? user.sub);
   }
 
   @Patch(':id/status')

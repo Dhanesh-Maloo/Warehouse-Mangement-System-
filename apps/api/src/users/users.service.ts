@@ -65,6 +65,25 @@ export class UsersService {
     return { data, total };
   }
 
+  /**
+   * Lightweight user picker list — id/fullName/role only, no email/phone.
+   * Used to populate "who handled this" dropdowns (e.g. retrieval owner).
+   * Always includes internal staff (clientId null); a client-scoped caller
+   * additionally sees their own client's users, never another client's.
+   */
+  async findDirectory(
+    callerClientId?: string,
+  ): Promise<{ id: string; fullName: string; role: string }[]> {
+    return this.prisma.user.findMany({
+      where: {
+        status: 'active',
+        OR: [{ clientId: null }, ...(callerClientId ? [{ clientId: callerClientId }] : [])],
+      },
+      select: { id: true, fullName: true, role: true },
+      orderBy: { fullName: 'asc' },
+    });
+  }
+
   async findOne(id: string): Promise<SafeUser> {
     const user = await this.prisma.user.findUnique({ where: { id }, select: SELECT_SAFE });
     if (!user) throw new NotFoundException(`User ${id} not found`);

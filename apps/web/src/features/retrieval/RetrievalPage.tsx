@@ -27,6 +27,12 @@ interface EndUser {
   clientId: string;
 }
 
+interface DirectoryUser {
+  id: string;
+  fullName: string;
+  role: string;
+}
+
 type RetrievalStatus =
   | 'pending'
   | 'initiated'
@@ -63,6 +69,7 @@ interface RetrievalRequest {
   trackingNumber?: string;
   status: RetrievalStatus;
   requestedAt: string;
+  createdByUser: { id: string; fullName: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -106,8 +113,18 @@ const NEXT_STATUSES: Partial<Record<RetrievalStatus, RetrievalStatus[]>> = {
   received: ['completed'],
 };
 
+const ALL_STATUSES: RetrievalStatus[] = [
+  'pending',
+  'initiated',
+  'in_transit',
+  'received',
+  'completed',
+  'cancelled',
+];
+
 const EMPTY_FORM = {
   assetId: '',
+  ownerId: '',
   bundleType: 'standard' as BundleType,
   addressLine1: '',
   city: '',
@@ -139,6 +156,12 @@ export function RetrievalPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [selectedClientId, setSelectedClientId] = useState('');
+
+  // Filters
+  const [statusFilter, setStatusFilter] = useState('');
+  const [ownerFilter, setOwnerFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const isClientUser = user?.role === 'client_user';
   const isEditor = user?.role === 'editor';
@@ -174,11 +197,24 @@ export function RetrievalPage() {
     enabled: showForm && form.bundleType === 'full_cycle' && !!assetClientId,
   });
 
-  // Retrieval requests list
+  // Directory of internal staff (+ own client's staff) for the Owner picker
+  const { data: directory = [] } = useQuery({
+    queryKey: ['users-directory'],
+    queryFn: () => api.get<DirectoryUser[]>('/users/directory'),
+  });
+
+  // Retrieval requests list, filtered by status / owner / requested-date range
   const { data: retrievals = [], isLoading } = useQuery({
-    queryKey: ['retrieval-requests', clientId],
-    queryFn: () =>
-      api.get<RetrievalRequest[]>(`/retrieval${clientId ? `?clientId=${clientId}` : ''}`),
+    queryKey: ['retrieval-requests', clientId, statusFilter, ownerFilter, fromDate, toDate],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (clientId) params.set('clientId', clientId);
+      if (statusFilter) params.set('status', statusFilter);
+      if (ownerFilter) params.set('ownerId', ownerFilter);
+      if (fromDate) params.set('fromDate', fromDate);
+      if (toDate) params.set('toDate', toDate);
+      return api.get<RetrievalRequest[]>(`/retrieval?${params.toString()}`);
+    },
   });
 
   // Courier zone is derived server-side from the pickup pincode. This is a
@@ -234,6 +270,7 @@ export function RetrievalPage() {
     createMutation.mutate({
       clientId: cid,
       assetId: form.assetId,
+      ownerId: form.ownerId || undefined,
       bundleType: form.bundleType,
       pickupAddress: {
         line1: form.addressLine1,
@@ -283,7 +320,10 @@ export function RetrievalPage() {
           </p>
         </div>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={() => {
+            setForm((prev) => ({ ...prev, ownerId: user?.id ?? '' }));
+            setShowForm(true);
+          }}
           className="flex items-center gap-2 bg-[#E86F2C] hover:bg-[#D05E1E] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
         >
           <Plus size={16} />
@@ -323,8 +363,8 @@ export function RetrievalPage() {
               </div>
             )}
 
-            {/* Asset + Bundle */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Asset + Bundle + Owner */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Asset <span className="text-red-500">*</span>
@@ -364,6 +404,29 @@ export function RetrievalPage() {
                   <option value="standard">Standard - ₹190</option>
                   <option value="full_cycle">Full Cycle (retrieve + redeploy) - ₹500</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Owner <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  value={form.ownerId}
+                  onChange={(e) => setField('ownerId', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                >
+                  <option value="">Select owner…</option>
+                  {directory.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.fullName}
+                      {u.id === user?.id ? ' (you)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Who&apos;s physically handling this retrieval — defaults to you.
+                </p>
               </div>
             </div>
 
@@ -649,6 +712,71 @@ export function RetrievalPage() {
         </div>
       )}
 
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+          >
+            <option value="">All</option>
+            {ALL_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Owner</label>
+          <select
+            value={ownerFilter}
+            onChange={(e) => setOwnerFilter(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+          >
+            <option value="">All</option>
+            {directory.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullName}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Requested from</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Requested to</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+          />
+        </div>
+        {(statusFilter || ownerFilter || fromDate || toDate) && (
+          <button
+            onClick={() => {
+              setStatusFilter('');
+              setOwnerFilter('');
+              setFromDate('');
+              setToDate('');
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 underline mb-1"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
       {/* Table */}
       {isLoading ? (
         <div className="text-sm text-gray-400">Loading…</div>
@@ -661,6 +789,7 @@ export function RetrievalPage() {
                 <th className="text-left px-5 py-3">Pickup location</th>
                 <th className="text-left px-5 py-3">Zone</th>
                 <th className="text-left px-5 py-3">Bundle</th>
+                <th className="text-left px-5 py-3">Owner</th>
                 <th className="text-left px-5 py-3">Damage</th>
                 <th className="text-left px-5 py-3">Tracking #</th>
                 <th className="text-left px-5 py-3">Notes</th>
@@ -719,6 +848,9 @@ export function RetrievalPage() {
                         <div className="text-[10px] text-amber-600 mt-0.5">Wipe requested</div>
                       )}
                     </td>
+
+                    {/* Owner — who handled this retrieval */}
+                    <td className="px-5 py-3.5 text-gray-700">{r.createdByUser?.fullName ?? '—'}</td>
 
                     {/* Damage found — set once the post-retrieval inspection completes */}
                     <td className="px-5 py-3.5">
