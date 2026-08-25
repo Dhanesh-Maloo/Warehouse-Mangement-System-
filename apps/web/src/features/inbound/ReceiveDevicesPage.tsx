@@ -31,6 +31,8 @@ interface DeviceRow {
   manufacturer: string;
   category: 'laptop' | 'monitor' | 'peripheral';
   assetTag: string;
+  referenceName: string;
+  vendorName: string;
   requiresInspection: boolean;
 }
 
@@ -106,6 +108,8 @@ export function ReceiveDevicesPage() {
         manufacturer: prefill.manufacturer ?? '',
         category: prefill.category ?? 'laptop',
         assetTag: '',
+        referenceName: '',
+        vendorName: '',
         requiresInspection: false,
       },
     ]);
@@ -129,12 +133,23 @@ export function ReceiveDevicesPage() {
         receivingLocationId: locationId,
         courierRef: courierRef.trim() || undefined,
         devices: devices.map(
-          ({ serialNumber, model, manufacturer, category, assetTag, requiresInspection }) => ({
+          ({
+            serialNumber,
+            model,
+            manufacturer,
+            category,
+            assetTag,
+            referenceName,
+            vendorName,
+            requiresInspection,
+          }) => ({
             serialNumber,
             model,
             manufacturer,
             category,
             assetTag: assetTag.trim() || undefined,
+            referenceName: referenceName.trim() || undefined,
+            vendorName: vendorName.trim() || undefined,
             requiresInspection,
           }),
         ),
@@ -334,6 +349,30 @@ export function ReceiveDevicesPage() {
                         value={device.assetTag}
                         onChange={(e) => updateDevice(device.key, 'assetTag', e.target.value)}
                         placeholder="TAG-001"
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Reference No. <span className="text-gray-400">(opt.)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={device.referenceName}
+                        onChange={(e) => updateDevice(device.key, 'referenceName', e.target.value)}
+                        placeholder="Client's own reference"
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Vendor <span className="text-gray-400">(opt.)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={device.vendorName}
+                        onChange={(e) => updateDevice(device.key, 'vendorName', e.target.value)}
+                        placeholder="iValue, or other vendor"
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
                       />
                     </div>

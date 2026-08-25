@@ -55,6 +55,8 @@ export class AssetsService {
             OR: [
               { serialNumber: { contains: filter.search, mode: 'insensitive' as const } },
               { assetTag: { contains: filter.search, mode: 'insensitive' as const } },
+              { referenceName: { contains: filter.search, mode: 'insensitive' as const } },
+              { vendorName: { contains: filter.search, mode: 'insensitive' as const } },
               { model: { contains: filter.search, mode: 'insensitive' as const } },
             ],
           }
@@ -132,6 +134,8 @@ export class AssetsService {
       conditionGrade?: ConditionGrade;
       serialNumber?: string;
       assetTag?: string;
+      referenceName?: string;
+      vendorName?: string;
       model?: string;
       manufacturer?: string;
       category?: string;
@@ -181,6 +185,8 @@ export class AssetsService {
   async create(data: {
     serialNumber: string;
     assetTag?: string;
+    referenceName?: string;
+    vendorName?: string;
     model: string;
     manufacturer: string;
     category: AssetCategory;

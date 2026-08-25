@@ -33,6 +33,14 @@ export class UpdateAssetStatusDto {
 
   @IsOptional()
   @IsString()
+  referenceName?: string;
+
+  @IsOptional()
+  @IsString()
+  vendorName?: string;
+
+  @IsOptional()
+  @IsString()
   model?: string;
 
   @IsOptional()

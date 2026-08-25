@@ -42,13 +42,14 @@ export class InboundController {
   findAllDeliveries(
     @Query('clientId') clientId?: string,
     @Query('expectedDate') expectedDate?: string,
+    @Query('search') search?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<InboundService['findAllDeliveries']> {
     const effectiveClientId =
       user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
-    return this.inboundService.findAllDeliveries(effectiveClientId, expectedDate);
+    return this.inboundService.findAllDeliveries(effectiveClientId, expectedDate, search);
   }
 
   @Get('deliveries/:id')

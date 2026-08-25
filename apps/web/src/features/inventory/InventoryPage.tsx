@@ -22,6 +22,8 @@ interface Asset {
   id: string;
   serialNumber: string;
   assetTag: string | null;
+  referenceName: string | null;
+  vendorName: string | null;
   assetCondition: 'new' | 'used' | 'dead' | null;
   model: string;
   manufacturer: string;
@@ -74,6 +76,8 @@ type AssetStatus =
 const EMPTY_ADD_FORM = {
   serialNumber: '',
   assetTag: '',
+  referenceName: '',
+  vendorName: '',
   manufacturer: '',
   model: '',
   category: 'laptop' as AssetCategory,
@@ -95,6 +99,8 @@ const EMPTY_ADD_FORM = {
 const EMPTY_EDIT_FORM = {
   serialNumber: '',
   assetTag: '',
+  referenceName: '',
+  vendorName: '',
   manufacturer: '',
   model: '',
   category: 'laptop' as AssetCategory,
@@ -328,6 +334,8 @@ export function InventoryPage() {
         currentStatus: payload.currentStatus,
       };
       if (payload.assetTag.trim()) body.assetTag = payload.assetTag.trim();
+      if (payload.referenceName.trim()) body.referenceName = payload.referenceName.trim();
+      if (payload.vendorName.trim()) body.vendorName = payload.vendorName.trim();
       if (payload.currentLocationId) body.currentLocationId = payload.currentLocationId;
       if (payload.conditionGrade) body.conditionGrade = payload.conditionGrade;
       if (payload.assetCondition) body.assetCondition = payload.assetCondition;
@@ -360,6 +368,8 @@ export function InventoryPage() {
       const body: Record<string, unknown> = {
         serialNumber: payload.serialNumber.trim() || undefined,
         assetTag: payload.assetTag.trim() || undefined,
+        referenceName: payload.referenceName.trim() || undefined,
+        vendorName: payload.vendorName.trim() || undefined,
         model: payload.model.trim() || undefined,
         manufacturer: payload.manufacturer.trim() || undefined,
         category: payload.category || undefined,
@@ -450,6 +460,8 @@ export function InventoryPage() {
     setEditForm({
       serialNumber: asset.serialNumber,
       assetTag: asset.assetTag ?? '',
+      referenceName: asset.referenceName ?? '',
+      vendorName: asset.vendorName ?? '',
       manufacturer: asset.manufacturer,
       model: asset.model,
       category: asset.category as AssetCategory,
@@ -570,6 +582,30 @@ export function InventoryPage() {
                   value={addForm.assetTag}
                   onChange={(e) => setAddForm((f) => ({ ...f, assetTag: e.target.value }))}
                   placeholder="AT-XXXX"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Reference No.
+                </label>
+                <input
+                  type="text"
+                  value={addForm.referenceName}
+                  onChange={(e) => setAddForm((f) => ({ ...f, referenceName: e.target.value }))}
+                  placeholder="Client's own reference"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Vendor
+                </label>
+                <input
+                  type="text"
+                  value={addForm.vendorName}
+                  onChange={(e) => setAddForm((f) => ({ ...f, vendorName: e.target.value }))}
+                  placeholder="iValue, or other vendor"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                 />
               </div>
@@ -820,7 +856,7 @@ export function InventoryPage() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search serial, tag, model…"
+            placeholder="Search serial, tag, reference no, vendor, model…"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -1182,6 +1218,30 @@ export function InventoryPage() {
                     onChange={(e) => setEditForm((f) => ({ ...f, assetTag: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] font-mono"
                     placeholder="AT-XXXX"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Reference No.
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.referenceName}
+                    onChange={(e) => setEditForm((f) => ({ ...f, referenceName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                    placeholder="Client's own reference"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Vendor
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.vendorName}
+                    onChange={(e) => setEditForm((f) => ({ ...f, vendorName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                    placeholder="iValue, or other vendor"
                   />
                 </div>
                 <div>

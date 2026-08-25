@@ -275,6 +275,11 @@ model Asset {
   id                String        @id @default(uuid()) @map("asset_id")
   serialNumber      String        @unique @map("serial_number")
   assetTag          String?       @unique @map("asset_tag")
+  // Client's own internal reference/name for the device — distinct from our
+  // serial number and asset tag.
+  referenceName     String?       @map("reference_name")
+  // Who this device was purchased from (e.g. iValue or another vendor).
+  vendorName        String?       @map("vendor_name")
   model             String
   manufacturer      String
   category          AssetCategory

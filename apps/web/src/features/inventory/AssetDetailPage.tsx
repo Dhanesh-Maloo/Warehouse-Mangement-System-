@@ -38,6 +38,8 @@ interface AssetDetail {
   id: string;
   serialNumber: string;
   assetTag: string | null;
+  referenceName: string | null;
+  vendorName: string | null;
   model: string;
   manufacturer: string;
   category: string;
@@ -125,6 +127,8 @@ export function AssetDetailPage() {
   const [editForm, setEditForm] = useState({
     serialNumber: '',
     assetTag: '',
+    referenceName: '',
+    vendorName: '',
     model: '',
     manufacturer: '',
     category: '',
@@ -147,6 +151,8 @@ export function AssetDetailPage() {
     setEditForm({
       serialNumber: asset.serialNumber,
       assetTag: asset.assetTag ?? '',
+      referenceName: asset.referenceName ?? '',
+      vendorName: asset.vendorName ?? '',
       model: asset.model,
       manufacturer: asset.manufacturer,
       category: asset.category,
@@ -171,6 +177,8 @@ export function AssetDetailPage() {
       const body: Record<string, unknown> = {
         serialNumber: formData.serialNumber || undefined,
         assetTag: formData.assetTag || undefined,
+        referenceName: formData.referenceName || undefined,
+        vendorName: formData.vendorName || undefined,
         model: formData.model || undefined,
         manufacturer: formData.manufacturer || undefined,
         category: formData.category || undefined,
@@ -284,6 +292,16 @@ export function AssetDetailPage() {
             {asset.assetTag && (
               <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded">
                 {asset.assetTag}
+              </span>
+            )}
+            {asset.referenceName && (
+              <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                Ref No: {asset.referenceName}
+              </span>
+            )}
+            {asset.vendorName && (
+              <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                Vendor: {asset.vendorName}
               </span>
             )}
             <span
@@ -588,6 +606,32 @@ export function AssetDetailPage() {
                     value={editForm.assetTag}
                     onChange={(e) => setEditForm((f) => ({ ...f, assetTag: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] font-mono"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Reference No. <span className="text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.referenceName}
+                    onChange={(e) => setEditForm((f) => ({ ...f, referenceName: e.target.value }))}
+                    placeholder="Client's own reference"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Vendor <span className="text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.vendorName}
+                    onChange={(e) => setEditForm((f) => ({ ...f, vendorName: e.target.value }))}
+                    placeholder="iValue, or other vendor"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                   />
                 </div>
               </div>

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Plus, Trash2, Package } from 'lucide-react';
+import { Plus, Trash2, Package, Search } from 'lucide-react';
 
 interface Client {
   id: string;
@@ -33,6 +33,7 @@ export function InboundPage() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'received' | 'not_received'>('all');
+  const [poSearch, setPoSearch] = useState('');
 
   // Form state
   const [selectedClientId, setSelectedClientId] = useState('');
@@ -58,9 +59,13 @@ export function InboundPage() {
   });
 
   const { data: deliveries = [], isLoading } = useQuery({
-    queryKey: ['inbound-deliveries', clientId],
-    queryFn: () =>
-      api.get<Delivery[]>(`/inbound/deliveries${clientId ? `?clientId=${clientId}` : ''}`),
+    queryKey: ['inbound-deliveries', clientId, poSearch],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (clientId) params.set('clientId', clientId);
+      if (poSearch.trim()) params.set('search', poSearch.trim());
+      return api.get<Delivery[]>(`/inbound/deliveries?${params.toString()}`);
+    },
   });
 
   const statusChangeMutation = useMutation({
@@ -305,7 +310,7 @@ export function InboundPage() {
         <div className="text-sm text-gray-400">Loading…</div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-3">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-3 flex-wrap">
             <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</label>
             <select
               value={statusFilter}
@@ -316,6 +321,17 @@ export function InboundPage() {
               <option value="received">Received</option>
               <option value="not_received">Not Received</option>
             </select>
+
+            <div className="relative ml-auto">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={poSearch}
+                onChange={(e) => setPoSearch(e.target.value)}
+                placeholder="Search PO reference, reference no, or vendor…"
+                className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white w-56"
+              />
+            </div>
           </div>
           <table className="w-full text-sm">
             <thead>

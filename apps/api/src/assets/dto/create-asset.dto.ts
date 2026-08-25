@@ -17,6 +17,14 @@ export class CreateAssetDto {
   @IsString()
   assetTag?: string;
 
+  @IsOptional()
+  @IsString()
+  referenceName?: string;
+
+  @IsOptional()
+  @IsString()
+  vendorName?: string;
+
   @IsString()
   model!: string;
 

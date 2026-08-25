@@ -50,6 +50,8 @@ export class AssetsController {
     return this.assetsService.create({
       serialNumber: dto.serialNumber,
       assetTag: dto.assetTag,
+      referenceName: dto.referenceName,
+      vendorName: dto.vendorName,
       model: dto.model,
       manufacturer: dto.manufacturer,
       category: dto.category as AssetCategory,

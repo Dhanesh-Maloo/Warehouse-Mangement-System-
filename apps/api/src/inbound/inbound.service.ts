@@ -27,6 +27,7 @@ export class InboundService {
   findAllDeliveries(
     clientId?: string,
     expectedDate?: string,
+    search?: string,
   ): Prisma.PrismaPromise<
     Prisma.ExpectedDeliveryGetPayload<{
       include: {
@@ -44,9 +45,32 @@ export class InboundService {
           },
         }
       : {};
+    const searchFilter = search
+      ? {
+          OR: [
+            { purchaseOrderRef: { contains: search, mode: 'insensitive' as const } },
+            {
+              grns: {
+                some: {
+                  assets: {
+                    some: {
+                      asset: {
+                        OR: [
+                          { referenceName: { contains: search, mode: 'insensitive' as const } },
+                          { vendorName: { contains: search, mode: 'insensitive' as const } },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        }
+      : {};
 
     return this.prisma.expectedDelivery.findMany({
-      where: { ...(clientId ? { clientId } : {}), ...dateFilter },
+      where: { ...(clientId ? { clientId } : {}), ...dateFilter, ...searchFilter },
       include: {
         items: true,
         grns: { include: { assets: true } },
@@ -168,6 +192,8 @@ export class InboundService {
           data: {
             serialNumber: device.serialNumber,
             assetTag: device.assetTag,
+            referenceName: device.referenceName,
+            vendorName: device.vendorName,
             model: device.model,
             manufacturer: device.manufacturer,
             category: device.category,

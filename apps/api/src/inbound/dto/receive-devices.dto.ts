@@ -27,6 +27,14 @@ export class ReceivedDeviceDto {
   @IsString()
   assetTag?: string;
 
+  @IsOptional()
+  @IsString()
+  referenceName?: string;
+
+  @IsOptional()
+  @IsString()
+  vendorName?: string;
+
   @IsBoolean()
   requiresInspection!: boolean;
 }
