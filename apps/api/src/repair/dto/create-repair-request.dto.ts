@@ -1,4 +1,13 @@
-import { IsEnum, IsInt, IsISO8601, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsISO8601,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
 
 export class CreateRepairRequestDto {
   @IsUUID()
@@ -40,9 +49,9 @@ export class CreateRepairRequestDto {
   @IsString()
   ivalueTicketNumber?: string;
 
-  @IsOptional()
   @IsString()
-  clientTicketNumber?: string;
+  @IsNotEmpty()
+  clientTicketNumber!: string;
 
   @IsString()
   @IsOptional()

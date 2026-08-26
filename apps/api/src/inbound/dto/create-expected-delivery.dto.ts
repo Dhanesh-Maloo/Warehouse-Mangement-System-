@@ -8,6 +8,7 @@ import {
   IsInt,
   Min,
   IsOptional,
+  IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AssetCategory } from '@prisma/client';
@@ -47,9 +48,9 @@ export class CreateExpectedDeliveryDto {
   @IsString()
   ivalueTicketNumber?: string;
 
-  @IsOptional()
   @IsString()
-  clientTicketNumber?: string;
+  @IsNotEmpty()
+  clientTicketNumber!: string;
 
   @IsOptional()
   @IsString()

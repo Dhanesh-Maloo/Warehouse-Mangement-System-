@@ -5,6 +5,7 @@ import {
   IsString,
   IsBoolean,
   IsOptional,
+  IsNotEmpty,
   ValidateNested,
   ValidateIf,
 } from 'class-validator';
@@ -105,9 +106,9 @@ export class CreateRetrievalRequestDto {
   @IsString()
   ivalueTicketNumber?: string;
 
-  @IsOptional()
   @IsString()
-  clientTicketNumber?: string;
+  @IsNotEmpty()
+  clientTicketNumber!: string;
 
   @IsOptional()
   @IsString()

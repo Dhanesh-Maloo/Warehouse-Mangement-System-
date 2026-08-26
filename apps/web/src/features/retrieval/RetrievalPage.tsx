@@ -340,6 +340,33 @@ export function RetrievalPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
           <h2 className="text-base font-semibold text-gray-900">New Retrieval Request</h2>
           <form onSubmit={handleCreate} className="space-y-5">
+            {/* Ticket numbers */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  iValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.ivalueTicketNumber}
+                  onChange={(e) => setField('ivalueTicketNumber', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client Ticket Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={form.clientTicketNumber}
+                  onChange={(e) => setField('clientTicketNumber', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+            </div>
+
             {/* Client selector (not shown for client-scoped roles) */}
             {!isClientScoped && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -663,32 +690,6 @@ export function RetrievalPage() {
                 </div>
               </div>
             )}
-
-            {/* Ticket numbers */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  iValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.ivalueTicketNumber}
-                  onChange={(e) => setField('ivalueTicketNumber', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Client Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.clientTicketNumber}
-                  onChange={(e) => setField('clientTicketNumber', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
-                />
-              </div>
-            </div>
 
             {/* Notes */}
             <div>

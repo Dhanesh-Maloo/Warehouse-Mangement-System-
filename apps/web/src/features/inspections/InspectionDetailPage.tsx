@@ -415,6 +415,10 @@ export function InspectionDetailPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (!clientTicketNumber.trim()) {
+      setError('Client ticket number is required.');
+      return;
+    }
     if (!grade) {
       setError('Select a condition grade.');
       return;
@@ -835,10 +839,11 @@ export function InspectionDetailPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Client ticket number <span className="text-gray-400 font-normal">(optional)</span>
+                  Client ticket number <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  required
                   value={clientTicketNumber}
                   onChange={(e) => setClientTicketNumber(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"

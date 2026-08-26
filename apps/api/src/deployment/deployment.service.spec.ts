@@ -33,6 +33,7 @@ describe('DeploymentService', () => {
     contactPhone: '9999999999',
     requiresLabeling: false,
     requiresRepacking: false,
+    clientTicketNumber: 'CL-1000',
   };
 
   beforeEach(() => {

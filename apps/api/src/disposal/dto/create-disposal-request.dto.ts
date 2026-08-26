@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateDisposalRequestDto {
   @IsUUID()
@@ -21,9 +21,9 @@ export class CreateDisposalRequestDto {
   @IsString()
   ivalueTicketNumber?: string;
 
-  @IsOptional()
   @IsString()
-  clientTicketNumber?: string;
+  @IsNotEmpty()
+  clientTicketNumber!: string;
 
   @IsString()
   @IsOptional()

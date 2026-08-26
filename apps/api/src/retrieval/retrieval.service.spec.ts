@@ -34,6 +34,7 @@ describe('RetrievalService', () => {
     requiresPostInspection: false,
     requiresWipe: false,
     requiresRedeploySetup: false,
+    clientTicketNumber: 'CL-1000',
   };
 
   const existingRetrieval = {

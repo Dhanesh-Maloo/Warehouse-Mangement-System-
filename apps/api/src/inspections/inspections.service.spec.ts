@@ -40,6 +40,7 @@ describe('InspectionsService', () => {
   // All-clean checklist — no damage signal.
   const cleanDto: CompleteInspectionDto = {
     conditionGrade: 'A' as CompleteInspectionDto['conditionGrade'],
+    clientTicketNumber: 'CL-1000',
     scratchesOnCasing: false,
     lidClosingOk: true,
     scratchesOnScreen: false,

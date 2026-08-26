@@ -10,9 +10,9 @@ export class CompleteInspectionDto {
   @IsString()
   ivalueTicketNumber?: string;
 
-  @IsOptional()
   @IsString()
-  clientTicketNumber?: string;
+  @IsNotEmpty()
+  clientTicketNumber!: string;
 
   @IsOptional()
   @IsString()
