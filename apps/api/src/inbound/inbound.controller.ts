@@ -14,6 +14,7 @@ import type { Response } from 'express';
 import { InboundService } from './inbound.service';
 import { CreateExpectedDeliveryDto } from './dto/create-expected-delivery.dto';
 import { ReceiveDevicesDto } from './dto/receive-devices.dto';
+import { UpdateTicketsDto } from '../common/dto/update-tickets.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -92,6 +93,17 @@ export class InboundController {
   ): ReturnType<InboundService['updateDeliveryStatus']> {
     await this.assertOwnsDelivery(id, user);
     return this.inboundService.updateDeliveryStatus(id, status, user.sub);
+  }
+
+  @Patch('deliveries/:id/tickets')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  async updateDeliveryTickets(
+    @Param('id') id: string,
+    @Body() dto: UpdateTicketsDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<InboundService['updateDeliveryTickets']> {
+    await this.assertOwnsDelivery(id, user);
+    return this.inboundService.updateDeliveryTickets(id, dto);
   }
 
   @Get('grns')

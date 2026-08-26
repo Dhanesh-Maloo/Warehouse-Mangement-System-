@@ -24,6 +24,7 @@ import { StorageModule } from './storage/storage.module';
 import { DocumentsModule } from './documents/documents.module';
 import { R2Module } from './r2/r2.module';
 import { LogisticsModule } from './logistics/logistics.module';
+import { TicketLookupModule } from './ticket-lookup/ticket-lookup.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { LogisticsModule } from './logistics/logistics.module';
     StorageModule,
     DocumentsModule,
     LogisticsModule,
+    TicketLookupModule,
   ],
 })
 export class AppModule implements NestModule {

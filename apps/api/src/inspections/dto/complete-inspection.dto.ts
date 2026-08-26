@@ -1,5 +1,5 @@
 import { IsEnum, IsBoolean, IsOptional, IsString, IsArray, IsNotEmpty } from 'class-validator';
-import { ConditionGrade, TicketSource } from '@prisma/client';
+import { ConditionGrade } from '@prisma/client';
 
 export class CompleteInspectionDto {
   @IsEnum(ConditionGrade)
@@ -8,7 +8,11 @@ export class CompleteInspectionDto {
   // Job details
   @IsOptional()
   @IsString()
-  ticketNumber?: string;
+  ivalueTicketNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  clientTicketNumber?: string;
 
   @IsOptional()
   @IsString()
@@ -17,9 +21,6 @@ export class CompleteInspectionDto {
   @IsOptional()
   @IsString()
   contactNumber?: string;
-
-  @IsEnum(TicketSource)
-  ticketSource!: TicketSource;
 
   // Every checklist item below is tri-state: true (Yes), false (No), or
   // null/undefined (N/A) — N/A is excluded from pass/fail and grade signal.

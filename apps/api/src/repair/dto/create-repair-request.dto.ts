@@ -36,6 +36,14 @@ export class CreateRepairRequestDto {
   @IsOptional()
   slaTargetAt?: string;
 
+  @IsOptional()
+  @IsString()
+  ivalueTicketNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  clientTicketNumber?: string;
+
   @IsString()
   @IsOptional()
   notes?: string;

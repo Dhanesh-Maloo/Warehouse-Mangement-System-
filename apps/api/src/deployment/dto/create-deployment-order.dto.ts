@@ -63,5 +63,13 @@ export class CreateDeploymentOrderDto {
 
   @IsOptional()
   @IsString()
+  ivalueTicketNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  clientTicketNumber?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 }

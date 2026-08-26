@@ -12,6 +12,7 @@ import {
 import { RetrievalService } from './retrieval.service';
 import { CreateRetrievalRequestDto } from './dto/create-retrieval-request.dto';
 import { UpdateRetrievalStatusDto } from './dto/update-retrieval-status.dto';
+import { UpdateTicketsDto } from '../common/dto/update-tickets.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -109,5 +110,16 @@ export class RetrievalController {
   ): ReturnType<RetrievalService['updateZone']> {
     await this.assertOwnsRetrieval(id, user);
     return this.retrievalService.updateZone(id, courierZone, user.sub);
+  }
+
+  @Patch(':id/tickets')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  async updateTickets(
+    @Param('id') id: string,
+    @Body() dto: UpdateTicketsDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<RetrievalService['updateTickets']> {
+    await this.assertOwnsRetrieval(id, user);
+    return this.retrievalService.updateTickets(id, dto);
   }
 }

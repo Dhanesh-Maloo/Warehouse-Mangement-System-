@@ -105,6 +105,8 @@ export class InboundService {
         clientId: dto.clientId,
         purchaseOrderRef: dto.purchaseOrderRef,
         expectedArrivalDate: new Date(dto.expectedArrivalDate),
+        ivalueTicketNumber: dto.ivalueTicketNumber,
+        clientTicketNumber: dto.clientTicketNumber,
         notes: dto.notes,
         status: 'pending',
         items: {
@@ -347,6 +349,22 @@ export class InboundService {
       newValue: { status },
     });
     return updated;
+  }
+
+  async updateDeliveryTickets(
+    id: string,
+    dto: { ivalueTicketNumber?: string; clientTicketNumber?: string },
+  ): Promise<Prisma.ExpectedDeliveryGetPayload<{ include: { items: true; grns: true } }>> {
+    const delivery = await this.prisma.expectedDelivery.findUnique({ where: { id } });
+    if (!delivery) throw new NotFoundException(`Expected delivery ${id} not found`);
+    return this.prisma.expectedDelivery.update({
+      where: { id },
+      data: {
+        ivalueTicketNumber: dto.ivalueTicketNumber,
+        clientTicketNumber: dto.clientTicketNumber,
+      },
+      include: { items: true, grns: true },
+    });
   }
 
   findAllGrns(clientId?: string): Prisma.PrismaPromise<

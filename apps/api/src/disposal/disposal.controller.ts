@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { DisposalService } from './disposal.service';
 import { CreateDisposalRequestDto } from './dto/create-disposal-request.dto';
+import { UpdateTicketsDto } from '../common/dto/update-tickets.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -111,5 +112,16 @@ export class DisposalController {
   ): ReturnType<DisposalService['complete']> {
     await this.assertOwnsDisposal(id, user);
     return this.disposalService.complete(id, user.sub);
+  }
+
+  @Patch(':id/tickets')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  async updateTickets(
+    @Param('id') id: string,
+    @Body() dto: UpdateTicketsDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DisposalService['updateTickets']> {
+    await this.assertOwnsDisposal(id, user);
+    return this.disposalService.updateTickets(id, dto);
   }
 }

@@ -45,5 +45,13 @@ export class CreateExpectedDeliveryDto {
 
   @IsOptional()
   @IsString()
+  ivalueTicketNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  clientTicketNumber?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 }

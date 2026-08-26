@@ -9,6 +9,7 @@ import { addBusinessMinutes } from '../common/business-hours.util';
 import type { CreateRepairRequestDto } from './dto/create-repair-request.dto';
 import type { UpdateRepairStatusDto } from './dto/update-repair-status.dto';
 import type { UpdateRepairSlaDto } from './dto/update-repair-sla.dto';
+import type { UpdateTicketsDto } from '../common/dto/update-tickets.dto';
 
 export interface RepairAssetSummary {
   id: string;
@@ -158,6 +159,8 @@ export class RepairService {
           repairType: dto.repairType,
           repairCategory: dto.repairType === 'in_house' ? dto.repairCategory : undefined,
           slaTargetAt,
+          ivalueTicketNumber: dto.ivalueTicketNumber,
+          clientTicketNumber: dto.clientTicketNumber,
           notes: dto.notes,
           status: 'pending',
           createdByUserId,
@@ -321,6 +324,22 @@ export class RepairService {
       entityId: id,
       oldValue: { slaTargetAt: repair.slaTargetAt },
       newValue: { slaTargetAt, reason: dto.reason },
+    });
+
+    const [withAsset] = await this.attachAssets([updated]);
+    return withAsset;
+  }
+
+  async updateTickets(id: string, dto: UpdateTicketsDto): Promise<RepairRequestWithAsset> {
+    const repair = await this.prisma.repairRequest.findUnique({ where: { id } });
+    if (!repair) throw new NotFoundException(`Repair request ${id} not found`);
+
+    const updated = await this.prisma.repairRequest.update({
+      where: { id },
+      data: {
+        ivalueTicketNumber: dto.ivalueTicketNumber,
+        clientTicketNumber: dto.clientTicketNumber,
+      },
     });
 
     const [withAsset] = await this.attachAssets([updated]);

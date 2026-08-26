@@ -93,6 +93,8 @@ const EMPTY_FORM = {
   contactPhone: '',
   requiresLabeling: false,
   requiresRepacking: false,
+  ivalueTicketNumber: '',
+  clientTicketNumber: '',
   notes: '',
 };
 
@@ -341,6 +343,8 @@ export function DeploymentPage() {
       contactPhone: form.contactPhone,
       requiresLabeling: form.requiresLabeling,
       requiresRepacking: form.requiresRepacking,
+      ivalueTicketNumber: form.ivalueTicketNumber.trim() || undefined,
+      clientTicketNumber: form.clientTicketNumber.trim() || undefined,
       notes: form.notes || undefined,
     });
   }
@@ -740,6 +744,32 @@ export function DeploymentPage() {
                 />
                 Requires repacking <span className="text-xs text-gray-500">(₹140)</span>
               </label>
+            </div>
+
+            {/* Ticket numbers */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  iValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.ivalueTicketNumber}
+                  onChange={(e) => f('ivalueTicketNumber', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.clientTicketNumber}
+                  onChange={(e) => f('clientTicketNumber', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
             </div>
 
             {/* Notes */}

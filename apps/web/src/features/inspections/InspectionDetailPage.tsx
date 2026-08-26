@@ -31,10 +31,10 @@ interface InspectionDetail {
   startedAt: string;
   completedAt: string | null;
   conditionGrade: string | null;
-  ticketNumber: string | null;
+  ivalueTicketNumber: string | null;
+  clientTicketNumber: string | null;
   contactPerson: string | null;
   contactNumber: string | null;
-  ticketSource: 'ivalue' | 'client' | null;
   scratchesOnCasing: boolean | null;
   lidClosingOk: boolean | null;
   scratchesOnScreen: boolean | null;
@@ -291,10 +291,10 @@ export function InspectionDetailPage() {
   const [checks, setChecks] = useState<CheckState>(buildInitialChecks);
   const [grade, setGrade] = useState<Grade | ''>('');
   const [notes, setNotes] = useState('');
-  const [ticketNumber, setTicketNumber] = useState('');
+  const [ivalueTicketNumber, setIvalueTicketNumber] = useState('');
+  const [clientTicketNumber, setClientTicketNumber] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [contactNumber, setContactNumber] = useState('');
-  const [ticketSource, setTicketSource] = useState<'ivalue' | 'client' | ''>('');
   const [otherAccessories, setOtherAccessories] = useState('');
   const [operatingSystem, setOperatingSystem] = useState('');
   const [cpu, setCpu] = useState('');
@@ -381,10 +381,10 @@ export function InspectionDetailPage() {
 
       return api.patch(`/inspections/${id ?? ''}/complete`, {
         conditionGrade: grade,
-        ticketNumber: ticketNumber.trim() || undefined,
+        ivalueTicketNumber: ivalueTicketNumber.trim() || undefined,
+        clientTicketNumber: clientTicketNumber.trim() || undefined,
         contactPerson: contactPerson.trim() || undefined,
         contactNumber: contactNumber.trim() || undefined,
-        ticketSource,
         ...checks,
         otherAccessories: otherAccessories.trim() || undefined,
         operatingSystem: operatingSystem.trim() || undefined,
@@ -417,10 +417,6 @@ export function InspectionDetailPage() {
     setError('');
     if (!grade) {
       setError('Select a condition grade.');
-      return;
-    }
-    if (!ticketSource) {
-      setError('Select a ticket type.');
       return;
     }
     if (photos.length === 0) {
@@ -592,23 +588,23 @@ export function InspectionDetailPage() {
       {/* ── Completed read-only view ── */}
       {isComplete ? (
         <div className="space-y-4">
-          {(inspection.ticketNumber ||
+          {(inspection.ivalueTicketNumber ||
+            inspection.clientTicketNumber ||
             inspection.contactPerson ||
-            inspection.contactNumber ||
-            inspection.ticketSource) && (
+            inspection.contactNumber) && (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <h2 className="text-sm font-semibold text-gray-700 mb-2">Job Details</h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                {inspection.ticketSource && (
+                {inspection.ivalueTicketNumber && (
                   <div>
-                    <span className="text-xs text-gray-400 block">Ticket type</span>
-                    {inspection.ticketSource === 'ivalue' ? 'iValue Ticket' : 'Client Ticket'}
+                    <span className="text-xs text-gray-400 block">iValue ticket number</span>
+                    {inspection.ivalueTicketNumber}
                   </div>
                 )}
-                {inspection.ticketNumber && (
+                {inspection.clientTicketNumber && (
                   <div>
-                    <span className="text-xs text-gray-400 block">Ticket number</span>
-                    {inspection.ticketNumber}
+                    <span className="text-xs text-gray-400 block">Client ticket number</span>
+                    {inspection.clientTicketNumber}
                   </div>
                 )}
                 {inspection.contactPerson && (
@@ -825,30 +821,26 @@ export function InspectionDetailPage() {
           {/* Job details */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-3">
             <h2 className="text-sm font-semibold text-gray-700">Job Details</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Ticket type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  required
-                  value={ticketSource}
-                  onChange={(e) => setTicketSource(e.target.value as 'ivalue' | 'client' | '')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
-                >
-                  <option value="">Select…</option>
-                  <option value="ivalue">iValue Ticket</option>
-                  <option value="client">Client Ticket</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Ticket number <span className="text-gray-400 font-normal">(optional)</span>
+                  iValue ticket number <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
-                  value={ticketNumber}
-                  onChange={(e) => setTicketNumber(e.target.value)}
+                  value={ivalueTicketNumber}
+                  onChange={(e) => setIvalueTicketNumber(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Client ticket number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={clientTicketNumber}
+                  onChange={(e) => setClientTicketNumber(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                 />
               </div>

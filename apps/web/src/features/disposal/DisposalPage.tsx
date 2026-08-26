@@ -104,6 +104,8 @@ export function DisposalPage() {
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [disposalType, setDisposalType] = useState<DisposalType>('non_certified');
   const [requiresCertification, setRequiresCertification] = useState(false);
+  const [ivalueTicketNumber, setIvalueTicketNumber] = useState('');
+  const [clientTicketNumber, setClientTicketNumber] = useState('');
   const [notes, setNotes] = useState('');
 
   const effectiveClientId = isClientScoped ? (clientId ?? '') : selectedClientId;
@@ -184,6 +186,8 @@ export function DisposalPage() {
     setSelectedAssetId('');
     setDisposalType('non_certified');
     setRequiresCertification(false);
+    setIvalueTicketNumber('');
+    setClientTicketNumber('');
     setNotes('');
   }
 
@@ -194,6 +198,8 @@ export function DisposalPage() {
       assetId: selectedAssetId,
       disposalType,
       requiresCertification: disposalType === 'certified_blanco' ? false : requiresCertification,
+      ivalueTicketNumber: ivalueTicketNumber.trim() || undefined,
+      clientTicketNumber: clientTicketNumber.trim() || undefined,
       notes: notes.trim() || undefined,
     });
   }
@@ -329,6 +335,32 @@ export function DisposalPage() {
                 <span className="text-xs text-gray-500">({CERTIFICATION_ADDON_PRICE})</span>
               </label>
             )}
+
+            {/* Ticket numbers */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  iValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={ivalueTicketNumber}
+                  onChange={(e) => setIvalueTicketNumber(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={clientTicketNumber}
+                  onChange={(e) => setClientTicketNumber(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+            </div>
 
             {/* Notes */}
             <div>

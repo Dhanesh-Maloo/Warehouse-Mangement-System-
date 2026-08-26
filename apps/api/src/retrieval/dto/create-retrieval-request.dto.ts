@@ -103,6 +103,14 @@ export class CreateRetrievalRequestDto {
 
   @IsOptional()
   @IsString()
+  ivalueTicketNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  clientTicketNumber?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 
   // Who physically handled/is handling this retrieval. Defaults to the

@@ -65,6 +65,8 @@ export class DisposalService {
         // certified_blanco already includes certification — never double-bill it.
         requiresCertification:
           dto.disposalType === 'certified_blanco' ? false : (dto.requiresCertification ?? false),
+        ivalueTicketNumber: dto.ivalueTicketNumber,
+        clientTicketNumber: dto.clientTicketNumber,
         notes: dto.notes,
         status: 'pending',
         createdByUserId,
@@ -251,6 +253,21 @@ export class DisposalService {
       where: clientId ? { assetId, clientId } : { assetId },
       include: { asset: true },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async updateTickets(
+    id: string,
+    dto: { ivalueTicketNumber?: string; clientTicketNumber?: string },
+  ): Promise<Prisma.DisposalRequestGetPayload<{ include: { asset: true } }>> {
+    await this.findOne(id);
+    return this.prisma.disposalRequest.update({
+      where: { id },
+      data: {
+        ivalueTicketNumber: dto.ivalueTicketNumber,
+        clientTicketNumber: dto.clientTicketNumber,
+      },
+      include: { asset: true },
     });
   }
 }

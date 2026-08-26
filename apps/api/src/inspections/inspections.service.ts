@@ -370,10 +370,10 @@ export class InspectionsService {
           completedByUserId,
           status: 'completed',
           conditionGrade: dto.conditionGrade,
-          ticketNumber: dto.ticketNumber,
+          ivalueTicketNumber: dto.ivalueTicketNumber,
+          clientTicketNumber: dto.clientTicketNumber,
           contactPerson: dto.contactPerson,
           contactNumber: dto.contactNumber,
-          ticketSource: dto.ticketSource,
           scratchesOnCasing: dto.scratchesOnCasing,
           lidClosingOk: dto.lidClosingOk,
           scratchesOnScreen: dto.scratchesOnScreen,
@@ -559,15 +559,28 @@ export class InspectionsService {
     let y = 225;
 
     // Job details — only shown when at least one was captured
-    if (inspection.ticketNumber || inspection.contactPerson || inspection.contactNumber) {
+    if (
+      inspection.ivalueTicketNumber ||
+      inspection.clientTicketNumber ||
+      inspection.contactPerson ||
+      inspection.contactNumber
+    ) {
       doc.fontSize(10).font('Helvetica-Bold').fillColor('#1A2B3C').text('Job Details', 50, y);
       y += 16;
-      if (inspection.ticketNumber) {
+      if (inspection.ivalueTicketNumber) {
         doc
           .fontSize(9)
           .font('Helvetica')
           .fillColor('#000000')
-          .text(`Ticket number: ${inspection.ticketNumber}`, 60, y);
+          .text(`iValue ticket number: ${inspection.ivalueTicketNumber}`, 60, y);
+        y += 14;
+      }
+      if (inspection.clientTicketNumber) {
+        doc
+          .fontSize(9)
+          .font('Helvetica')
+          .fillColor('#000000')
+          .text(`Client ticket number: ${inspection.clientTicketNumber}`, 60, y);
         y += 14;
       }
       if (inspection.contactPerson) {

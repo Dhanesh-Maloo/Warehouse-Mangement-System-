@@ -24,7 +24,6 @@ interface Delivery {
   grns: { deviceCount: number }[];
 }
 
-
 const EMPTY_ITEM: DeliveryItem = { category: 'laptop', model: '', manufacturer: '', quantity: 1 };
 
 export function InboundPage() {
@@ -39,6 +38,8 @@ export function InboundPage() {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [poRef, setPoRef] = useState('');
   const [arrivalDate, setArrivalDate] = useState('');
+  const [ivalueTicketNumber, setIvalueTicketNumber] = useState('');
+  const [clientTicketNumber, setClientTicketNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<DeliveryItem[]>([{ ...EMPTY_ITEM }]);
 
@@ -100,6 +101,8 @@ export function InboundPage() {
       setShowForm(false);
       setPoRef('');
       setArrivalDate('');
+      setIvalueTicketNumber('');
+      setClientTicketNumber('');
       setNotes('');
       setSelectedClientId('');
       setItems([{ ...EMPTY_ITEM }]);
@@ -113,6 +116,8 @@ export function InboundPage() {
       clientId: cid,
       purchaseOrderRef: poRef,
       expectedArrivalDate: arrivalDate,
+      ivalueTicketNumber: ivalueTicketNumber.trim() || undefined,
+      clientTicketNumber: clientTicketNumber.trim() || undefined,
       notes: notes.trim() || undefined,
       items,
     });
@@ -268,6 +273,31 @@ export function InboundPage() {
               <p className="mt-1.5 text-xs text-gray-400">Category · Model · Manufacturer · Qty</p>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  iValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={ivalueTicketNumber}
+                  onChange={(e) => setIvalueTicketNumber(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={clientTicketNumber}
+                  onChange={(e) => setClientTicketNumber(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Notes <span className="text-gray-400 font-normal">(optional)</span>
@@ -311,7 +341,9 @@ export function InboundPage() {
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-3 flex-wrap">
-            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</label>
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Status
+            </label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
@@ -323,7 +355,10 @@ export function InboundPage() {
             </select>
 
             <div className="relative ml-auto">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search
+                size={14}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+              />
               <input
                 type="text"
                 value={poSearch}
@@ -393,7 +428,9 @@ export function InboundPage() {
               {filteredDeliveries.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-5 py-12 text-center text-gray-400 text-sm">
-                    {statusFilter === 'all' ? 'No deliveries yet. Create one above.' : 'No deliveries match the selected filter.'}
+                    {statusFilter === 'all'
+                      ? 'No deliveries yet. Create one above.'
+                      : 'No deliveries match the selected filter.'}
                   </td>
                 </tr>
               )}

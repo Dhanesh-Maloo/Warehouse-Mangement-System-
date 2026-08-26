@@ -40,7 +40,6 @@ describe('InspectionsService', () => {
   // All-clean checklist — no damage signal.
   const cleanDto: CompleteInspectionDto = {
     conditionGrade: 'A' as CompleteInspectionDto['conditionGrade'],
-    ticketSource: 'ivalue' as CompleteInspectionDto['ticketSource'],
     scratchesOnCasing: false,
     lidClosingOk: true,
     scratchesOnScreen: false,
@@ -447,7 +446,8 @@ describe('InspectionsService', () => {
       completedAt: new Date('2026-07-01T06:00:00.000Z'),
       completedByUserId: 'user-2',
       conditionGrade: 'A',
-      ticketNumber: '11250',
+      ivalueTicketNumber: '11250',
+      clientTicketNumber: 'CL-9981',
       contactPerson: 'Franly Homo',
       contactNumber: 'franly@veremark.com',
       operatingSystem: 'Windows 11 Pro 25H2',

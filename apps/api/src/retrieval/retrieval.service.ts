@@ -131,6 +131,8 @@ export class RetrievalService {
             : undefined,
           redeployContactName: dto.redeployContactName,
           redeployContactPhone: dto.redeployContactPhone,
+          ivalueTicketNumber: dto.ivalueTicketNumber,
+          clientTicketNumber: dto.clientTicketNumber,
           notes: dto.notes,
           createdByUserId,
         },
@@ -309,6 +311,21 @@ export class RetrievalService {
       where: clientId ? { assetId, clientId } : { assetId },
       include: { asset: true },
       orderBy: { requestedAt: 'desc' },
+    });
+  }
+
+  async updateTickets(
+    id: string,
+    dto: { ivalueTicketNumber?: string; clientTicketNumber?: string },
+  ): Promise<Prisma.RetrievalRequestGetPayload<{ include: { asset: true } }>> {
+    await this.findOne(id);
+    return this.prisma.retrievalRequest.update({
+      where: { id },
+      data: {
+        ivalueTicketNumber: dto.ivalueTicketNumber,
+        clientTicketNumber: dto.clientTicketNumber,
+      },
+      include: { asset: true },
     });
   }
 }

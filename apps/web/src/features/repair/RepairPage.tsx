@@ -40,6 +40,8 @@ interface RepairRequest {
   status: RepairStatus;
   repairType: RepairType;
   repairCategory: RepairCategory | null;
+  ivalueTicketNumber: string | null;
+  clientTicketNumber: string | null;
   notes?: string;
   requestedAt: string;
   slaTargetAt: string | null;
@@ -105,6 +107,8 @@ const EMPTY_FORM = {
   repairType: 'in_house' as RepairType,
   repairCategory: '' as RepairCategory | '',
   slaTargetAt: '',
+  ivalueTicketNumber: '',
+  clientTicketNumber: '',
   notes: '',
 };
 
@@ -266,6 +270,8 @@ export function RepairPage() {
       repairType: form.repairType,
       repairCategory: form.repairType === 'in_house' ? form.repairCategory || undefined : undefined,
       slaTargetAt: form.slaTargetAt ? new Date(form.slaTargetAt).toISOString() : undefined,
+      ivalueTicketNumber: form.ivalueTicketNumber.trim() || undefined,
+      clientTicketNumber: form.clientTicketNumber.trim() || undefined,
       notes: form.notes.trim() || undefined,
     });
   }
@@ -450,6 +456,32 @@ export function RepairPage() {
                     once known.
                   </p>
                 )}
+            </div>
+
+            {/* Ticket numbers */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  iValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.ivalueTicketNumber}
+                  onChange={(e) => setField('ivalueTicketNumber', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.clientTicketNumber}
+                  onChange={(e) => setField('clientTicketNumber', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
             </div>
 
             {/* Notes */}

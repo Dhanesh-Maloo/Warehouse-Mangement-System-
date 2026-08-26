@@ -127,6 +127,8 @@ export class DeploymentService {
           courierZone,
           requiresLabeling: dto.requiresLabeling ?? false,
           requiresRepacking: dto.requiresRepacking ?? false,
+          ivalueTicketNumber: dto.ivalueTicketNumber,
+          clientTicketNumber: dto.clientTicketNumber,
           notes: dto.notes ?? null,
           createdByUserId,
           status: 'pending',
@@ -353,6 +355,21 @@ export class DeploymentService {
       newValue: { trackingNumber },
     });
     return updated;
+  }
+
+  async updateTickets(
+    id: string,
+    dto: { ivalueTicketNumber?: string; clientTicketNumber?: string },
+  ): Promise<Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>> {
+    await this.findOne(id);
+    return this.prisma.deploymentOrder.update({
+      where: { id },
+      data: {
+        ivalueTicketNumber: dto.ivalueTicketNumber,
+        clientTicketNumber: dto.clientTicketNumber,
+      },
+      include: { asset: true, endUser: true },
+    });
   }
 
   /**

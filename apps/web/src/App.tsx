@@ -28,6 +28,7 @@ import { BillingPage } from './features/billing';
 import { AuditLogPage } from './features/audit/AuditLogPage';
 import { HelpPage } from './features/help';
 import { RuralPincodesPage } from './features/logistics/RuralPincodesPage';
+import { TicketLookupPage } from './features/ticket-lookup/TicketLookupPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +64,7 @@ export function App() {
                 <Route path="inspections/:id" element={<InspectionDetailPage />} />
                 <Route path="ledger" element={<LedgerPage />} />
                 <Route path="rate-card" element={<RateCardPage />} />
+                <Route path="ticket-lookup" element={<TicketLookupPage />} />
                 <Route path="clients" element={<ClientsPage />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="locations" element={<LocationsPage />} />

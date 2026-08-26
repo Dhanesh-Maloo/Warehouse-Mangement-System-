@@ -142,6 +142,8 @@ const EMPTY_FORM = {
   redeployPincode: '',
   redeployContactName: '',
   redeployContactPhone: '',
+  ivalueTicketNumber: '',
+  clientTicketNumber: '',
   notes: '',
 };
 
@@ -296,6 +298,8 @@ export function RetrievalPage() {
         : undefined,
       redeployContactName: isFullCycle ? form.redeployContactName : undefined,
       redeployContactPhone: isFullCycle ? form.redeployContactPhone : undefined,
+      ivalueTicketNumber: form.ivalueTicketNumber.trim() || undefined,
+      clientTicketNumber: form.clientTicketNumber.trim() || undefined,
       notes: form.notes.trim() || undefined,
     });
   }
@@ -660,6 +664,32 @@ export function RetrievalPage() {
               </div>
             )}
 
+            {/* Ticket numbers */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  iValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.ivalueTicketNumber}
+                  onChange={(e) => setField('ivalueTicketNumber', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.clientTicketNumber}
+                  onChange={(e) => setField('clientTicketNumber', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+            </div>
+
             {/* Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -850,7 +880,9 @@ export function RetrievalPage() {
                     </td>
 
                     {/* Owner — who handled this retrieval */}
-                    <td className="px-5 py-3.5 text-gray-700">{r.createdByUser?.fullName ?? '—'}</td>
+                    <td className="px-5 py-3.5 text-gray-700">
+                      {r.createdByUser?.fullName ?? '—'}
+                    </td>
 
                     {/* Damage found — set once the post-retrieval inspection completes */}
                     <td className="px-5 py-3.5">

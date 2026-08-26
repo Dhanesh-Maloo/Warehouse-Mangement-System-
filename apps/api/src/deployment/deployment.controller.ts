@@ -12,6 +12,7 @@ import {
 import { DeploymentService } from './deployment.service';
 import { CreateDeploymentOrderDto } from './dto/create-deployment-order.dto';
 import { UpdateDeploymentStatusDto } from './dto/update-deployment-status.dto';
+import { UpdateTicketsDto } from '../common/dto/update-tickets.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -102,5 +103,16 @@ export class DeploymentController {
   ): ReturnType<DeploymentService['updateTracking']> {
     await this.assertOwnsOrder(id, user);
     return this.deploymentService.updateTracking(id, trackingNumber, user.sub);
+  }
+
+  @Patch(':id/tickets')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  async updateTickets(
+    @Param('id') id: string,
+    @Body() dto: UpdateTicketsDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DeploymentService['updateTickets']> {
+    await this.assertOwnsOrder(id, user);
+    return this.deploymentService.updateTickets(id, dto);
   }
 }

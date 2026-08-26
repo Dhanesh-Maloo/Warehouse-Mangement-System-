@@ -32,6 +32,7 @@ import {
   Map,
   Wrench,
   Tag,
+  Ticket,
 } from 'lucide-react';
 
 type NavItem = {
@@ -73,6 +74,7 @@ const navGroups: NavGroup[] = [
       { to: '/billing', label: 'Billing', icon: CircleDollarSign },
       { to: '/ledger', label: 'Ledger', icon: BookOpen },
       { to: '/rate-card', label: 'Rate Card', icon: CreditCard },
+      { to: '/ticket-lookup', label: 'Ticket Lookup', icon: Ticket },
     ],
   },
   {
