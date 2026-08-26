@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Search, Package, Plus, X, Pencil, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, Package, Plus, X, Pencil, ChevronDown, Loader2, MoveRight } from 'lucide-react';
 
 interface DisposalSummary {
   disposalType: string;
@@ -120,7 +120,10 @@ const EMPTY_EDIT_FORM = {
 
 // ─── Inline dropdown cell ─────────────────────────────────────────────────────
 
-interface SelectOpt { value: string; label: string }
+interface SelectOpt {
+  value: string;
+  label: string;
+}
 
 function InlineSelect({
   assetId,
@@ -296,6 +299,9 @@ export function InventoryPage() {
   const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
   const [editFormError, setEditFormError] = useState('');
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkTargetLocationId, setBulkTargetLocationId] = useState('');
+
   const canAdd =
     user?.role === 'admin' ||
     user?.role === 'manager' ||
@@ -312,15 +318,25 @@ export function InventoryPage() {
 
   const { data: clientsList = [] } = useQuery({
     queryKey: ['clients-list-for-add'],
-    queryFn: () =>
-      api.get<{ data: Client[]; total: number }>('/clients').then((r) => r.data),
+    queryFn: () => api.get<{ data: Client[]; total: number }>('/clients').then((r) => r.data),
     enabled: showAddForm && needsClientSelect,
   });
 
   const { data: locationsList = [] } = useQuery({
     queryKey: ['locations-list-for-add'],
     queryFn: () => api.get<Location[]>('/locations'),
-    enabled: showAddForm || editingAsset !== null,
+    enabled: showAddForm || editingAsset !== null || selectedIds.size > 0,
+  });
+
+  const bulkMoveMutation = useMutation({
+    mutationFn: (payload: { assetIds: string[]; locationId: string }) =>
+      api.post('/assets/bulk-move', payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['assets'] });
+      void queryClient.invalidateQueries({ queryKey: ['storage-summary'] });
+      setSelectedIds(new Set());
+      setBulkTargetLocationId('');
+    },
   });
 
   const addMutation = useMutation({
@@ -341,8 +357,10 @@ export function InventoryPage() {
       if (payload.assetCondition) body.assetCondition = payload.assetCondition;
       body.repairHandling = payload.repairHandling;
       if (payload.repairHandling) {
-        if (payload.repairServiceName.trim()) body.repairServiceName = payload.repairServiceName.trim();
-        if (payload.repairEstimateCost) body.repairEstimateCost = parseInt(payload.repairEstimateCost, 10);
+        if (payload.repairServiceName.trim())
+          body.repairServiceName = payload.repairServiceName.trim();
+        if (payload.repairEstimateCost)
+          body.repairEstimateCost = parseInt(payload.repairEstimateCost, 10);
       }
       if (payload.awbNumber.trim()) body.awbNumber = payload.awbNumber.trim();
       if (payload.courierName.trim()) body.courierName = payload.courierName.trim();
@@ -359,7 +377,9 @@ export function InventoryPage() {
       setAddFormError('');
     },
     onError: (err: Error) => {
-      setAddFormError(err.message || 'Failed to add asset. Check if the serial number is already registered.');
+      setAddFormError(
+        err.message || 'Failed to add asset. Check if the serial number is already registered.',
+      );
     },
   });
 
@@ -474,9 +494,7 @@ export function InventoryPage() {
       repairEstimateCost: asset.repairEstimateCost?.toString() ?? '',
       awbNumber: asset.awbNumber ?? '',
       courierName: asset.courierName ?? '',
-      deliveredAt: asset.deliveredAt
-        ? new Date(asset.deliveredAt).toISOString().split('T')[0]
-        : '',
+      deliveredAt: asset.deliveredAt ? new Date(asset.deliveredAt).toISOString().split('T')[0] : '',
       disposalType: asset.disposalType ?? '',
       hasCertification: asset.hasCertification ?? false,
     });
@@ -574,9 +592,7 @@ export function InventoryPage() {
           <form onSubmit={handleAddSubmit}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Asset tag
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Asset tag</label>
                 <input
                   type="text"
                   value={addForm.assetTag}
@@ -598,9 +614,7 @@ export function InventoryPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Vendor
-                </label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Vendor</label>
                 <input
                   type="text"
                   value={addForm.vendorName}
@@ -761,10 +775,14 @@ export function InventoryPage() {
               />
               {/* Shipping & disposal */}
               <div className="col-span-full border border-gray-200 rounded-lg p-4 space-y-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Shipping &amp; Disposal</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Shipping &amp; Disposal
+                </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">AWB / Tracking No.</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      AWB / Tracking No.
+                    </label>
                     <input
                       type="text"
                       value={addForm.awbNumber}
@@ -774,7 +792,9 @@ export function InventoryPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Courier name</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Courier name
+                    </label>
                     <input
                       type="text"
                       value={addForm.courierName}
@@ -784,7 +804,9 @@ export function InventoryPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Delivery date</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Delivery date
+                    </label>
                     <input
                       type="date"
                       value={addForm.deliveredAt}
@@ -793,7 +815,9 @@ export function InventoryPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Disposal type</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Disposal type
+                    </label>
                     <select
                       value={addForm.disposalType}
                       onChange={(e) => setAddForm((f) => ({ ...f, disposalType: e.target.value }))}
@@ -896,6 +920,53 @@ export function InventoryPage() {
         </select>
       </div>
 
+      {/* Bulk transfer action bar */}
+      {canEdit && selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+          <span className="text-sm font-medium text-gray-700">
+            {selectedIds.size} asset{selectedIds.size !== 1 ? 's' : ''} selected
+          </span>
+          <select
+            value={bulkTargetLocationId}
+            onChange={(e) => setBulkTargetLocationId(e.target.value)}
+            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+          >
+            <option value="">Transfer to location…</option>
+            {locationsList.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={!bulkTargetLocationId || bulkMoveMutation.isPending}
+            onClick={() =>
+              bulkMoveMutation.mutate({
+                assetIds: Array.from(selectedIds),
+                locationId: bulkTargetLocationId,
+              })
+            }
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E86F2C] hover:bg-[#d4621f] text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+          >
+            <MoveRight size={14} />
+            {bulkMoveMutation.isPending ? 'Transferring…' : 'Transfer'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            Clear
+          </button>
+          {bulkMoveMutation.isError && (
+            <span className="text-sm text-red-600">
+              {(bulkMoveMutation.error as Error).message}
+            </span>
+          )}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="text-sm text-gray-400">Loading…</div>
       ) : (
@@ -904,6 +975,27 @@ export function InventoryPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
+                  {canEdit && (
+                    <th className="px-4 py-3 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={
+                          (data?.data ?? []).length > 0 &&
+                          (data?.data ?? []).every((a) => selectedIds.has(a.id))
+                        }
+                        onChange={(e) => {
+                          const ids = (data?.data ?? []).map((a) => a.id);
+                          setSelectedIds((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) ids.forEach((id) => next.add(id));
+                            else ids.forEach((id) => next.delete(id));
+                            return next;
+                          });
+                        }}
+                        className="w-4 h-4 accent-[#E86F2C] cursor-pointer"
+                      />
+                    </th>
+                  )}
                   <th className="text-left px-4 py-3 whitespace-nowrap">Date Added</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Asset Tag</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Serial No.</th>
@@ -953,6 +1045,26 @@ export function InventoryPage() {
                       onClick={() => navigate(`/inventory/${a.id}`)}
                       className="border-b border-gray-50 hover:bg-orange-50/40 cursor-pointer transition-colors group"
                     >
+                      {canEdit && (
+                        <td
+                          className="px-4 py-3 whitespace-nowrap"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(a.id)}
+                            onChange={(e) => {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(a.id);
+                                else next.delete(a.id);
+                                return next;
+                              });
+                            }}
+                            className="w-4 h-4 accent-[#E86F2C] cursor-pointer"
+                          />
+                        </td>
+                      )}
                       {/* 1. Date Added */}
                       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                         {fmt(a.createdAt)}
@@ -969,7 +1081,10 @@ export function InventoryPage() {
                       </td>
 
                       {/* 4. Condition Grade — inline editable */}
-                      <td className="px-4 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <td
+                        className="px-4 py-3 whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {canEdit ? (
                           <InlineSelect
                             assetId={a.id}
@@ -986,7 +1101,9 @@ export function InventoryPage() {
                             onSave={handleInlineSave}
                             renderBadge={(v) =>
                               v ? (
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${gradeColors[v] ?? 'bg-gray-100 text-gray-600'}`}>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-xs font-bold ${gradeColors[v] ?? 'bg-gray-100 text-gray-600'}`}
+                                >
                                   Grade {v}
                                 </span>
                               ) : (
@@ -995,7 +1112,9 @@ export function InventoryPage() {
                             }
                           />
                         ) : a.conditionGrade ? (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${gradeColors[a.conditionGrade] ?? 'bg-gray-100 text-gray-600'}`}>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-bold ${gradeColors[a.conditionGrade] ?? 'bg-gray-100 text-gray-600'}`}
+                          >
                             Grade {a.conditionGrade}
                           </span>
                         ) : (
@@ -1014,7 +1133,10 @@ export function InventoryPage() {
                       </td>
 
                       {/* 7. Status — inline editable */}
-                      <td className="px-4 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <td
+                        className="px-4 py-3 whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {canEdit ? (
                           <InlineSelect
                             assetId={a.id}
@@ -1034,13 +1156,17 @@ export function InventoryPage() {
                             ]}
                             onSave={handleInlineSave}
                             renderBadge={(v) => (
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[v] ?? 'bg-gray-100 text-gray-600'}`}>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[v] ?? 'bg-gray-100 text-gray-600'}`}
+                              >
                                 {STATUS_LABELS[v] ?? v}
                               </span>
                             )}
                           />
                         ) : (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[a.currentStatus] ?? 'bg-gray-100 text-gray-600'}`}>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[a.currentStatus] ?? 'bg-gray-100 text-gray-600'}`}
+                          >
                             {STATUS_LABELS[a.currentStatus] ?? a.currentStatus}
                           </span>
                         )}
@@ -1053,12 +1179,16 @@ export function InventoryPage() {
 
                       {/* 9. AWB (Tracking No.) — asset-level field, falls back to deployment */}
                       <td className="px-4 py-3 font-mono text-xs text-gray-600 whitespace-nowrap">
-                        {a.awbNumber ?? deployment?.trackingNumber ?? <span className="text-gray-300">-</span>}
+                        {a.awbNumber ?? deployment?.trackingNumber ?? (
+                          <span className="text-gray-300">-</span>
+                        )}
                       </td>
 
                       {/* 10. Courier — asset-level field, falls back to deployment */}
                       <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-                        {a.courierName ?? deployment?.courierName ?? <span className="text-gray-300">-</span>}
+                        {a.courierName ?? deployment?.courierName ?? (
+                          <span className="text-gray-300">-</span>
+                        )}
                       </td>
 
                       {/* 11. Delivered Date — asset-level field, falls back to deployment */}
@@ -1067,7 +1197,10 @@ export function InventoryPage() {
                       </td>
 
                       {/* 12. Disposal — inline editable */}
-                      <td className="px-4 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <td
+                        className="px-4 py-3 whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {canEdit ? (
                           <InlineSelect
                             assetId={a.id}
@@ -1081,7 +1214,9 @@ export function InventoryPage() {
                             onSave={handleInlineSave}
                             renderBadge={(v) =>
                               v ? (
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${disposalColors[v] ?? 'bg-gray-100 text-gray-600'}`}>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${disposalColors[v] ?? 'bg-gray-100 text-gray-600'}`}
+                                >
                                   {disposalLabel[v] ?? v}
                                 </span>
                               ) : (
@@ -1089,18 +1224,27 @@ export function InventoryPage() {
                               )
                             }
                           />
-                        ) : (() => {
-                          const dtype = a.disposalType ?? disposal?.disposalType;
-                          return dtype ? (
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${disposalColors[dtype] ?? 'bg-gray-100 text-gray-600'}`}>
-                              {disposalLabel[dtype] ?? dtype}
-                            </span>
-                          ) : <span className="text-gray-300">-</span>;
-                        })()}
+                        ) : (
+                          (() => {
+                            const dtype = a.disposalType ?? disposal?.disposalType;
+                            return dtype ? (
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-xs font-medium ${disposalColors[dtype] ?? 'bg-gray-100 text-gray-600'}`}
+                              >
+                                {disposalLabel[dtype] ?? dtype}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">-</span>
+                            );
+                          })()
+                        )}
                       </td>
 
                       {/* 13. Certification — inline editable */}
-                      <td className="px-4 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <td
+                        className="px-4 py-3 whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {canEdit ? (
                           <InlineSelect
                             assetId={a.id}
@@ -1114,18 +1258,24 @@ export function InventoryPage() {
                             onSave={handleInlineSave}
                             renderBadge={(v) =>
                               v === 'true' ? (
-                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Yes</span>
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                                  Yes
+                                </span>
                               ) : (
-                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">No</span>
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                                  No
+                                </span>
                               )
                             }
                           />
+                        ) : (a.hasCertification ?? disposal?.certificateS3Key) ? (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                            Yes
+                          </span>
                         ) : (
-                          (a.hasCertification ?? disposal?.certificateS3Key) ? (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Yes</span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">No</span>
-                          )
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                            No
+                          </span>
                         )}
                       </td>
 
@@ -1147,7 +1297,7 @@ export function InventoryPage() {
                 {(data?.data ?? []).length === 0 && (
                   <tr>
                     <td
-                      colSpan={canEdit ? 14 : 13}
+                      colSpan={canEdit ? 15 : 13}
                       className="px-5 py-12 text-center text-gray-400 text-sm"
                     >
                       <Package size={24} className="mx-auto mb-2 text-gray-300" />
@@ -1209,9 +1359,7 @@ export function InventoryPage() {
             >
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Asset tag
-                  </label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Asset tag</label>
                   <input
                     type="text"
                     value={editForm.assetTag}
@@ -1233,9 +1381,7 @@ export function InventoryPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Vendor
-                  </label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Vendor</label>
                   <input
                     type="text"
                     value={editForm.vendorName}
@@ -1386,10 +1532,14 @@ export function InventoryPage() {
               </div>
               {/* Shipping & disposal info */}
               <div className="border border-gray-200 rounded-lg p-4 space-y-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Shipping &amp; Disposal</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Shipping &amp; Disposal
+                </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">AWB / Tracking No.</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      AWB / Tracking No.
+                    </label>
                     <input
                       type="text"
                       value={editForm.awbNumber}
@@ -1399,7 +1549,9 @@ export function InventoryPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Courier name</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Courier name
+                    </label>
                     <input
                       type="text"
                       value={editForm.courierName}
@@ -1409,7 +1561,9 @@ export function InventoryPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Delivery date</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Delivery date
+                    </label>
                     <input
                       type="date"
                       value={editForm.deliveredAt}
@@ -1418,7 +1572,9 @@ export function InventoryPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Disposal type</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Disposal type
+                    </label>
                     <select
                       value={editForm.disposalType}
                       onChange={(e) => setEditForm((f) => ({ ...f, disposalType: e.target.value }))}

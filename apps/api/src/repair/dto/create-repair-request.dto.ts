@@ -18,8 +18,10 @@ export class CreateRepairRequestDto {
 
   // oem_warranty: repair is handled by the OEM on their own timeline (no internal SLA).
   // in_house: repaired by the iValue team — SLA depends on repairCategory (see below).
-  @IsEnum(['oem_warranty', 'in_house'])
-  repairType!: 'oem_warranty' | 'in_house';
+  // out_of_warranty: sent to a paid external service center, not OEM/in-house — SLA
+  // depends on that vendor's timeline (no fixed default, same as in_house/hardware).
+  @IsEnum(['oem_warranty', 'in_house', 'out_of_warranty'])
+  repairType!: 'oem_warranty' | 'in_house' | 'out_of_warranty';
 
   // Required when repairType = in_house: software issues get a fixed internal SLA,
   // hardware issues have no fixed default (turnaround depends on parts availability).

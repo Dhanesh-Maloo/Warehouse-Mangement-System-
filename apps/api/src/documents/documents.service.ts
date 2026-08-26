@@ -79,6 +79,68 @@ export class DocumentsService {
     });
   }
 
+  async createForRepair(
+    repairRequestId: string,
+    file: Express.Multer.File,
+    r2Key: string,
+    uploadedByUserId: string,
+    requestingClientId?: string,
+  ): Promise<
+    Prisma.AssetDocumentGetPayload<{
+      include: { uploadedBy: { select: { id: true; fullName: true } } };
+    }>
+  > {
+    const repair = await this.prisma.repairRequest.findUnique({
+      where: { id: repairRequestId },
+      select: { assetId: true, clientId: true },
+    });
+    if (!repair) throw new NotFoundException(`Repair request ${repairRequestId} not found`);
+    if (requestingClientId && repair.clientId !== requestingClientId) {
+      throw new ForbiddenException(
+        'Cannot upload a document for a repair request from another client',
+      );
+    }
+    return this.prisma.assetDocument.create({
+      data: {
+        assetId: repair.assetId,
+        repairRequestId,
+        clientId: repair.clientId,
+        originalName: file.originalname,
+        storagePath: r2Key,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+        uploadedByUserId,
+      },
+      include: { uploadedBy: { select: { id: true, fullName: true } } },
+    });
+  }
+
+  async findByRepair(
+    repairRequestId: string,
+    requestingClientId?: string,
+  ): Promise<
+    Prisma.AssetDocumentGetPayload<{
+      include: { uploadedBy: { select: { id: true; fullName: true } } };
+    }>[]
+  > {
+    if (requestingClientId) {
+      const repair = await this.prisma.repairRequest.findUnique({
+        where: { id: repairRequestId },
+        select: { clientId: true },
+      });
+      if (repair && repair.clientId !== requestingClientId) {
+        throw new ForbiddenException(
+          'Cannot view documents for a repair request from another client',
+        );
+      }
+    }
+    return this.prisma.assetDocument.findMany({
+      where: { repairRequestId },
+      include: { uploadedBy: { select: { id: true, fullName: true } } },
+      orderBy: { uploadedAt: 'desc' },
+    });
+  }
+
   async findByAsset(
     assetId: string,
     requestingClientId?: string,

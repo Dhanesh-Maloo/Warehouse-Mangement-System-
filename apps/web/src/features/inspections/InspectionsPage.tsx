@@ -55,7 +55,7 @@ const GRADE_COLOR: Record<string, string> = {
   A: 'text-emerald-600',
   B: 'text-blue-600',
   C: 'text-amber-600',
-  D: 'text-red-600',
+  D: 'text-slate-500',
 };
 
 export function InspectionsPage() {
@@ -391,7 +391,7 @@ export function InspectionsPage() {
                           )}
                         </td>
                         <td
-                          className={`px-5 py-3.5 font-bold text-lg ${GRADE_COLOR[ins.conditionGrade ?? ''] ?? 'text-gray-400'}`}
+                          className={`px-5 py-3.5 font-medium text-sm ${GRADE_COLOR[ins.conditionGrade ?? ''] ?? 'text-gray-400'}`}
                         >
                           {ins.conditionGrade ?? '-'}
                         </td>

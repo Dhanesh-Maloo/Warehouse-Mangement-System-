@@ -1,5 +1,5 @@
 import { IsEnum, IsBoolean, IsOptional, IsString, IsArray, IsNotEmpty } from 'class-validator';
-import { ConditionGrade } from '@prisma/client';
+import { ConditionGrade, TicketSource } from '@prisma/client';
 
 export class CompleteInspectionDto {
   @IsEnum(ConditionGrade)
@@ -18,69 +18,94 @@ export class CompleteInspectionDto {
   @IsString()
   contactNumber?: string;
 
+  @IsEnum(TicketSource)
+  ticketSource!: TicketSource;
+
+  // Every checklist item below is tri-state: true (Yes), false (No), or
+  // null/undefined (N/A) — N/A is excluded from pass/fail and grade signal.
+
   // Physical appearance
+  @IsOptional()
   @IsBoolean()
-  scratchesOnCasing!: boolean;
+  scratchesOnCasing?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  lidClosingOk!: boolean;
+  lidClosingOk?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  scratchesOnScreen!: boolean;
+  scratchesOnScreen?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  keyboardIssues!: boolean;
+  keyboardIssues?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  missingFeet!: boolean;
+  missingFeet?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  chargerDamage!: boolean;
+  chargerDamage?: boolean | null;
 
   // Accessories — itemized
+  @IsOptional()
   @IsBoolean()
-  acAdapterPresent!: boolean;
+  acAdapterPresent?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  powerCablePresent!: boolean;
+  powerCablePresent?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  headsetPresent!: boolean;
+  headsetPresent?: boolean | null;
 
   @IsOptional()
   @IsString()
   otherAccessories?: string;
 
   // Functional checks
+  @IsOptional()
   @IsBoolean()
-  webcamOk!: boolean;
+  webcamOk?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  speakersOk!: boolean;
+  speakersOk?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  bluetoothOk!: boolean;
+  bluetoothOk?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  batteryCharges!: boolean;
+  batteryCharges?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  screenOk!: boolean;
+  screenOk?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  keyboardOk!: boolean;
+  keyboardOk?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  trackpadOk!: boolean;
+  trackpadOk?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  portsOk!: boolean;
+  portsOk?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  powersOnOk!: boolean;
+  powersOnOk?: boolean | null;
 
+  @IsOptional()
   @IsBoolean()
-  imagesUploaded!: boolean;
+  imagesUploaded?: boolean | null;
 
   // Process — null means N/A
   @IsOptional()

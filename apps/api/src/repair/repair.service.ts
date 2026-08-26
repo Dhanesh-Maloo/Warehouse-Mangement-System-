@@ -46,6 +46,8 @@ const REPAIR_TERMINAL_STATUSES = new Set(['completed', 'cancelled']);
 //  - in_house + hardware: no fixed default — completion depends on parts
 //    availability from the OEM/supplier, so slaTargetAt stays unset until
 //    staff enter/update an estimate once parts availability is known.
+//  - out_of_warranty: sent to a paid external service center (not OEM, not
+//    in-house) — no fixed default either, same reasoning as in_house/hardware.
 // All of the above can be overridden with an explicit slaTargetAt at creation,
 // and revised later at any point via updateSla.
 const SOFTWARE_REPAIR_SLA_BUSINESS_MINUTES = 3 * 9 * 60;
@@ -222,6 +224,19 @@ export class RepairService {
       throw new BadRequestException(
         `Cannot transition repair request from '${repair.status}' to '${dto.status}'`,
       );
+    }
+
+    // Closing a repair requires the Delivery Challan (DC) to be uploaded first
+    // — proof the device physically came back from the service center.
+    if (dto.status === 'completed') {
+      const dcCount = await this.prisma.assetDocument.count({
+        where: { repairRequestId: id },
+      });
+      if (dcCount === 0) {
+        throw new BadRequestException(
+          'Upload the Delivery Challan (DC) before marking this repair completed',
+        );
+      }
     }
 
     const now = new Date();

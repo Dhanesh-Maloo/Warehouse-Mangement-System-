@@ -34,6 +34,7 @@ interface InspectionDetail {
   ticketNumber: string | null;
   contactPerson: string | null;
   contactNumber: string | null;
+  ticketSource: 'ivalue' | 'client' | null;
   scratchesOnCasing: boolean | null;
   lidClosingOk: boolean | null;
   scratchesOnScreen: boolean | null;
@@ -88,6 +89,8 @@ interface ChecklistItem {
   threeWay?: boolean; // adds N/A option
 }
 
+// Every checklist item is tri-state (Yes / No / N/A) — N/A counts as neither a
+// pass nor a fail (see isPass below).
 const CHECKLIST_SECTIONS: { title: string; items: ChecklistItem[] }[] = [
   {
     title: 'Physical Appearance',
@@ -96,41 +99,105 @@ const CHECKLIST_SECTIONS: { title: string; items: ChecklistItem[] }[] = [
         key: 'scratchesOnCasing',
         label: 'Visible scratches on the outer casing',
         yesIsGood: false,
+        threeWay: true,
       },
-      { key: 'lidClosingOk', label: 'Lid closing properly (no gap at hinge)', yesIsGood: true },
-      { key: 'scratchesOnScreen', label: 'Visible scratches on the screen', yesIsGood: false },
+      {
+        key: 'lidClosingOk',
+        label: 'Lid closing properly (no gap at hinge)',
+        yesIsGood: true,
+        threeWay: true,
+      },
+      {
+        key: 'scratchesOnScreen',
+        label: 'Visible scratches on the screen',
+        yesIsGood: false,
+        threeWay: true,
+      },
       {
         key: 'keyboardIssues',
         label: 'Loose, missing or unidentified keys on keyboard',
         yesIsGood: false,
+        threeWay: true,
       },
-      { key: 'missingFeet', label: 'Missing rubber feet (bottom of laptop)', yesIsGood: false },
+      {
+        key: 'missingFeet',
+        label: 'Missing rubber feet (bottom of laptop)',
+        yesIsGood: false,
+        threeWay: true,
+      },
       {
         key: 'chargerDamage',
         label: 'Damage to adapter / charger (exposed wire, etc.)',
         yesIsGood: false,
+        threeWay: true,
       },
-      { key: 'acAdapterPresent', label: 'Returned with AC Adapter', yesIsGood: true },
-      { key: 'powerCablePresent', label: 'Returned with Power Cable', yesIsGood: true },
-      { key: 'headsetPresent', label: 'Returned with Headset', yesIsGood: true },
+      {
+        key: 'acAdapterPresent',
+        label: 'Returned with AC Adapter',
+        yesIsGood: true,
+        threeWay: true,
+      },
+      {
+        key: 'powerCablePresent',
+        label: 'Returned with Power Cable',
+        yesIsGood: true,
+        threeWay: true,
+      },
+      { key: 'headsetPresent', label: 'Returned with Headset', yesIsGood: true, threeWay: true },
     ],
   },
   {
     title: 'Functional Checks',
     items: [
-      { key: 'webcamOk', label: 'Webcam in working condition', yesIsGood: true },
-      { key: 'speakersOk', label: 'Speakers in working condition', yesIsGood: true },
-      { key: 'bluetoothOk', label: 'Bluetooth in working condition', yesIsGood: true },
-      { key: 'batteryCharges', label: 'Battery could be charged', yesIsGood: true },
-      { key: 'screenOk', label: 'Screen fully lit with no missing pixels', yesIsGood: true },
-      { key: 'keyboardOk', label: 'Keyboards in working condition', yesIsGood: true },
-      { key: 'trackpadOk', label: 'Trackpad in working condition', yesIsGood: true },
-      { key: 'portsOk', label: 'All ports in working condition', yesIsGood: true },
-      { key: 'powersOnOk', label: 'Unit powered on without any hardware errors', yesIsGood: true },
+      { key: 'webcamOk', label: 'Webcam in working condition', yesIsGood: true, threeWay: true },
+      {
+        key: 'speakersOk',
+        label: 'Speakers in working condition',
+        yesIsGood: true,
+        threeWay: true,
+      },
+      {
+        key: 'bluetoothOk',
+        label: 'Bluetooth in working condition',
+        yesIsGood: true,
+        threeWay: true,
+      },
+      {
+        key: 'batteryCharges',
+        label: 'Battery could be charged',
+        yesIsGood: true,
+        threeWay: true,
+      },
+      {
+        key: 'screenOk',
+        label: 'Screen fully lit with no missing pixels',
+        yesIsGood: true,
+        threeWay: true,
+      },
+      {
+        key: 'keyboardOk',
+        label: 'Keyboards in working condition',
+        yesIsGood: true,
+        threeWay: true,
+      },
+      {
+        key: 'trackpadOk',
+        label: 'Trackpad in working condition',
+        yesIsGood: true,
+        threeWay: true,
+      },
+      { key: 'portsOk', label: 'All ports in working condition', yesIsGood: true, threeWay: true },
+      {
+        key: 'powersOnOk',
+        label: 'Unit powered on without any hardware errors',
+        yesIsGood: true,
+        threeWay: true,
+      },
       {
         key: 'imagesUploaded',
         label: 'Uploaded photos (top, bottom, front, etc.)',
         yesIsGood: true,
+        threeWay: true,
       },
     ],
   },
@@ -176,7 +243,7 @@ const GRADE_LABELS: Record<Grade, { label: string; description: string; color: s
   D: {
     label: 'Grade D',
     description: 'Poor - significant damage',
-    color: 'border-red-500 bg-red-50 text-red-700',
+    color: 'border-slate-400 bg-slate-50 text-slate-600',
   },
 };
 
@@ -227,6 +294,7 @@ export function InspectionDetailPage() {
   const [ticketNumber, setTicketNumber] = useState('');
   const [contactPerson, setContactPerson] = useState('');
   const [contactNumber, setContactNumber] = useState('');
+  const [ticketSource, setTicketSource] = useState<'ivalue' | 'client' | ''>('');
   const [otherAccessories, setOtherAccessories] = useState('');
   const [operatingSystem, setOperatingSystem] = useState('');
   const [cpu, setCpu] = useState('');
@@ -316,6 +384,7 @@ export function InspectionDetailPage() {
         ticketNumber: ticketNumber.trim() || undefined,
         contactPerson: contactPerson.trim() || undefined,
         contactNumber: contactNumber.trim() || undefined,
+        ticketSource,
         ...checks,
         otherAccessories: otherAccessories.trim() || undefined,
         operatingSystem: operatingSystem.trim() || undefined,
@@ -350,8 +419,14 @@ export function InspectionDetailPage() {
       setError('Select a condition grade.');
       return;
     }
-    // Ensure all non-threeWay items have been answered (not left as false by default is fine,
-    // but check that user has interacted — for now we allow defaults)
+    if (!ticketSource) {
+      setError('Select a ticket type.');
+      return;
+    }
+    if (photos.length === 0) {
+      setError('At least one photo is required to complete an inspection.');
+      return;
+    }
     completeMutation.mutate();
   }
 
@@ -445,7 +520,7 @@ export function InspectionDetailPage() {
         </div>
         {inspection.status === 'completed' && inspection.conditionGrade && (
           <span
-            className={`px-3 py-1 rounded-lg text-sm font-bold border ${GRADE_LABELS[inspection.conditionGrade as Grade]?.color}`}
+            className={`px-3 py-1 rounded-lg text-xs font-medium border ${GRADE_LABELS[inspection.conditionGrade as Grade]?.color}`}
           >
             Grade {inspection.conditionGrade}
           </span>
@@ -517,10 +592,19 @@ export function InspectionDetailPage() {
       {/* ── Completed read-only view ── */}
       {isComplete ? (
         <div className="space-y-4">
-          {(inspection.ticketNumber || inspection.contactPerson || inspection.contactNumber) && (
+          {(inspection.ticketNumber ||
+            inspection.contactPerson ||
+            inspection.contactNumber ||
+            inspection.ticketSource) && (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <h2 className="text-sm font-semibold text-gray-700 mb-2">Job Details</h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                {inspection.ticketSource && (
+                  <div>
+                    <span className="text-xs text-gray-400 block">Ticket type</span>
+                    {inspection.ticketSource === 'ivalue' ? 'iValue Ticket' : 'Client Ticket'}
+                  </div>
+                )}
                 {inspection.ticketNumber && (
                   <div>
                     <span className="text-xs text-gray-400 block">Ticket number</span>
@@ -555,7 +639,7 @@ export function InspectionDetailPage() {
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left px-5 py-2 text-xs font-medium text-gray-500 w-full">
-                      Item
+                      Device
                     </th>
                     <th className="text-center px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">
                       Yes
@@ -740,13 +824,26 @@ export function InspectionDetailPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Job details */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-gray-700">
-              Job Details <span className="text-gray-400 font-normal">(optional)</span>
-            </h2>
+            <h2 className="text-sm font-semibold text-gray-700">Job Details</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Ticket number
+                  Ticket type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  value={ticketSource}
+                  onChange={(e) => setTicketSource(e.target.value as 'ivalue' | 'client' | '')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+                >
+                  <option value="">Select…</option>
+                  <option value="ivalue">iValue Ticket</option>
+                  <option value="client">Client Ticket</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Ticket number <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -814,21 +911,15 @@ export function InspectionDetailPage() {
                 <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-gray-700">{section.title}</h2>
                   <span className="text-xs text-gray-400">
-                    {
-                      section.items.filter(
-                        (i) =>
-                          checks[i.key as string] !== undefined &&
-                          checks[i.key as string] !== (i.threeWay ? undefined : false),
-                      ).length
-                    }
-                    /{section.items.length} answered
+                    {section.items.filter((i) => checks[i.key as string] !== null).length}/
+                    {section.items.length} marked Yes/No
                   </span>
                 </div>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100">
                       <th className="text-left px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-full">
-                        Item
+                        Device
                       </th>
                       <th className="text-center px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                         Yes

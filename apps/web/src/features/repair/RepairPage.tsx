@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Plus } from 'lucide-react';
+import { Plus, Upload, FileText } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,7 +22,7 @@ interface InventoryAsset {
 }
 
 type RepairStatus = 'pending' | 'sent' | 'in_repair' | 'returned' | 'completed' | 'cancelled';
-type RepairType = 'oem_warranty' | 'in_house';
+type RepairType = 'oem_warranty' | 'in_house' | 'out_of_warranty';
 type RepairCategory = 'software' | 'hardware';
 
 interface RepairRequest {
@@ -49,6 +49,7 @@ interface RepairRequest {
 const REPAIR_TYPE_LABELS: Record<RepairType, string> = {
   oem_warranty: 'OEM / Warranty',
   in_house: 'In-House',
+  out_of_warranty: 'Out of Warranty',
 };
 
 const REPAIR_CATEGORY_LABELS: Record<RepairCategory, string> = {
@@ -127,6 +128,11 @@ export function RepairPage() {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [editingSlaId, setEditingSlaId] = useState<string | null>(null);
   const [slaDraft, setSlaDraft] = useState('');
+  const [dcModalRepairId, setDcModalRepairId] = useState<string | null>(null);
+  const [dcFile, setDcFile] = useState<File | null>(null);
+  const [dcError, setDcError] = useState('');
+  const dcFileRef = useRef<HTMLInputElement>(null);
+  const [selectResetTick, setSelectResetTick] = useState(0);
 
   const effectiveClientId = isClientScoped ? (clientId ?? '') : selectedClientId;
 
@@ -179,6 +185,51 @@ export function RepairPage() {
     },
     onError: (e: Error) => alert(e.message),
   });
+
+  const completeWithDcMutation = useMutation({
+    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+      const form = new FormData();
+      form.append('file', file);
+      const token = localStorage.getItem('wh_token');
+      const base = import.meta.env.VITE_API_URL ?? '';
+      const res = await fetch(`${base}/api/v1/repair/${id}/documents`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { message?: string }).message ?? 'DC upload failed');
+      }
+      await api.patch(`/repair/${id}/status`, { status: 'completed' });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['repair-requests'] });
+      void qc.invalidateQueries({ queryKey: ['assets'] });
+      void qc.invalidateQueries({ queryKey: ['inventory-summary'] });
+      setDcModalRepairId(null);
+      setDcFile(null);
+      setDcError('');
+    },
+    onError: (e: Error) => setDcError(e.message),
+  });
+
+  function closeDcModal() {
+    setDcModalRepairId(null);
+    setDcFile(null);
+    setDcError('');
+    setSelectResetTick((t) => t + 1);
+  }
+
+  function handleStatusChange(repairId: string, next: RepairStatus) {
+    if (next === 'completed') {
+      setDcModalRepairId(repairId);
+      setDcFile(null);
+      setDcError('');
+      return;
+    }
+    updateStatusMutation.mutate({ id: repairId, status: next });
+  }
 
   const updateSlaMutation = useMutation({
     mutationFn: ({ id, slaTargetAt }: { id: string; slaTargetAt: string }) =>
@@ -346,6 +397,7 @@ export function RepairPage() {
                 >
                   <option value="in_house">In-House (iValue team)</option>
                   <option value="oem_warranty">OEM / Warranty</option>
+                  <option value="out_of_warranty">Out of Warranty</option>
                 </select>
               </div>
               {form.repairType === 'in_house' && (
@@ -375,9 +427,11 @@ export function RepairPage() {
                   (optional -{' '}
                   {form.repairType === 'oem_warranty'
                     ? 'OEM-confirmed date, if known'
-                    : form.repairCategory === 'hardware'
-                      ? 'parts ETA, if known'
-                      : 'overrides the 3-business-day default'}
+                    : form.repairType === 'out_of_warranty'
+                      ? 'vendor ETA, if known'
+                      : form.repairCategory === 'hardware'
+                        ? 'parts ETA, if known'
+                        : 'overrides the 3-business-day default'}
                   )
                 </span>
               </label>
@@ -387,7 +441,9 @@ export function RepairPage() {
                 onChange={(e) => setField('slaTargetAt', e.target.value)}
                 className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
               />
-              {(form.repairType === 'oem_warranty' || form.repairCategory === 'hardware') &&
+              {(form.repairType === 'oem_warranty' ||
+                form.repairType === 'out_of_warranty' ||
+                form.repairCategory === 'hardware') &&
                 !form.slaTargetAt && (
                   <p className="text-xs text-gray-400 mt-1">
                     No fixed SLA for this repair type - leave blank and set the target date later
@@ -499,13 +555,9 @@ export function RepairPage() {
                     <td className="px-5 py-3.5">
                       {canUpdate ? (
                         <select
+                          key={`${r.id}-${r.status}-${selectResetTick}`}
                           defaultValue={r.status}
-                          onChange={(e) =>
-                            updateStatusMutation.mutate({
-                              id: r.id,
-                              status: e.target.value as RepairStatus,
-                            })
-                          }
+                          onChange={(e) => handleStatusChange(r.id, e.target.value as RepairStatus)}
                           disabled={updateStatusMutation.isPending}
                           className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white disabled:opacity-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-500"
                         >
@@ -610,6 +662,66 @@ export function RepairPage() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Delivery Challan (DC) upload — required before marking a repair completed */}
+      {dcModalRepairId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+            <h2 className="text-base font-semibold text-gray-900 mb-1">
+              Upload Delivery Challan (DC)
+            </h2>
+            <p className="text-sm text-gray-500 mb-4">
+              A DC must be uploaded before this repair can be marked completed.
+            </p>
+            <input
+              ref={dcFileRef}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={(e) => setDcFile(e.target.files?.[0] ?? null)}
+            />
+            <button
+              type="button"
+              onClick={() => dcFileRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 rounded-lg py-6 text-sm text-gray-500 hover:border-[#E86F2C] hover:text-[#E86F2C] transition-colors"
+            >
+              {dcFile ? (
+                <>
+                  <FileText size={16} />
+                  {dcFile.name}
+                </>
+              ) : (
+                <>
+                  <Upload size={16} />
+                  Select DC (PDF)
+                </>
+              )}
+            </button>
+            {dcError && <p className="text-sm text-red-600 mt-3">{dcError}</p>}
+            <div className="flex gap-3 justify-end mt-5">
+              <button
+                type="button"
+                onClick={closeDcModal}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!dcFile || completeWithDcMutation.isPending}
+                onClick={() =>
+                  dcModalRepairId &&
+                  dcFile &&
+                  completeWithDcMutation.mutate({ id: dcModalRepairId, file: dcFile })
+                }
+                className="px-4 py-2 text-sm font-semibold bg-[#E86F2C] hover:bg-[#D05E1E] text-white rounded-lg transition-colors disabled:opacity-40"
+              >
+                {completeWithDcMutation.isPending ? 'Uploading…' : 'Upload & complete'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

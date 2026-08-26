@@ -12,6 +12,7 @@ import {
 import { AssetsService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetStatusDto } from './dto/update-asset-status.dto';
+import { BulkMoveAssetsDto } from './dto/bulk-move-assets.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -147,5 +148,15 @@ export class AssetsController {
   ): ReturnType<AssetsService['moveLocation']> {
     await this.assertOwnsAsset(id, user);
     return this.assetsService.moveLocation(id, locationId);
+  }
+
+  @Post('bulk-move')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  async bulkMove(
+    @Body() dto: BulkMoveAssetsDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<AssetsService['bulkMoveLocation']> {
+    await Promise.all(dto.assetIds.map((id) => this.assertOwnsAsset(id, user)));
+    return this.assetsService.bulkMoveLocation(dto.assetIds, dto.locationId);
   }
 }

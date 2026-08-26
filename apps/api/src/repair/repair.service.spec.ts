@@ -36,6 +36,9 @@ describe('RepairService', () => {
       assetStatusHistory: {
         create: jest.fn().mockResolvedValue({}),
       },
+      assetDocument: {
+        count: jest.fn().mockResolvedValue(1),
+      },
       $transaction: jest.fn((cb) => cb(mockPrisma)),
     };
     mockLedger = { create: jest.fn().mockResolvedValue({ id: 'ledger-1' }) };
@@ -215,6 +218,27 @@ describe('RepairService', () => {
       expect(createCall.data.slaTargetAt).toBeNull();
     });
 
+    it('leaves slaTargetAt unset for out_of_warranty repairs (vendor-dependent)', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
+      mockPrisma.repairRequest.create.mockResolvedValue({
+        id: 'repair-7',
+        assetId: 'asset-1',
+        status: 'pending',
+      });
+      mockPrisma.asset.update.mockResolvedValue({ ...baseAsset, currentStatus: 'in_repair' });
+      mockPrisma.asset.findMany.mockResolvedValue([baseAsset]);
+      mockRateCard.findEffectiveAt.mockResolvedValue(null);
+
+      await service.create(
+        { ...dto, repairType: 'out_of_warranty', repairCategory: undefined } as any,
+        'user-1',
+      );
+
+      const createCall = mockPrisma.repairRequest.create.mock.calls[0][0];
+      expect(createCall.data.slaTargetAt).toBeNull();
+      expect(createCall.data.repairCategory).toBeUndefined();
+    });
+
     it('throws BadRequestException when repairType is in_house but repairCategory is missing', async () => {
       mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
 
@@ -313,6 +337,15 @@ describe('RepairService', () => {
 
     it('rejects an invalid transition (pending -> completed)', async () => {
       setupRepair('pending');
+
+      await expect(
+        service.updateStatus('repair-1', { status: 'completed' } as any, 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects completing without a Delivery Challan (DC) uploaded', async () => {
+      setupRepair('returned');
+      mockPrisma.assetDocument.count.mockResolvedValue(0);
 
       await expect(
         service.updateStatus('repair-1', { status: 'completed' } as any, 'user-1'),

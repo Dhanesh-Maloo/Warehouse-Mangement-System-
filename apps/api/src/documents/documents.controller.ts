@@ -113,6 +113,42 @@ export class DocumentsController {
     return this.documentsService.findByInspection(inspectionId, requestingClientId);
   }
 
+  @Post('repair/:repairId/documents')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  @UseInterceptors(pdfInterceptor)
+  async uploadForRepair(
+    @Param('repairId') repairId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DocumentsService['createForRepair']> {
+    if (!file) throw new BadRequestException('No file uploaded');
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const r2Key = `documents/repairs/${unique}${extname(file.originalname)}`;
+    await this.r2.upload(r2Key, file.buffer, file.mimetype);
+    const requestingClientId = DocumentsController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    return this.documentsService.createForRepair(
+      repairId,
+      file,
+      r2Key,
+      user.sub,
+      requestingClientId,
+    );
+  }
+
+  @Get('repair/:repairId/documents')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
+  listForRepair(
+    @Param('repairId') repairId: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DocumentsService['findByRepair']> {
+    const requestingClientId = DocumentsController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    return this.documentsService.findByRepair(repairId, requestingClientId);
+  }
+
   @Get('documents/:id/download')
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   async download(

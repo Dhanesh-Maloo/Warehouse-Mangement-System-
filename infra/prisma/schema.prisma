@@ -155,10 +155,20 @@ enum RepairStatus {
 }
 
 // Drives SLA computation (see RepairRequest.slaTargetAt) — OEM/warranty repairs
-// run on the OEM's own timeline, in-house repairs run on iValue's internal SLA.
+// run on the OEM's own timeline, in-house repairs run on iValue's internal SLA,
+// out_of_warranty repairs (paid external service center, no OEM/in-house cover)
+// run on the vendor's timeline like in_house/hardware — no fixed default.
 enum RepairType {
   oem_warranty
   in_house
+  out_of_warranty
+}
+
+// Which side raised the inspection ticket — for reporting/filtering only, does
+// not change checklist or workflow behaviour.
+enum TicketSource {
+  ivalue
+  client
 }
 
 // Only meaningful when repairType = in_house — software has a fixed internal
@@ -419,6 +429,9 @@ model Inspection {
   ticketNumber     String?          @map("ticket_number")
   contactPerson    String?          @map("contact_person")
   contactNumber    String?          @map("contact_number")
+  // Which side raised the ticket — iValue-internal or the client. Required at
+  // completion time in the UI; nullable here for rows predating this field.
+  ticketSource     TicketSource?    @map("ticket_source")
   // Checklist booleans — null until inspection is completed
   // Physical appearance
   scratchesOnCasing       Boolean? @map("scratches_on_casing")
@@ -674,6 +687,8 @@ model RepairRequest {
   createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
+  documents AssetDocument[] @relation("RepairDocuments")
+
   @@map("repair_requests")
 }
 
@@ -755,6 +770,7 @@ model AssetDocument {
   id               String    @id @default(uuid()) @map("document_id")
   assetId          String    @map("asset_id")
   inspectionId     String?   @map("inspection_id")
+  repairRequestId  String?   @map("repair_request_id")
   clientId         String    @map("client_id")
   originalName     String    @map("original_name")
   storagePath      String    @map("storage_path")
@@ -764,6 +780,7 @@ model AssetDocument {
   uploadedAt       DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz
   asset            Asset     @relation("AssetDocuments", fields: [assetId], references: [id])
   inspection       Inspection? @relation("InspectionDocuments", fields: [inspectionId], references: [id])
+  repairRequest    RepairRequest? @relation("RepairDocuments", fields: [repairRequestId], references: [id])
   uploadedBy       User      @relation("UserDocuments", fields: [uploadedByUserId], references: [id])
 
   @@map("asset_documents")

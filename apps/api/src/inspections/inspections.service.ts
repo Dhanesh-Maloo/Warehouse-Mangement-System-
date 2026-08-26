@@ -110,7 +110,13 @@ export class InspectionsService {
    * power-on/battery check counts as damage found.
    */
   private isDamageFound(dto: CompleteInspectionDto): boolean {
-    return dto.conditionGrade === 'D' || !dto.screenOk || !dto.powersOnOk || !dto.batteryCharges;
+    // Explicit `=== false` — null/undefined means N/A and is not a failure.
+    return (
+      dto.conditionGrade === 'D' ||
+      dto.screenOk === false ||
+      dto.powersOnOk === false ||
+      dto.batteryCharges === false
+    );
   }
 
   /**
@@ -367,6 +373,7 @@ export class InspectionsService {
           ticketNumber: dto.ticketNumber,
           contactPerson: dto.contactPerson,
           contactNumber: dto.contactNumber,
+          ticketSource: dto.ticketSource,
           scratchesOnCasing: dto.scratchesOnCasing,
           lidClosingOk: dto.lidClosingOk,
           scratchesOnScreen: dto.scratchesOnScreen,

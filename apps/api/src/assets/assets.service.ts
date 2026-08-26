@@ -126,6 +126,16 @@ export class AssetsService {
     });
   }
 
+  async bulkMoveLocation(ids: string[], locationId: string): Promise<{ moved: number }> {
+    const location = await this.prisma.location.findUnique({ where: { id: locationId } });
+    if (!location) throw new NotFoundException(`Location ${locationId} not found`);
+    const result = await this.prisma.asset.updateMany({
+      where: { id: { in: ids } },
+      data: { currentLocationId: locationId },
+    });
+    return { moved: result.count };
+  }
+
   async updateStatus(
     id: string,
     data: {
