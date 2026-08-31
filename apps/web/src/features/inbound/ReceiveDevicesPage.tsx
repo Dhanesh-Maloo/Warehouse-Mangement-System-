@@ -316,7 +316,7 @@ export function ReceiveDevicesPage() {
                         required
                         value={device.vendorName}
                         onChange={(e) => updateDevice(device.key, 'vendorName', e.target.value)}
-                        placeholder="iValue, or other vendor"
+                        placeholder="IValue, or other vendor"
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
                       />
                     </div>

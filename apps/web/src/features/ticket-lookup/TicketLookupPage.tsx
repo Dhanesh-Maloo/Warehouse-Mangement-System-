@@ -94,7 +94,7 @@ export function TicketLookupPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Ticket Lookup</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Search by iValue or client ticket number to see what work was done and its total cost.
+          Search by IValue or client ticket number to see what work was done and its total cost.
         </p>
       </div>
 
@@ -105,7 +105,7 @@ export function TicketLookupPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Enter iValue or client ticket number…"
+            placeholder="Enter IValue or client ticket number…"
             className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
           />
         </div>
@@ -174,7 +174,7 @@ export function TicketLookupPage() {
                         </p>
                       )}
                       <div className="flex gap-4 mt-2 text-xs text-gray-400">
-                        {item.ivalueTicketNumber && <span>iValue: {item.ivalueTicketNumber}</span>}
+                        {item.ivalueTicketNumber && <span>IValue: {item.ivalueTicketNumber}</span>}
                         {item.clientTicketNumber && <span>Client: {item.clientTicketNumber}</span>}
                       </div>
                     </div>

@@ -23,7 +23,7 @@ export function LoginPage() {
     <div className="min-h-screen bg-[#1A2B3C] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <img src={ivalueLogo} alt="iValue" className="h-20 w-auto mx-auto mb-3" />
+          <img src={ivalueLogo} alt="IValue" className="h-20 w-auto mx-auto mb-3" />
           <div className="text-white font-bold text-2xl tracking-tight">IValue WMS</div>
           <div className="text-[#8AA6BF] text-sm mt-1">Warehouse Management System</div>
         </div>

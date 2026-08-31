@@ -605,7 +605,7 @@ export function InspectionDetailPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 {inspection.ivalueTicketNumber && (
                   <div>
-                    <span className="text-xs text-gray-400 block">iValue ticket number</span>
+                    <span className="text-xs text-gray-400 block">IValue ticket number</span>
                     {inspection.ivalueTicketNumber}
                   </div>
                 )}
@@ -832,7 +832,7 @@ export function InspectionDetailPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">
-                  iValue ticket number <span className="text-gray-400 font-normal">(optional)</span>
+                  IValue ticket number <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"

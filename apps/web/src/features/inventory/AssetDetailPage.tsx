@@ -630,7 +630,7 @@ export function AssetDetailPage() {
                     type="text"
                     value={editForm.vendorName}
                     onChange={(e) => setEditForm((f) => ({ ...f, vendorName: e.target.value }))}
-                    placeholder="iValue, or other vendor"
+                    placeholder="IValue, or other vendor"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                   />
                 </div>

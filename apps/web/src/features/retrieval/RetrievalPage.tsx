@@ -462,7 +462,7 @@ export function RetrievalPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  iValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                  IValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -1105,7 +1105,7 @@ export function RetrievalPage() {
                 <th className="text-left px-5 py-3">Bundle</th>
                 <th className="text-left px-5 py-3">Owner</th>
                 <th className="text-left px-5 py-3">Damage</th>
-                <th className="text-left px-5 py-3">iValue Ticket #</th>
+                <th className="text-left px-5 py-3">IValue Ticket #</th>
                 <th className="text-left px-5 py-3">Client Ticket #</th>
                 <th className="text-left px-5 py-3">Tracking #</th>
                 <th className="text-left px-5 py-3">Notes</th>
@@ -1187,7 +1187,7 @@ export function RetrievalPage() {
                       )}
                     </td>
 
-                    {/* iValue Ticket # */}
+                    {/* IValue Ticket # */}
                     <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
                       {r.ivalueTicketNumber || <span className="text-gray-300">-</span>}
                     </td>

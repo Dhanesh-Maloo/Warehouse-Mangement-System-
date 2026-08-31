@@ -375,7 +375,7 @@ export function RepairPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  iValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                  IValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -497,7 +497,7 @@ export function RepairPage() {
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                 >
-                  <option value="in_house">In-House (iValue team)</option>
+                  <option value="in_house">In-House (IValue team)</option>
                   <option value="oem_warranty">OEM / Warranty</option>
                   <option value="out_of_warranty">Out of Warranty</option>
                 </select>
@@ -653,7 +653,7 @@ export function RepairPage() {
             type="text"
             value={ticketFilter}
             onChange={(e) => setTicketFilter(e.target.value)}
-            placeholder="iValue or client ticket #"
+            placeholder="IValue or client ticket #"
             className="pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] w-48"
           />
         </div>
@@ -744,7 +744,7 @@ export function RepairPage() {
                 <th className="text-left px-5 py-3">Type</th>
                 <th className="text-left px-5 py-3">Estimate</th>
                 <th className="text-left px-5 py-3">Status</th>
-                <th className="text-left px-5 py-3">iValue Ticket #</th>
+                <th className="text-left px-5 py-3">IValue Ticket #</th>
                 <th className="text-left px-5 py-3">Client Ticket #</th>
                 <th className="text-left px-5 py-3">Requested</th>
                 <th className="text-left px-5 py-3">SLA Target</th>
@@ -835,7 +835,7 @@ export function RepairPage() {
                       </div>
                     </td>
 
-                    {/* iValue Ticket # */}
+                    {/* IValue Ticket # */}
                     <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
                       {r.ivalueTicketNumber || <span className="text-gray-300">-</span>}
                     </td>

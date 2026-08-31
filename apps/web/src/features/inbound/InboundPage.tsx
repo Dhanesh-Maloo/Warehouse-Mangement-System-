@@ -20,6 +20,8 @@ interface Delivery {
   purchaseOrderRef: string;
   expectedArrivalDate: string;
   status: string;
+  ivalueTicketNumber: string | null;
+  clientTicketNumber: string | null;
   items: { category: string; quantity: number; receivedQuantity: number }[];
   grns: { deviceCount: number; assets: { asset: { vendorName: string | null } }[] }[];
 }
@@ -164,7 +166,7 @@ export function InboundPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  iValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
+                  IValue Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -379,8 +381,8 @@ export function InboundPage() {
                 type="text"
                 value={poSearch}
                 onChange={(e) => setPoSearch(e.target.value)}
-                placeholder="Search PO reference, reference no, or vendor…"
-                className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white w-56"
+                placeholder="Search PO, ticket #, reference no, or vendor…"
+                className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white w-64"
               />
             </div>
           </div>
@@ -389,6 +391,8 @@ export function InboundPage() {
               <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
                 <th className="text-left px-5 py-3">PO Reference</th>
                 <th className="text-left px-5 py-3">Vendor</th>
+                <th className="text-left px-5 py-3">IValue Ticket #</th>
+                <th className="text-left px-5 py-3">Client Ticket #</th>
                 <th className="text-left px-5 py-3">Expected arrival</th>
                 <th className="text-left px-5 py-3">Items</th>
                 <th className="text-left px-5 py-3">Status</th>
@@ -408,6 +412,12 @@ export function InboundPage() {
                       {d.purchaseOrderRef}
                     </td>
                     <td className="px-5 py-3.5 text-gray-600">{vendorNamesFor(d)}</td>
+                    <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                      {d.ivalueTicketNumber || <span className="text-gray-300">-</span>}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                      {d.clientTicketNumber || <span className="text-gray-300">-</span>}
+                    </td>
                     <td className="px-5 py-3.5 text-gray-600">
                       {new Date(d.expectedArrivalDate).toLocaleDateString('en-IN')}
                     </td>
@@ -445,7 +455,7 @@ export function InboundPage() {
               })}
               {filteredDeliveries.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={7} className="px-5 py-12 text-center text-gray-400 text-sm">
                     {statusFilter === 'all'
                       ? 'No deliveries yet. Create one above.'
                       : 'No deliveries match the selected filter.'}

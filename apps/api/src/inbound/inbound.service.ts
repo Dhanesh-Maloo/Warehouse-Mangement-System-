@@ -49,6 +49,8 @@ export class InboundService {
       ? {
           OR: [
             { purchaseOrderRef: { contains: search, mode: 'insensitive' as const } },
+            { ivalueTicketNumber: { contains: search, mode: 'insensitive' as const } },
+            { clientTicketNumber: { contains: search, mode: 'insensitive' as const } },
             {
               grns: {
                 some: {

@@ -264,10 +264,10 @@ export function Layout() {
           className={`border-b border-white/10 ${collapsed ? 'px-3 py-5 flex justify-center' : 'px-6 py-5'}`}
         >
           {collapsed ? (
-            <img src={ivalueLogo} alt="iValue" className="h-8 w-auto" />
+            <img src={ivalueLogo} alt="IValue" className="h-8 w-auto" />
           ) : (
             <div className="flex items-center gap-3">
-              <img src={ivalueLogo} alt="iValue" className="h-11 w-auto flex-shrink-0" />
+              <img src={ivalueLogo} alt="IValue" className="h-11 w-auto flex-shrink-0" />
               <div>
                 <div className="text-white font-bold text-lg tracking-tight">IValue WMS</div>
                 <div className="text-[#8AA6BF] text-xs mt-0.5">Warehouse Management</div>
