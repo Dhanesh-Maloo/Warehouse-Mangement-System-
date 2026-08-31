@@ -136,6 +136,13 @@ enum DisposalType {
   itad_bundled
 }
 
+// Which billed tier applies when a RetrievalRequest has requiresWipe = true.
+// Mirrors DisposalType's non_certified/certified_blanco wording/pricing.
+enum WipeType {
+  non_certified
+  certified_blanco
+}
+
 enum DisposalStatus {
   pending
   approved
@@ -596,10 +603,12 @@ model RetrievalRequest {
   courierZone            CourierZone         @map("courier_zone")
   trackingNumber         String?             @map("tracking_number")
   requiresPostInspection Boolean             @default(false) @map("requires_post_inspection")
-  // Placeholder — captured but not yet acted on. See CLAUDE session notes: "wipe" is
-  // provisionally expected to be executed via the existing Inspection
-  // sanitization/factoryReset checklist fields, pending Esevel confirmation.
+  // Billed immediately at creation (see wipeType). Execution of the actual
+  // wipe is still expected via the existing Inspection sanitization/
+  // factoryReset checklist fields, pending Esevel confirmation.
   requiresWipe           Boolean             @default(false) @map("requires_wipe")
+  // Which billed tier — only set when requiresWipe = true.
+  wipeType               WipeType?           @map("wipe_type")
   // Only meaningful when bundleType = full_cycle. Determines whether the
   // auto-created redeploy Deployment order uses 'full_prep' vs 'standard'.
   requiresRedeploySetup  Boolean             @default(false) @map("requires_redeploy_setup")

@@ -311,11 +311,24 @@ async function seedRateCard(): Promise<void> {
       bundleComponentCodes: [] as string[],
     },
     {
-      code: 'WIPE',
-      description: 'Certified Data Wipe',
+      // Retrieval's "Requires data wipe" checkbox requires choosing one of
+      // these two tiers — same wording/pricing as the Disposal module's
+      // non_certified/certified_blanco types, kept as separate rate codes so
+      // retrieval-wipe revenue is distinguishable from disposal revenue.
+      code: 'RETRIEVAL_WIPE_NON_CERT',
+      description: 'Data Wipe - Non-Certified',
       basis: 'per_device' as const,
       categoryApplies: 'any' as const,
-      unitRatePaise: BigInt(35000),
+      unitRatePaise: BigInt(45000),
+      isBundle: false,
+      bundleComponentCodes: [] as string[],
+    },
+    {
+      code: 'RETRIEVAL_WIPE_CERTIFIED',
+      description: 'Data Wipe - Certified Data Destruction (Blanco)',
+      basis: 'per_device' as const,
+      categoryApplies: 'any' as const,
+      unitRatePaise: BigInt(55000),
       isBundle: false,
       bundleComponentCodes: [] as string[],
     },

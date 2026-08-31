@@ -123,6 +123,12 @@ export class RetrievalService {
       );
     }
 
+    if (dto.requiresWipe && !dto.wipeType) {
+      throw new BadRequestException(
+        'wipeType (non_certified or certified_blanco) is required when requiresWipe is true',
+      );
+    }
+
     const occurredAt = new Date();
 
     // Resolve retrieval rate code based on bundle type
@@ -138,10 +144,14 @@ export class RetrievalService {
     };
     const courierCode = courierCodeMap[courierZone];
 
+    // Two billed wipe tiers, mirroring Disposal's non_certified/certified_blanco.
+    const wipeCode =
+      dto.wipeType === 'certified_blanco' ? 'RETRIEVAL_WIPE_CERTIFIED' : 'RETRIEVAL_WIPE_NON_CERT';
+
     const [retrievalRate, courierRate, wipeRate] = await Promise.all([
       this.rateCard.findEffectiveAt(retrievalCode, occurredAt),
       this.rateCard.findEffectiveAt(courierCode, occurredAt),
-      dto.requiresWipe ? this.rateCard.findEffectiveAt('WIPE', occurredAt) : null,
+      dto.requiresWipe ? this.rateCard.findEffectiveAt(wipeCode, occurredAt) : null,
     ]);
 
     const retrievalUnitRate = retrievalRate ? retrievalRate.unitRatePaise : BigInt(0);
@@ -161,6 +171,7 @@ export class RetrievalService {
           courierZone,
           requiresPostInspection: dto.requiresPostInspection,
           requiresWipe: dto.requiresWipe ?? false,
+          wipeType: dto.requiresWipe ? dto.wipeType : undefined,
           requiresRedeploySetup: dto.requiresRedeploySetup ?? false,
           redeployEndUserId: dto.redeployEndUserId,
           redeployDeliveryAddress: dto.redeployDeliveryAddress
@@ -207,7 +218,7 @@ export class RetrievalService {
       // Post data wipe ledger event, if requested
       if (dto.requiresWipe) {
         await this.ledger.create({
-          eventType: 'WIPE',
+          eventType: wipeCode,
           asset: { connect: { id: dto.assetId } },
           client: { connect: { id: dto.clientId } },
           quantity: 1,

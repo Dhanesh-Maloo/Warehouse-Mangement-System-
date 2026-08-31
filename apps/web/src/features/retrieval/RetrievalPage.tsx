@@ -43,6 +43,7 @@ type RetrievalStatus =
 
 type BundleType = 'standard' | 'full_cycle';
 type CourierZone = 'intra_state' | 'inter_state' | 'rural';
+type WipeType = 'non_certified' | 'certified_blanco';
 
 interface RetrievalRequest {
   id: string;
@@ -63,6 +64,7 @@ interface RetrievalRequest {
   bundleType: BundleType;
   requiresPostInspection: boolean;
   requiresWipe: boolean;
+  wipeType: WipeType | null;
   requiresRedeploySetup: boolean;
   damageFound: boolean | null;
   notes?: string;
@@ -126,6 +128,21 @@ const ALL_STATUSES: RetrievalStatus[] = [
   'cancelled',
 ];
 
+// Mirrors the Disposal module's non_certified/certified_blanco wording and
+// pricing (see infra/prisma/seed.ts RETRIEVAL_WIPE_* rate codes).
+const WIPE_TYPE_META: Record<WipeType, { label: string; price: string; description: string }> = {
+  non_certified: {
+    label: 'Non-Certified',
+    price: '₹450 + GST',
+    description: 'Data wipe with no certificate',
+  },
+  certified_blanco: {
+    label: 'Certified Data Destruction',
+    price: '₹550 + GST',
+    description: 'Certified wipe + destruction certificate',
+  },
+};
+
 const EMPTY_FORM = {
   assetId: '',
   ownerId: '',
@@ -138,6 +155,7 @@ const EMPTY_FORM = {
   contactPhone: '',
   requiresPostInspection: false,
   requiresWipe: false,
+  wipeType: '' as WipeType | '',
   requiresRedeploySetup: false,
   redeployEndUserId: '',
   redeployAddressLine1: '',
@@ -304,6 +322,7 @@ export function RetrievalPage() {
       // always true; the field remains for backward compatibility.
       requiresPostInspection: true,
       requiresWipe: form.requiresWipe,
+      wipeType: form.requiresWipe ? form.wipeType || undefined : undefined,
       requiresRedeploySetup: isFullCycle ? form.requiresRedeploySetup : undefined,
       redeployEndUserId: isFullCycle ? form.redeployEndUserId || undefined : undefined,
       redeployDeliveryAddress: isFullCycle
@@ -329,10 +348,12 @@ export function RetrievalPage() {
   // Bundle price preview — the diagnostic inspection is billed separately
   // when it's completed (INSPECT rate code), not at request-creation time.
   const bundlePaise = form.bundleType === 'full_cycle' ? 50000 : 19000;
-  // Mirrors the seeded WIPE rate card default (see infra/prisma/seed.ts) — the
-  // actual charge is resolved server-side from the current rate card at creation time.
-  const WIPE_PAISE = 35000;
-  const totalPaise = bundlePaise + (form.requiresWipe ? WIPE_PAISE : 0);
+  // Mirrors the seeded RETRIEVAL_WIPE_* rate card defaults (see
+  // infra/prisma/seed.ts) — the actual charge is resolved server-side from
+  // the current rate card at creation time.
+  const WIPE_PAISE: Record<WipeType, number> = { non_certified: 45000, certified_blanco: 55000 };
+  const wipePaise = form.requiresWipe && form.wipeType ? WIPE_PAISE[form.wipeType] : 0;
+  const totalPaise = bundlePaise + wipePaise;
   const formatRupees = (p: number) => `₹${(p / 100).toFixed(0)}`;
 
   return (
@@ -595,23 +616,74 @@ export function RetrievalPage() {
             </div>
 
             {/* Wipe — chargeable add-on, flags the request for the team (execution itself is manual) */}
-            <div className="flex items-center gap-3">
-              <input
-                id="requires-wipe"
-                type="checkbox"
-                checked={form.requiresWipe}
-                onChange={(e) => setField('requiresWipe', e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-[#E86F2C] focus:ring-[#E86F2C] accent-[#E86F2C]"
-              />
-              <label
-                htmlFor="requires-wipe"
-                className="text-sm text-gray-700 cursor-pointer select-none"
-              >
-                Requires data wipe{' '}
-                <span className="text-xs text-gray-500">
-                  ({formatRupees(WIPE_PAISE)} - flags the request for your team, billed on creation)
-                </span>
-              </label>
+            <div>
+              <div className="flex items-center gap-3">
+                <input
+                  id="requires-wipe"
+                  type="checkbox"
+                  checked={form.requiresWipe}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setForm((prev) => ({
+                      ...prev,
+                      requiresWipe: checked,
+                      wipeType: checked ? prev.wipeType : '',
+                    }));
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-[#E86F2C] focus:ring-[#E86F2C] accent-[#E86F2C]"
+                />
+                <label
+                  htmlFor="requires-wipe"
+                  className="text-sm text-gray-700 cursor-pointer select-none"
+                >
+                  Requires data wipe{' '}
+                  <span className="text-xs text-gray-500">
+                    (flags the request for your team, billed on creation)
+                  </span>
+                </label>
+              </div>
+
+              {form.requiresWipe && (
+                <div className="mt-3 ml-7 space-y-2">
+                  <p className="text-xs font-medium text-gray-600">
+                    Wipe type <span className="text-red-500">*</span>
+                  </p>
+                  {(
+                    Object.entries(WIPE_TYPE_META) as [
+                      WipeType,
+                      (typeof WIPE_TYPE_META)[WipeType],
+                    ][]
+                  ).map(([value, meta]) => (
+                    <label
+                      key={value}
+                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        form.wipeType === value
+                          ? 'border-[#E86F2C] bg-orange-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="wipeType"
+                        value={value}
+                        required
+                        checked={form.wipeType === value}
+                        onChange={() => setField('wipeType', value)}
+                        className="mt-0.5 accent-[#E86F2C]"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900">{meta.label}</span>
+                          <span className="text-sm font-semibold text-[#E86F2C]">
+                            ({meta.price})
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">{meta.description}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Full Cycle redeploy details */}
@@ -733,10 +805,11 @@ export function RetrievalPage() {
                 Estimated charges:{' '}
                 <span className="font-semibold">{formatRupees(bundlePaise)}</span> retrieval +
                 courier
-                {form.requiresWipe && (
+                {form.requiresWipe && form.wipeType && (
                   <>
                     {' '}
-                    + <span className="font-semibold">{formatRupees(WIPE_PAISE)}</span> data wipe
+                    + <span className="font-semibold">{formatRupees(wipePaise)}</span>{' '}
+                    {WIPE_TYPE_META[form.wipeType].label.toLowerCase()} wipe
                   </>
                 )}{' '}
                 (inspection billed separately on completion)
@@ -919,7 +992,9 @@ export function RetrievalPage() {
                         'Standard'
                       )}
                       {r.requiresWipe && (
-                        <div className="text-[10px] text-amber-600 mt-0.5">Wipe requested</div>
+                        <div className="text-[10px] text-amber-600 mt-0.5">
+                          Wipe requested{r.wipeType ? ` (${WIPE_TYPE_META[r.wipeType].label})` : ''}
+                        </div>
                       )}
                     </td>
 

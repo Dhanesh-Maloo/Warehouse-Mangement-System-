@@ -67,13 +67,20 @@ export class CreateRetrievalRequestDto {
   @IsBoolean()
   requiresPostInspection: boolean = false;
 
-  // Placeholder — captured but not yet executed automatically. The actual
-  // wipe is expected to be recorded via the existing Inspection
-  // sanitization/factoryReset checklist fields when the post-retrieval
-  // inspection is completed.
+  // Captured at creation and billed immediately (see wipeType below). The
+  // actual wipe execution is still recorded separately via the existing
+  // Inspection sanitization/factoryReset checklist fields when the
+  // post-retrieval inspection is completed.
   @IsOptional()
   @IsBoolean()
   requiresWipe?: boolean = false;
+
+  // Required when requiresWipe is true — determines which of the two billed
+  // wipe tiers applies (mirrors the Disposal module's non_certified vs
+  // certified_blanco wording/pricing).
+  @ValidateIf((o: CreateRetrievalRequestDto) => o.requiresWipe === true)
+  @IsEnum(['non_certified', 'certified_blanco'])
+  wipeType?: 'non_certified' | 'certified_blanco';
 
   // Only meaningful when bundleType = 'full_cycle'. Determines whether the
   // auto-created redeploy Deployment order uses 'full_prep' vs 'standard'.

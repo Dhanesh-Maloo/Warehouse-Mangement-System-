@@ -160,6 +160,48 @@ describe('RetrievalService', () => {
       expect(retrievalLedgerCall).toBeDefined();
     });
 
+    it('throws BadRequestException when requiresWipe is true but wipeType is missing', async () => {
+      await expect(
+        service.create({ ...baseDto, requiresWipe: true, wipeType: undefined }, 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it.each([
+      ['non_certified', 'RETRIEVAL_WIPE_NON_CERT'],
+      ['certified_blanco', 'RETRIEVAL_WIPE_CERTIFIED'],
+    ])('bills %s wipeType as %s', async (wipeType, expectedCode) => {
+      mockCourierZone.resolveZone.mockResolvedValue('intra_state');
+      mockRateCard.findEffectiveAt.mockResolvedValue({ unitRatePaise: BigInt(450) });
+
+      await service.create(
+        { ...baseDto, requiresWipe: true, wipeType: wipeType as never },
+        'user-1',
+      );
+
+      expect(mockRateCard.findEffectiveAt).toHaveBeenCalledWith(expectedCode, expect.any(Date));
+      const wipeLedgerCall = mockLedger.create.mock.calls.find(
+        (call) => call[0].eventType === expectedCode,
+      );
+      expect(wipeLedgerCall).toBeDefined();
+      expect(mockPrisma.retrievalRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ requiresWipe: true, wipeType }),
+        }),
+      );
+    });
+
+    it('does not bill any wipe tier when requiresWipe is false', async () => {
+      mockCourierZone.resolveZone.mockResolvedValue('intra_state');
+      mockRateCard.findEffectiveAt.mockResolvedValue({ unitRatePaise: BigInt(450) });
+
+      await service.create({ ...baseDto, requiresWipe: false }, 'user-1');
+
+      const wipeLedgerCall = mockLedger.create.mock.calls.find((call) =>
+        (call[0].eventType as string).startsWith('RETRIEVAL_WIPE'),
+      );
+      expect(wipeLedgerCall).toBeUndefined();
+    });
+
     it('persists the redeploy fields on tx.retrievalRequest.create', async () => {
       mockCourierZone.resolveZone.mockResolvedValue('intra_state');
       mockRateCard.findEffectiveAt.mockResolvedValue({ unitRatePaise: BigInt(100) });
@@ -168,6 +210,7 @@ describe('RetrievalService', () => {
         ...baseDto,
         bundleType: 'full_cycle',
         requiresWipe: true,
+        wipeType: 'certified_blanco',
         requiresRedeploySetup: true,
         redeployEndUserId: 'end-user-1',
         redeployDeliveryAddress: {
