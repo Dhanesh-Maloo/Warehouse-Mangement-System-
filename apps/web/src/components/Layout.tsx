@@ -53,8 +53,9 @@ const navGroups: NavGroup[] = [
     group: 'Operations',
     items: [
       { to: '/inbound', label: 'Inbound', icon: PackagePlus },
-      { to: '/deployment', label: 'Deployment', icon: Truck },
       { to: '/retrieval', label: 'Retrieval', icon: ArrowDownToLine },
+      { to: '/inspections', label: 'Inspections', icon: ClipboardCheck },
+      { to: '/deployment', label: 'Deployment', icon: Truck },
       { to: '/disposal', label: 'Disposal', icon: Trash2 },
       { to: '/repair', label: 'Repair', icon: Wrench },
       { to: '/resale', label: 'Resale', icon: Tag },
@@ -64,7 +65,6 @@ const navGroups: NavGroup[] = [
     group: 'Inventory',
     items: [
       { to: '/inventory', label: 'Inventory', icon: Package },
-      { to: '/inspections', label: 'Inspections', icon: ClipboardCheck },
       { to: '/locations', label: 'Locations', icon: MapPin },
     ],
   },
