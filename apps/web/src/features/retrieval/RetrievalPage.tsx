@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Plus, Truck } from 'lucide-react';
+import { Plus, Truck, Search } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,6 +67,8 @@ interface RetrievalRequest {
   damageFound: boolean | null;
   notes?: string;
   trackingNumber?: string;
+  ivalueTicketNumber?: string;
+  clientTicketNumber?: string;
   status: RetrievalStatus;
   requestedAt: string;
   createdByUser: { id: string; fullName: string };
@@ -106,11 +108,13 @@ const COURIER_ZONE_COLORS: Record<CourierZone, string> = {
   rural: 'bg-teal-100 text-teal-700',
 };
 
+// 'received' is the final manually-driven stage — a clean Full Cycle retrieval
+// is still auto-completed by the inspection outcome (see the backend's
+// handleRetrievalDiagnosticOutcome), which happens outside this manual flow.
 const NEXT_STATUSES: Partial<Record<RetrievalStatus, RetrievalStatus[]>> = {
   pending: ['initiated', 'cancelled'],
   initiated: ['in_transit', 'cancelled'],
   in_transit: ['received', 'cancelled'],
-  received: ['completed'],
 };
 
 const ALL_STATUSES: RetrievalStatus[] = [
@@ -164,6 +168,7 @@ export function RetrievalPage() {
   const [ownerFilter, setOwnerFilter] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [ticketSearch, setTicketSearch] = useState('');
 
   const isClientUser = user?.role === 'client_user';
   const isEditor = user?.role === 'editor';
@@ -207,7 +212,15 @@ export function RetrievalPage() {
 
   // Retrieval requests list, filtered by status / owner / requested-date range
   const { data: retrievals = [], isLoading } = useQuery({
-    queryKey: ['retrieval-requests', clientId, statusFilter, ownerFilter, fromDate, toDate],
+    queryKey: [
+      'retrieval-requests',
+      clientId,
+      statusFilter,
+      ownerFilter,
+      fromDate,
+      toDate,
+      ticketSearch,
+    ],
     queryFn: () => {
       const params = new URLSearchParams();
       if (clientId) params.set('clientId', clientId);
@@ -215,6 +228,7 @@ export function RetrievalPage() {
       if (ownerFilter) params.set('ownerId', ownerFilter);
       if (fromDate) params.set('fromDate', fromDate);
       if (toDate) params.set('toDate', toDate);
+      if (ticketSearch.trim()) params.set('ticketSearch', ticketSearch.trim());
       return api.get<RetrievalRequest[]>(`/retrieval?${params.toString()}`);
     },
   });
@@ -311,6 +325,10 @@ export function RetrievalPage() {
   // Bundle price preview — the diagnostic inspection is billed separately
   // when it's completed (INSPECT rate code), not at request-creation time.
   const bundlePaise = form.bundleType === 'full_cycle' ? 50000 : 19000;
+  // Mirrors the seeded WIPE rate card default (see infra/prisma/seed.ts) — the
+  // actual charge is resolved server-side from the current rate card at creation time.
+  const WIPE_PAISE = 35000;
+  const totalPaise = bundlePaise + (form.requiresWipe ? WIPE_PAISE : 0);
   const formatRupees = (p: number) => `₹${(p / 100).toFixed(0)}`;
 
   return (
@@ -572,7 +590,7 @@ export function RetrievalPage() {
               Cycle) proceed to redeploy. This happens automatically; there&apos;s no opt-out.
             </div>
 
-            {/* Wipe — placeholder, captured but not yet executed automatically */}
+            {/* Wipe — chargeable add-on, flags the request for the team (execution itself is manual) */}
             <div className="flex items-center gap-3">
               <input
                 id="requires-wipe"
@@ -586,8 +604,8 @@ export function RetrievalPage() {
                 className="text-sm text-gray-700 cursor-pointer select-none"
               >
                 Requires data wipe{' '}
-                <span className="text-gray-400">
-                  (flags the request for your team - not yet automated)
+                <span className="text-xs text-gray-500">
+                  ({formatRupees(WIPE_PAISE)} - flags the request for your team, billed on creation)
                 </span>
               </label>
             </div>
@@ -710,9 +728,16 @@ export function RetrievalPage() {
               <span>
                 Estimated charges:{' '}
                 <span className="font-semibold">{formatRupees(bundlePaise)}</span> retrieval +
-                courier (inspection billed separately on completion)
+                courier
+                {form.requiresWipe && (
+                  <>
+                    {' '}
+                    + <span className="font-semibold">{formatRupees(WIPE_PAISE)}</span> data wipe
+                  </>
+                )}{' '}
+                (inspection billed separately on completion)
               </span>
-              <span className="font-bold text-[#E86F2C]">Total: {formatRupees(bundlePaise)}</span>
+              <span className="font-bold text-[#E86F2C]">Total: {formatRupees(totalPaise)}</span>
             </div>
 
             {createMutation.error && (
@@ -793,13 +818,25 @@ export function RetrievalPage() {
             className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
           />
         </div>
-        {(statusFilter || ownerFilter || fromDate || toDate) && (
+        <div className="relative">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Ticket number</label>
+          <Search size={13} className="absolute left-2.5 top-[1.9rem] text-gray-400" />
+          <input
+            type="text"
+            value={ticketSearch}
+            onChange={(e) => setTicketSearch(e.target.value)}
+            placeholder="iValue or client ticket #"
+            className="pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] w-48"
+          />
+        </div>
+        {(statusFilter || ownerFilter || fromDate || toDate || ticketSearch) && (
           <button
             onClick={() => {
               setStatusFilter('');
               setOwnerFilter('');
               setFromDate('');
               setToDate('');
+              setTicketSearch('');
             }}
             className="text-xs text-gray-500 hover:text-gray-700 underline mb-1"
           >
@@ -822,6 +859,8 @@ export function RetrievalPage() {
                 <th className="text-left px-5 py-3">Bundle</th>
                 <th className="text-left px-5 py-3">Owner</th>
                 <th className="text-left px-5 py-3">Damage</th>
+                <th className="text-left px-5 py-3">iValue Ticket #</th>
+                <th className="text-left px-5 py-3">Client Ticket #</th>
                 <th className="text-left px-5 py-3">Tracking #</th>
                 <th className="text-left px-5 py-3">Notes</th>
                 <th className="text-left px-5 py-3">Requested</th>
@@ -900,6 +939,16 @@ export function RetrievalPage() {
                       )}
                     </td>
 
+                    {/* iValue Ticket # */}
+                    <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                      {r.ivalueTicketNumber || <span className="text-gray-300">-</span>}
+                    </td>
+
+                    {/* Client Ticket # */}
+                    <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                      {r.clientTicketNumber || <span className="text-gray-300">-</span>}
+                    </td>
+
                     {/* Tracking number */}
                     <td className="px-5 py-3.5 text-xs">
                       {r.trackingNumber ? (
@@ -960,8 +1009,10 @@ export function RetrievalPage() {
               })}
               {retrievals.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-5 py-12 text-center text-gray-400 text-sm">
-                    No retrieval requests yet. Create one above.
+                  <td colSpan={13} className="px-5 py-12 text-center text-gray-400 text-sm">
+                    {statusFilter || ownerFilter || fromDate || toDate || ticketSearch
+                      ? 'No retrieval requests match the selected filters.'
+                      : 'No retrieval requests yet. Create one above.'}
                   </td>
                 </tr>
               )}

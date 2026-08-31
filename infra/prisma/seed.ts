@@ -310,6 +310,15 @@ async function seedRateCard(): Promise<void> {
       isBundle: false,
       bundleComponentCodes: [] as string[],
     },
+    {
+      code: 'WIPE',
+      description: 'Certified Data Wipe',
+      basis: 'per_device' as const,
+      categoryApplies: 'any' as const,
+      unitRatePaise: BigInt(35000),
+      isBundle: false,
+      bundleComponentCodes: [] as string[],
+    },
   ];
 
   for (const item of items) {

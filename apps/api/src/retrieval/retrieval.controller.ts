@@ -44,13 +44,20 @@ export class RetrievalController {
     @Query('ownerId') ownerId?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
+    @Query('ticketSearch') ticketSearch?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<RetrievalService['findAll']> {
     const effectiveClientId =
       user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
-    return this.retrievalService.findAll(effectiveClientId, { status, ownerId, fromDate, toDate });
+    return this.retrievalService.findAll(effectiveClientId, {
+      status,
+      ownerId,
+      fromDate,
+      toDate,
+      ticketSearch,
+    });
   }
 
   @Get('asset/:assetId')

@@ -236,7 +236,6 @@ describe('RetrievalService', () => {
       ['initiated', 'cancelled'],
       ['in_transit', 'received'],
       ['in_transit', 'cancelled'],
-      ['received', 'completed'],
     ])('allows transition from %s to %s', async (fromStatus, toStatus) => {
       setupRetrieval({ status: fromStatus });
       const dto: UpdateRetrievalStatusDto = { status: toStatus as never };
@@ -251,6 +250,7 @@ describe('RetrievalService', () => {
       ['pending', 'completed'],
       ['initiated', 'received'],
       ['received', 'initiated'],
+      ['received', 'completed'],
       ['completed', 'initiated'],
       ['cancelled', 'initiated'],
     ])(

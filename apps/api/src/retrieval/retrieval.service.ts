@@ -22,7 +22,13 @@ export class RetrievalService {
 
   findAll(
     clientId?: string,
-    filters?: { status?: string; ownerId?: string; fromDate?: string; toDate?: string },
+    filters?: {
+      status?: string;
+      ownerId?: string;
+      fromDate?: string;
+      toDate?: string;
+      ticketSearch?: string;
+    },
   ): Prisma.PrismaPromise<
     Prisma.RetrievalRequestGetPayload<{
       include: { asset: true; createdByUser: { select: { id: true; fullName: true } } };
@@ -35,6 +41,19 @@ export class RetrievalService {
           return d;
         })()
       : null;
+
+    const ticketFilter = filters?.ticketSearch
+      ? {
+          OR: [
+            {
+              ivalueTicketNumber: { contains: filters.ticketSearch, mode: 'insensitive' as const },
+            },
+            {
+              clientTicketNumber: { contains: filters.ticketSearch, mode: 'insensitive' as const },
+            },
+          ],
+        }
+      : {};
 
     return this.prisma.retrievalRequest.findMany({
       where: {
@@ -49,6 +68,7 @@ export class RetrievalService {
               },
             }
           : {}),
+        ...ticketFilter,
       },
       include: { asset: true, createdByUser: { select: { id: true, fullName: true } } },
       orderBy: { requestedAt: 'desc' },
@@ -103,13 +123,15 @@ export class RetrievalService {
     };
     const courierCode = courierCodeMap[courierZone];
 
-    const [retrievalRate, courierRate] = await Promise.all([
+    const [retrievalRate, courierRate, wipeRate] = await Promise.all([
       this.rateCard.findEffectiveAt(retrievalCode, occurredAt),
       this.rateCard.findEffectiveAt(courierCode, occurredAt),
+      dto.requiresWipe ? this.rateCard.findEffectiveAt('WIPE', occurredAt) : null,
     ]);
 
     const retrievalUnitRate = retrievalRate ? retrievalRate.unitRatePaise : BigInt(0);
     const courierUnitRate = courierRate ? courierRate.unitRatePaise : BigInt(0);
+    const wipeUnitRate = wipeRate ? wipeRate.unitRatePaise : BigInt(0);
 
     return this.prisma.$transaction(async (tx) => {
       const retrieval = await tx.retrievalRequest.create({
@@ -167,6 +189,22 @@ export class RetrievalService {
         referenceType: 'retrieval',
       });
 
+      // Post data wipe ledger event, if requested
+      if (dto.requiresWipe) {
+        await this.ledger.create({
+          eventType: 'WIPE',
+          asset: { connect: { id: dto.assetId } },
+          client: { connect: { id: dto.clientId } },
+          quantity: 1,
+          unitRatePaise: wipeUnitRate,
+          amountPaise: wipeUnitRate,
+          occurredAt,
+          createdBy: createdByUserId,
+          referenceId: retrieval.id,
+          referenceType: 'retrieval',
+        });
+      }
+
       // Update asset status to 'returning'
       await tx.asset.update({
         where: { id: dto.assetId },
@@ -202,11 +240,15 @@ export class RetrievalService {
   ): Promise<Prisma.RetrievalRequestGetPayload<{ include: { asset: true } }>> {
     const retrieval = await this.findOne(id);
 
+    // 'received' is the final manually-driven stage — a clean Full Cycle
+    // retrieval is still auto-completed by the inspection outcome handler
+    // (see InspectionsService.handleRetrievalDiagnosticOutcome), which updates
+    // the record directly and does not go through this transition map.
     const RETRIEVAL_TRANSITIONS: Record<string, string[]> = {
       pending: ['initiated', 'cancelled'],
       initiated: ['in_transit', 'cancelled'],
       in_transit: ['received', 'cancelled'],
-      received: ['completed'],
+      received: [],
       completed: [],
       cancelled: [],
     };
