@@ -222,13 +222,51 @@ export class InspectionsService {
   findAll(
     clientId?: string,
     status?: string,
+    filters?: { type?: string; search?: string; fromDate?: string; toDate?: string },
   ): Prisma.PrismaPromise<
     Prisma.InspectionGetPayload<{ include: { asset: true; photos: true } }>[]
   > {
+    const toDateFilter = filters?.toDate
+      ? (() => {
+          const d = new Date(filters.toDate as string);
+          if (!(filters.toDate as string).includes('T')) d.setDate(d.getDate() + 1);
+          return d;
+        })()
+      : null;
+
+    const searchFilter = filters?.search
+      ? {
+          OR: [
+            { ivalueTicketNumber: { contains: filters.search, mode: 'insensitive' as const } },
+            { clientTicketNumber: { contains: filters.search, mode: 'insensitive' as const } },
+            {
+              asset: {
+                OR: [
+                  { serialNumber: { contains: filters.search, mode: 'insensitive' as const } },
+                  { model: { contains: filters.search, mode: 'insensitive' as const } },
+                  { manufacturer: { contains: filters.search, mode: 'insensitive' as const } },
+                  { assetTag: { contains: filters.search, mode: 'insensitive' as const } },
+                ],
+              },
+            },
+          ],
+        }
+      : {};
+
     return this.prisma.inspection.findMany({
       where: {
         ...(clientId ? { asset: { clientId } } : {}),
         ...(status ? { status: status as never } : {}),
+        ...(filters?.type ? { type: filters.type as never } : {}),
+        ...(filters?.fromDate || toDateFilter
+          ? {
+              startedAt: {
+                ...(filters?.fromDate ? { gte: new Date(filters.fromDate) } : {}),
+                ...(toDateFilter ? { lt: toDateFilter } : {}),
+              },
+            }
+          : {}),
+        ...searchFilter,
       },
       include: { asset: true, photos: true },
       orderBy: { startedAt: 'desc' },

@@ -26,9 +26,51 @@ export class ResaleService {
     private readonly assetStatusHistory: AssetStatusHistoryService,
   ) {}
 
-  async findAll(clientId?: string): Promise<ResaleListingWithAsset[]> {
+  async findAll(
+    clientId?: string,
+    filters?: { status?: string; assetSearch?: string; fromDate?: string; toDate?: string },
+  ): Promise<ResaleListingWithAsset[]> {
+    const toDateFilter = filters?.toDate
+      ? (() => {
+          const d = new Date(filters.toDate as string);
+          if (!(filters.toDate as string).includes('T')) d.setDate(d.getDate() + 1);
+          return d;
+        })()
+      : null;
+
+    // ResaleListing has no Prisma relation to Asset (see class-level comment),
+    // so an asset search resolves matching asset ids first, then filters
+    // resaleListing.assetId against that set.
+    let assetIdFilter: string[] | null = null;
+    if (filters?.assetSearch) {
+      const matchingAssets = await this.prisma.asset.findMany({
+        where: {
+          OR: [
+            { serialNumber: { contains: filters.assetSearch, mode: 'insensitive' } },
+            { model: { contains: filters.assetSearch, mode: 'insensitive' } },
+            { manufacturer: { contains: filters.assetSearch, mode: 'insensitive' } },
+            { assetTag: { contains: filters.assetSearch, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+      });
+      assetIdFilter = matchingAssets.map((a) => a.id);
+    }
+
     const listings = await this.prisma.resaleListing.findMany({
-      where: clientId ? { clientId } : {},
+      where: {
+        ...(clientId ? { clientId } : {}),
+        ...(filters?.status ? { status: filters.status as never } : {}),
+        ...(assetIdFilter ? { assetId: { in: assetIdFilter } } : {}),
+        ...(filters?.fromDate || toDateFilter
+          ? {
+              listedAt: {
+                ...(filters?.fromDate ? { gte: new Date(filters.fromDate) } : {}),
+                ...(toDateFilter ? { lt: toDateFilter } : {}),
+              },
+            }
+          : {}),
+      },
       orderBy: { createdAt: 'desc' },
     });
     return this.attachAssets(listings);

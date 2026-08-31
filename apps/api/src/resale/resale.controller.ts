@@ -39,13 +39,22 @@ export class ResaleController {
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(
     @Query('clientId') clientId?: string,
+    @Query('status') status?: string,
+    @Query('assetSearch') assetSearch?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<ResaleService['findAll']> {
     const effectiveClientId =
       user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
-    return this.resaleService.findAll(effectiveClientId);
+    return this.resaleService.findAll(effectiveClientId, {
+      status,
+      assetSearch,
+      fromDate,
+      toDate,
+    });
   }
 
   @Get('asset/:assetId')

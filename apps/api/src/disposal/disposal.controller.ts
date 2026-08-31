@@ -39,13 +39,24 @@ export class DisposalController {
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(
     @Query('clientId') clientId?: string,
+    @Query('status') status?: string,
+    @Query('disposalType') disposalType?: string,
+    @Query('search') search?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<DisposalService['findAll']> {
     const effectiveClientId =
       user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
-    return this.disposalService.findAll(effectiveClientId);
+    return this.disposalService.findAll(effectiveClientId, {
+      status,
+      disposalType,
+      search,
+      fromDate,
+      toDate,
+    });
   }
 
   @Get('asset/:assetId')

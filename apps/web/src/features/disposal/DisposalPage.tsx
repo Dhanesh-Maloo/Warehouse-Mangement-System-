@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,6 +34,8 @@ interface DisposalRequest {
   disposalType: DisposalType;
   requiresCertification: boolean;
   status: DisposalStatus;
+  ivalueTicketNumber: string | null;
+  clientTicketNumber: string | null;
   notes?: string;
   createdAt: string;
 }
@@ -98,6 +100,13 @@ export function DisposalPage() {
   const [showForm, setShowForm] = useState(false);
   const [confirmApproveId, setConfirmApproveId] = useState<string | null>(null);
 
+  // Filters
+  const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
   // ── Form state ────────────────────────────────────────────────────────────
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedAssetId, setSelectedAssetId] = useState('');
@@ -130,12 +139,28 @@ export function DisposalPage() {
   });
 
   const { data: disposals = [], isLoading } = useQuery({
-    queryKey: ['disposal-requests', clientId],
+    queryKey: [
+      'disposal-requests',
+      clientId,
+      statusFilter,
+      typeFilter,
+      searchQuery,
+      fromDate,
+      toDate,
+    ],
     queryFn: async () => {
-      const params = clientId ? `?clientId=${clientId}` : '';
-      const res = await api.get<DisposalRequest[]>(`/disposal${params}`);
-      return res;
+      const params = new URLSearchParams();
+      if (clientId) params.set('clientId', clientId);
+      if (statusFilter) params.set('status', statusFilter);
+      if (typeFilter) params.set('disposalType', typeFilter);
+      if (searchQuery.trim()) params.set('search', searchQuery.trim());
+      if (fromDate) params.set('fromDate', fromDate);
+      if (toDate) params.set('toDate', toDate);
+      return api.get<DisposalRequest[]>(`/disposal?${params.toString()}`);
     },
+    // Keeps showing previous results while a new filter/search fetch is in
+    // flight, instead of flipping isLoading back to true.
+    placeholderData: keepPreviousData,
   });
 
   // ── Mutations ─────────────────────────────────────────────────────────────
@@ -415,6 +440,85 @@ export function DisposalPage() {
         </div>
       )}
 
+      {/* ── Filters ─────────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+          >
+            <option value="">All</option>
+            {(Object.keys(STATUS_LABELS) as DisposalStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Disposal Type</label>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+          >
+            <option value="">All</option>
+            {(Object.entries(DISPOSAL_TYPE_META) as [DisposalType, { label: string }][]).map(
+              ([value, meta]) => (
+                <option key={value} value={value}>
+                  {meta.label}
+                </option>
+              ),
+            )}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Created from</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Created to</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+          />
+        </div>
+        <div className="relative">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Search</label>
+          <Search size={13} className="absolute left-2.5 top-[1.9rem] text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Asset or ticket #…"
+            className="pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] w-56"
+          />
+        </div>
+        {(statusFilter || typeFilter || searchQuery || fromDate || toDate) && (
+          <button
+            onClick={() => {
+              setStatusFilter('');
+              setTypeFilter('');
+              setSearchQuery('');
+              setFromDate('');
+              setToDate('');
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 underline mb-1"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
       {/* ── Disposal requests table ────────────────────────────────────────── */}
       {isLoading ? (
         <div className="text-sm text-gray-400">Loading…</div>
@@ -426,6 +530,8 @@ export function DisposalPage() {
                 <th className="text-left px-5 py-3">Asset</th>
                 <th className="text-left px-5 py-3">Disposal Type</th>
                 <th className="text-left px-5 py-3">Status</th>
+                <th className="text-left px-5 py-3">IValue Ticket #</th>
+                <th className="text-left px-5 py-3">Client Ticket #</th>
                 <th className="text-left px-5 py-3">Created</th>
                 <th className="px-5 py-3" />
               </tr>
@@ -520,6 +626,16 @@ export function DisposalPage() {
                       )}
                     </td>
 
+                    {/* IValue Ticket # */}
+                    <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                      {d.ivalueTicketNumber || <span className="text-gray-300">-</span>}
+                    </td>
+
+                    {/* Client Ticket # */}
+                    <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                      {d.clientTicketNumber || <span className="text-gray-300">-</span>}
+                    </td>
+
                     {/* Created date */}
                     <td className="px-5 py-3.5 text-gray-600">
                       {new Date(d.createdAt).toLocaleDateString('en-IN')}
@@ -531,8 +647,10 @@ export function DisposalPage() {
               })}
               {disposals.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-gray-400 text-sm">
-                    No disposal requests yet. Create one above.
+                  <td colSpan={7} className="px-5 py-12 text-center text-gray-400 text-sm">
+                    {statusFilter || typeFilter || searchQuery || fromDate || toDate
+                      ? 'No disposal requests match the selected filters.'
+                      : 'No disposal requests yet. Create one above.'}
                   </td>
                 </tr>
               )}

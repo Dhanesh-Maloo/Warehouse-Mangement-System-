@@ -53,13 +53,22 @@ export class InspectionsController {
   findAll(
     @Query('clientId') clientId?: string,
     @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('search') search?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<InspectionsService['findAll']> {
     const effectiveClientId =
       user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
-    return this.inspectionsService.findAll(effectiveClientId, status);
+    return this.inspectionsService.findAll(effectiveClientId, status, {
+      type,
+      search,
+      fromDate,
+      toDate,
+    });
   }
 
   @Get(':id')

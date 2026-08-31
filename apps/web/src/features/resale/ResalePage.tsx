@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -81,6 +81,12 @@ export function ResalePage() {
   const [pendingSold, setPendingSold] = useState<{ id: string; price: string } | null>(null);
   const [soldError, setSoldError] = useState('');
 
+  // Filters
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
   // ── Form state ────────────────────────────────────────────────────────────
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedAssetId, setSelectedAssetId] = useState('');
@@ -111,12 +117,19 @@ export function ResalePage() {
   });
 
   const { data: listings = [], isLoading } = useQuery({
-    queryKey: ['resale-listings', clientId],
+    queryKey: ['resale-listings', clientId, statusFilter, searchQuery, fromDate, toDate],
     queryFn: async () => {
-      const params = clientId ? `?clientId=${clientId}` : '';
-      const res = await api.get<ResaleListing[]>(`/resale${params}`);
-      return res;
+      const params = new URLSearchParams();
+      if (clientId) params.set('clientId', clientId);
+      if (statusFilter) params.set('status', statusFilter);
+      if (searchQuery.trim()) params.set('assetSearch', searchQuery.trim());
+      if (fromDate) params.set('fromDate', fromDate);
+      if (toDate) params.set('toDate', toDate);
+      return api.get<ResaleListing[]>(`/resale?${params.toString()}`);
     },
+    // Keeps showing previous results while a new filter/search fetch is in
+    // flight, instead of flipping isLoading back to true.
+    placeholderData: keepPreviousData,
   });
 
   // ── Mutations ─────────────────────────────────────────────────────────────
@@ -367,6 +380,67 @@ export function ResalePage() {
         </div>
       )}
 
+      {/* ── Filters ─────────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+          >
+            <option value="">All</option>
+            {(Object.keys(STATUS_LABELS) as ResaleStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Listed from</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Listed to</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+          />
+        </div>
+        <div className="relative">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Search</label>
+          <Search size={13} className="absolute left-2.5 top-[1.9rem] text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Serial, model, or tag…"
+            className="pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] w-56"
+          />
+        </div>
+        {(statusFilter || searchQuery || fromDate || toDate) && (
+          <button
+            onClick={() => {
+              setStatusFilter('');
+              setSearchQuery('');
+              setFromDate('');
+              setToDate('');
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 underline mb-1"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
       {/* ── Resale listings table ──────────────────────────────────────────── */}
       {isLoading ? (
         <div className="text-sm text-gray-400">Loading…</div>
@@ -451,7 +525,9 @@ export function ResalePage() {
               {listings.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">
-                    No resale listings yet. Create one above.
+                    {statusFilter || searchQuery || fromDate || toDate
+                      ? 'No resale listings match the selected filters.'
+                      : 'No resale listings yet. Create one above.'}
                   </td>
                 </tr>
               )}

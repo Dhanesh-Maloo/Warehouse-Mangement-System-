@@ -19,9 +19,56 @@ export class DisposalService {
 
   findAll(
     clientId?: string,
+    filters?: {
+      status?: string;
+      disposalType?: string;
+      search?: string;
+      fromDate?: string;
+      toDate?: string;
+    },
   ): Prisma.PrismaPromise<Prisma.DisposalRequestGetPayload<{ include: { asset: true } }>[]> {
+    const toDateFilter = filters?.toDate
+      ? (() => {
+          const d = new Date(filters.toDate as string);
+          if (!(filters.toDate as string).includes('T')) d.setDate(d.getDate() + 1);
+          return d;
+        })()
+      : null;
+
+    const searchFilter = filters?.search
+      ? {
+          OR: [
+            { ivalueTicketNumber: { contains: filters.search, mode: 'insensitive' as const } },
+            { clientTicketNumber: { contains: filters.search, mode: 'insensitive' as const } },
+            {
+              asset: {
+                OR: [
+                  { serialNumber: { contains: filters.search, mode: 'insensitive' as const } },
+                  { model: { contains: filters.search, mode: 'insensitive' as const } },
+                  { manufacturer: { contains: filters.search, mode: 'insensitive' as const } },
+                  { assetTag: { contains: filters.search, mode: 'insensitive' as const } },
+                ],
+              },
+            },
+          ],
+        }
+      : {};
+
     return this.prisma.disposalRequest.findMany({
-      where: clientId ? { clientId } : {},
+      where: {
+        ...(clientId ? { clientId } : {}),
+        ...(filters?.status ? { status: filters.status as never } : {}),
+        ...(filters?.disposalType ? { disposalType: filters.disposalType as never } : {}),
+        ...(filters?.fromDate || toDateFilter
+          ? {
+              createdAt: {
+                ...(filters?.fromDate ? { gte: new Date(filters.fromDate) } : {}),
+                ...(toDateFilter ? { lt: toDateFilter } : {}),
+              },
+            }
+          : {}),
+        ...searchFilter,
+      },
       include: { asset: true },
       orderBy: { createdAt: 'desc' },
     });

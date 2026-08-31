@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { ClipboardCheck, Plus, AlertTriangle, Clock } from 'lucide-react';
+import { ClipboardCheck, Plus, AlertTriangle, Clock, Search } from 'lucide-react';
 
 interface Asset {
   id: string;
@@ -63,6 +63,10 @@ export function InspectionsPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [showStart, setShowStart] = useState(false);
 
   // Start inspection form state
@@ -73,11 +77,15 @@ export function InspectionsPage() {
   const clientId = user?.role === 'client_user' ? (user.clientId ?? undefined) : undefined;
 
   const { data: inspections = [], isLoading } = useQuery({
-    queryKey: ['inspections', clientId, statusFilter],
+    queryKey: ['inspections', clientId, statusFilter, typeFilter, searchQuery, fromDate, toDate],
     queryFn: () => {
       const params = new URLSearchParams();
       if (clientId) params.set('clientId', clientId);
       if (statusFilter) params.set('status', statusFilter);
+      if (typeFilter) params.set('type', typeFilter);
+      if (searchQuery.trim()) params.set('search', searchQuery.trim());
+      if (fromDate) params.set('fromDate', fromDate);
+      if (toDate) params.set('toDate', toDate);
       return api.get<Inspection[]>(`/inspections${params.size ? `?${params}` : ''}`);
     },
     // Keeps showing previous results while a new filter fetch is in flight,
@@ -147,6 +155,65 @@ export function InspectionsPage() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Type</label>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+          >
+            <option value="">All</option>
+            <option value="inbound">Inbound</option>
+            <option value="outbound">Outbound</option>
+            <option value="periodic">Periodic</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Started from</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Started to</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+          />
+        </div>
+        <div className="relative">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Search</label>
+          <Search size={13} className="absolute left-2.5 top-[1.9rem] text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Asset, model, or ticket #…"
+            className="pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] w-56"
+          />
+        </div>
+        {(typeFilter || fromDate || toDate || searchQuery) && (
+          <button
+            onClick={() => {
+              setTypeFilter('');
+              setFromDate('');
+              setToDate('');
+              setSearchQuery('');
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 underline mb-1"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       {/* Start inspection slide panel */}
@@ -404,7 +471,9 @@ export function InspectionsPage() {
                       <tr>
                         <td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">
                           <ClipboardCheck size={24} className="mx-auto mb-2 text-gray-300" />
-                          No inspections yet.
+                          {statusFilter || typeFilter || fromDate || toDate || searchQuery
+                            ? 'No inspections match the selected filters.'
+                            : 'No inspections yet.'}
                         </td>
                       </tr>
                     )}
