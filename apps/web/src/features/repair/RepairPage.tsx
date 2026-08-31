@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Plus, Upload, FileText } from 'lucide-react';
+import { Plus, Upload, FileText, Search } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,7 +21,14 @@ interface InventoryAsset {
   manufacturer: string;
 }
 
-type RepairStatus = 'pending' | 'sent' | 'in_repair' | 'returned' | 'completed' | 'cancelled';
+type RepairStatus =
+  | 'pending'
+  | 'approved'
+  | 'sent'
+  | 'in_repair'
+  | 'returned'
+  | 'completed'
+  | 'cancelled';
 type RepairType = 'oem_warranty' | 'in_house' | 'out_of_warranty';
 type RepairCategory = 'software' | 'hardware';
 
@@ -44,6 +51,7 @@ interface RepairRequest {
   clientTicketNumber: string | null;
   notes?: string;
   requestedAt: string;
+  approvedAt: string | null;
   slaTargetAt: string | null;
   isOverdue: boolean;
 }
@@ -65,6 +73,7 @@ const REPAIR_CATEGORY_LABELS: Record<RepairCategory, string> = {
 
 const STATUS_COLORS: Record<RepairStatus, string> = {
   pending: 'bg-gray-100 text-gray-700',
+  approved: 'bg-sky-100 text-sky-700',
   sent: 'bg-blue-100 text-blue-700',
   in_repair: 'bg-amber-100 text-amber-700',
   returned: 'bg-purple-100 text-purple-700',
@@ -74,6 +83,7 @@ const STATUS_COLORS: Record<RepairStatus, string> = {
 
 const STATUS_LABELS: Record<RepairStatus, string> = {
   pending: 'Pending',
+  approved: 'Approved',
   sent: 'Sent',
   in_repair: 'In Repair',
   returned: 'Returned',
@@ -81,10 +91,23 @@ const STATUS_LABELS: Record<RepairStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+const ALL_STATUSES: RepairStatus[] = [
+  'pending',
+  'approved',
+  'sent',
+  'in_repair',
+  'returned',
+  'completed',
+  'cancelled',
+];
+
 const REPAIR_TERMINAL_STATUSES = new Set<RepairStatus>(['completed', 'cancelled']);
 
+// 'approved' is reached only via the dedicated Approve action (designated
+// manager sign-off) below — not through this generic status dropdown.
 const NEXT_STATUSES: Partial<Record<RepairStatus, RepairStatus[]>> = {
-  pending: ['sent', 'cancelled'],
+  pending: ['cancelled'],
+  approved: ['sent', 'cancelled'],
   sent: ['in_repair', 'cancelled'],
   in_repair: ['returned', 'cancelled'],
   returned: ['completed'],
@@ -125,6 +148,9 @@ export function RepairPage() {
   const isClientAdmin = user?.role === 'client_admin';
   // editors are scoped to their own client like client_users, but can create repair requests
   const isClientScoped = isClientUser || isEditor || isClientAdmin;
+  const isAdminOrManager = user?.role === 'admin' || user?.role === 'manager';
+  // Approval is an authority gate — editors/operators cannot approve their own requests.
+  const canApprove = isAdminOrManager || isClientAdmin;
   const clientId = isClientScoped ? (user?.clientId ?? undefined) : undefined;
 
   const [showForm, setShowForm] = useState(false);
@@ -137,6 +163,16 @@ export function RepairPage() {
   const [dcError, setDcError] = useState('');
   const dcFileRef = useRef<HTMLInputElement>(null);
   const [selectResetTick, setSelectResetTick] = useState(0);
+  const [confirmApproveId, setConfirmApproveId] = useState<string | null>(null);
+
+  // Filters
+  const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [serviceCenterFilter, setServiceCenterFilter] = useState('');
+  const [assetFilter, setAssetFilter] = useState('');
+  const [ticketFilter, setTicketFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const effectiveClientId = isClientScoped ? (clientId ?? '') : selectedClientId;
 
@@ -162,8 +198,29 @@ export function RepairPage() {
   });
 
   const { data: repairs = [], isLoading } = useQuery({
-    queryKey: ['repair-requests', clientId],
-    queryFn: () => api.get<RepairRequest[]>(`/repair${clientId ? `?clientId=${clientId}` : ''}`),
+    queryKey: [
+      'repair-requests',
+      clientId,
+      statusFilter,
+      typeFilter,
+      serviceCenterFilter,
+      assetFilter,
+      ticketFilter,
+      fromDate,
+      toDate,
+    ],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (clientId) params.set('clientId', clientId);
+      if (statusFilter) params.set('status', statusFilter);
+      if (typeFilter) params.set('repairType', typeFilter);
+      if (serviceCenterFilter.trim()) params.set('serviceCenterName', serviceCenterFilter.trim());
+      if (assetFilter.trim()) params.set('assetSearch', assetFilter.trim());
+      if (ticketFilter.trim()) params.set('ticketSearch', ticketFilter.trim());
+      if (fromDate) params.set('fromDate', fromDate);
+      if (toDate) params.set('toDate', toDate);
+      return api.get<RepairRequest[]>(`/repair?${params.toString()}`);
+    },
   });
 
   // ── Mutations ─────────────────────────────────────────────────────────────
@@ -176,6 +233,14 @@ export function RepairPage() {
       void qc.invalidateQueries({ queryKey: ['inventory-summary'] });
       void qc.invalidateQueries({ queryKey: ['in-storage-assets-repair'] });
       resetForm();
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/repair/${id}/approve`, {}),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['repair-requests'] });
+      setConfirmApproveId(null);
     },
   });
 
@@ -523,6 +588,145 @@ export function RepairPage() {
         </div>
       )}
 
+      {/* ── Filters ─────────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+          >
+            <option value="">All</option>
+            {ALL_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Type</label>
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+          >
+            <option value="">All</option>
+            {(Object.entries(REPAIR_TYPE_LABELS) as [RepairType, string][]).map(
+              ([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ),
+            )}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Service Center</label>
+          <input
+            type="text"
+            value={serviceCenterFilter}
+            onChange={(e) => setServiceCenterFilter(e.target.value)}
+            placeholder="e.g. Dell ASC"
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] w-40"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Asset</label>
+          <input
+            type="text"
+            value={assetFilter}
+            onChange={(e) => setAssetFilter(e.target.value)}
+            placeholder="Serial, tag, or model"
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] w-40"
+          />
+        </div>
+        <div className="relative">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Ticket number</label>
+          <Search size={13} className="absolute left-2.5 top-[1.9rem] text-gray-400" />
+          <input
+            type="text"
+            value={ticketFilter}
+            onChange={(e) => setTicketFilter(e.target.value)}
+            placeholder="iValue or client ticket #"
+            className="pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] w-48"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Requested from</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Requested to</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+          />
+        </div>
+        {(statusFilter ||
+          typeFilter ||
+          serviceCenterFilter ||
+          assetFilter ||
+          ticketFilter ||
+          fromDate ||
+          toDate) && (
+          <button
+            onClick={() => {
+              setStatusFilter('');
+              setTypeFilter('');
+              setServiceCenterFilter('');
+              setAssetFilter('');
+              setTicketFilter('');
+              setFromDate('');
+              setToDate('');
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 underline mb-1"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {/* ── Approval confirmation dialog ────────────────────────────────────── */}
+      {confirmApproveId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm mx-4 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900">Confirm Approval</h3>
+            <p className="text-sm text-gray-600">
+              Are you sure you want to approve this repair request? It can then be sent to the
+              service center.
+            </p>
+            {approveMutation.error && (
+              <p className="text-sm text-red-600">{(approveMutation.error as Error).message}</p>
+            )}
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => approveMutation.mutate(confirmApproveId)}
+                disabled={approveMutation.isPending}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 transition-colors"
+              >
+                {approveMutation.isPending ? 'Approving…' : 'Yes, Approve'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmApproveId(null)}
+                className="flex-1 text-sm text-gray-600 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Repair requests table ──────────────────────────────────────────── */}
       {isLoading ? (
         <div className="text-sm text-gray-400">Loading…</div>
@@ -536,6 +740,8 @@ export function RepairPage() {
                 <th className="text-left px-5 py-3">Type</th>
                 <th className="text-left px-5 py-3">Estimate</th>
                 <th className="text-left px-5 py-3">Status</th>
+                <th className="text-left px-5 py-3">iValue Ticket #</th>
+                <th className="text-left px-5 py-3">Client Ticket #</th>
                 <th className="text-left px-5 py-3">Requested</th>
                 <th className="text-left px-5 py-3">SLA Target</th>
                 <th className="px-5 py-3" />
@@ -586,30 +792,53 @@ export function RepairPage() {
 
                     {/* Status — inline select for actionable rows, badge for terminal states */}
                     <td className="px-5 py-3.5">
-                      {canUpdate ? (
-                        <select
-                          key={`${r.id}-${r.status}-${selectResetTick}`}
-                          defaultValue={r.status}
-                          onChange={(e) => handleStatusChange(r.id, e.target.value as RepairStatus)}
-                          disabled={updateStatusMutation.isPending}
-                          className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white disabled:opacity-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-500"
-                        >
-                          <option value={r.status}>{STATUS_LABELS[r.status]}</option>
-                          {nextStatuses.map((s) => (
-                            <option key={s} value={s}>
-                              {STATUS_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                            STATUS_COLORS[r.status] ?? 'bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          {STATUS_LABELS[r.status] ?? r.status}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {canUpdate ? (
+                          <select
+                            key={`${r.id}-${r.status}-${selectResetTick}`}
+                            defaultValue={r.status}
+                            onChange={(e) =>
+                              handleStatusChange(r.id, e.target.value as RepairStatus)
+                            }
+                            disabled={updateStatusMutation.isPending}
+                            className="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white disabled:opacity-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-500"
+                          >
+                            <option value={r.status}>{STATUS_LABELS[r.status]}</option>
+                            {nextStatuses.map((s) => (
+                              <option key={s} value={s}>
+                                {STATUS_LABELS[s]}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                              STATUS_COLORS[r.status] ?? 'bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            {STATUS_LABELS[r.status] ?? r.status}
+                          </span>
+                        )}
+                        {canApprove && r.status === 'pending' && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmApproveId(r.id)}
+                            className="text-xs font-semibold text-blue-600 hover:underline whitespace-nowrap"
+                          >
+                            Approve
+                          </button>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* iValue Ticket # */}
+                    <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                      {r.ivalueTicketNumber || <span className="text-gray-300">-</span>}
+                    </td>
+
+                    {/* Client Ticket # */}
+                    <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                      {r.clientTicketNumber || <span className="text-gray-300">-</span>}
                     </td>
 
                     {/* Requested date */}
@@ -688,8 +917,16 @@ export function RepairPage() {
               })}
               {repairs.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center text-gray-400 text-sm">
-                    No repair requests yet. Create one above.
+                  <td colSpan={10} className="px-5 py-12 text-center text-gray-400 text-sm">
+                    {statusFilter ||
+                    typeFilter ||
+                    serviceCenterFilter ||
+                    assetFilter ||
+                    ticketFilter ||
+                    fromDate ||
+                    toDate
+                      ? 'No repair requests match the selected filters.'
+                      : 'No repair requests yet. Create one above.'}
                   </td>
                 </tr>
               )}

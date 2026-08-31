@@ -145,8 +145,11 @@ enum DisposalStatus {
 }
 
 // Placeholder scope pending Esevel/Divya sign-off — see RepairRequest model comment.
+// 'approved' gates the request behind sign-off from a designated manager
+// (admin/manager/client_admin) before it can be sent to a service center.
 enum RepairStatus {
   pending
+  approved
   sent
   in_repair
   returned
@@ -680,6 +683,8 @@ model RepairRequest {
   notes             String?
   createdByUserId   String       @map("created_by_user_id")
   requestedAt       DateTime     @default(now()) @map("requested_at") @db.Timestamptz
+  approvedAt        DateTime?    @map("approved_at") @db.Timestamptz
+  approvedByUserId  String?      @map("approved_by_user_id")
   slaTargetAt       DateTime?    @map("sla_target_at") @db.Timestamptz
   slaUpdatedAt      DateTime?    @map("sla_updated_at") @db.Timestamptz
   sentAt            DateTime?    @map("sent_at") @db.Timestamptz

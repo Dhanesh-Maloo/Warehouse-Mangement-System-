@@ -298,6 +298,49 @@ describe('RepairService', () => {
     });
   });
 
+  describe('approve', () => {
+    it('throws NotFoundException if the repair request does not exist', async () => {
+      mockPrisma.repairRequest.findUnique.mockResolvedValue(null);
+
+      await expect(service.approve('missing', 'manager-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects approving a repair request that is not pending', async () => {
+      mockPrisma.repairRequest.findUnique.mockResolvedValue({
+        id: 'repair-1',
+        status: 'sent',
+      });
+
+      await expect(service.approve('repair-1', 'manager-1')).rejects.toThrow(BadRequestException);
+    });
+
+    it('transitions pending -> approved and stamps approvedAt/approvedByUserId', async () => {
+      mockPrisma.repairRequest.findUnique.mockResolvedValue({
+        id: 'repair-1',
+        assetId: 'asset-1',
+        status: 'pending',
+      });
+      mockPrisma.repairRequest.update.mockImplementation(({ data }: any) => ({
+        id: 'repair-1',
+        assetId: 'asset-1',
+        ...data,
+      }));
+      mockPrisma.asset.findMany.mockResolvedValue([baseAsset]);
+
+      const result = await service.approve('repair-1', 'manager-1');
+
+      expect(result.status).toBe('approved');
+      expect(mockPrisma.repairRequest.update).toHaveBeenCalledWith({
+        where: { id: 'repair-1' },
+        data: expect.objectContaining({
+          status: 'approved',
+          approvedByUserId: 'manager-1',
+          approvedAt: expect.any(Date),
+        }),
+      });
+    });
+  });
+
   describe('updateStatus', () => {
     function setupRepair(status: string): void {
       mockPrisma.repairRequest.findUnique.mockResolvedValue({
@@ -323,7 +366,7 @@ describe('RepairService', () => {
     });
 
     it.each([
-      ['pending', 'sent'],
+      ['approved', 'sent'],
       ['sent', 'in_repair'],
       ['in_repair', 'returned'],
       ['returned', 'completed'],
@@ -340,6 +383,14 @@ describe('RepairService', () => {
 
       await expect(
         service.updateStatus('repair-1', { status: 'completed' } as any, 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects going straight from pending to sent — requires approval first', async () => {
+      setupRepair('pending');
+
+      await expect(
+        service.updateStatus('repair-1', { status: 'sent' } as any, 'user-1'),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -385,7 +436,7 @@ describe('RepairService', () => {
     it.each(['sent', 'in_repair', 'completed'])(
       'does not touch the asset status on transition to %s',
       async (to) => {
-        const from = to === 'sent' ? 'pending' : to === 'in_repair' ? 'sent' : 'returned';
+        const from = to === 'sent' ? 'approved' : to === 'in_repair' ? 'sent' : 'returned';
         setupRepair(from);
 
         await service.updateStatus('repair-1', { status: to } as any, 'user-1');

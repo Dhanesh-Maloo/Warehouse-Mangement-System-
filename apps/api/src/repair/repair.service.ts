@@ -27,8 +27,12 @@ export type RepairRequestWithAsset = RepairRequest & {
 // relation field — so the related asset is looked up separately (batched by id)
 // and attached in-memory, same pattern used for other relation-less lookups
 // (e.g. EventSuppression) elsewhere in the codebase.
+// 'approved' is reached only via the dedicated approve() method below (gated
+// to admin/manager/client_admin at the controller) — never via updateStatus,
+// so UpdateRepairStatusDto intentionally omits it from its allowed values.
 const REPAIR_TRANSITIONS: Record<string, string[]> = {
-  pending: ['sent', 'cancelled'],
+  pending: ['cancelled'],
+  approved: ['sent', 'cancelled'],
   sent: ['in_repair', 'cancelled'],
   in_repair: ['returned', 'cancelled'],
   returned: ['completed'],
@@ -90,9 +94,80 @@ export class RepairService {
     }));
   }
 
-  async findAll(clientId?: string): Promise<RepairRequestWithAsset[]> {
+  async findAll(
+    clientId?: string,
+    filters?: {
+      status?: string;
+      repairType?: string;
+      serviceCenterName?: string;
+      assetSearch?: string;
+      ticketSearch?: string;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ): Promise<RepairRequestWithAsset[]> {
+    const toDateFilter = filters?.toDate
+      ? (() => {
+          const d = new Date(filters.toDate as string);
+          if (!(filters.toDate as string).includes('T')) d.setDate(d.getDate() + 1);
+          return d;
+        })()
+      : null;
+
+    // RepairRequest has no Prisma relation to Asset (see class-level comment),
+    // so an asset search resolves matching asset ids first, then filters
+    // repairRequest.assetId against that set.
+    let assetIdFilter: string[] | null = null;
+    if (filters?.assetSearch) {
+      const matchingAssets = await this.prisma.asset.findMany({
+        where: {
+          OR: [
+            { serialNumber: { contains: filters.assetSearch, mode: 'insensitive' } },
+            { model: { contains: filters.assetSearch, mode: 'insensitive' } },
+            { assetTag: { contains: filters.assetSearch, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+      });
+      assetIdFilter = matchingAssets.map((a) => a.id);
+    }
+
     const rows = await this.prisma.repairRequest.findMany({
-      where: clientId ? { clientId } : {},
+      where: {
+        ...(clientId ? { clientId } : {}),
+        ...(filters?.status ? { status: filters.status as never } : {}),
+        ...(filters?.repairType ? { repairType: filters.repairType as never } : {}),
+        ...(filters?.serviceCenterName
+          ? { serviceCenterName: { contains: filters.serviceCenterName, mode: 'insensitive' } }
+          : {}),
+        ...(assetIdFilter ? { assetId: { in: assetIdFilter } } : {}),
+        ...(filters?.ticketSearch
+          ? {
+              OR: [
+                {
+                  ivalueTicketNumber: {
+                    contains: filters.ticketSearch,
+                    mode: 'insensitive' as const,
+                  },
+                },
+                {
+                  clientTicketNumber: {
+                    contains: filters.ticketSearch,
+                    mode: 'insensitive' as const,
+                  },
+                },
+              ],
+            }
+          : {}),
+        ...(filters?.fromDate || toDateFilter
+          ? {
+              requestedAt: {
+                ...(filters?.fromDate ? { gte: new Date(filters.fromDate) } : {}),
+                ...(toDateFilter ? { lt: toDateFilter } : {}),
+              },
+            }
+          : {}),
+      },
       orderBy: { requestedAt: 'desc' },
     });
     return this.attachAssets(rows);
@@ -211,6 +286,41 @@ export class RepairService {
     });
 
     const [withAsset] = await this.attachAssets([repair]);
+    return withAsset;
+  }
+
+  // Sign-off from a designated manager before the request is sent to a
+  // service center. Restricted to admin/manager/client_admin at the
+  // controller — editors and operators cannot approve their own requests.
+  async approve(id: string, approvedByUserId: string): Promise<RepairRequestWithAsset> {
+    const repair = await this.prisma.repairRequest.findUnique({ where: { id } });
+    if (!repair) throw new NotFoundException(`Repair request ${id} not found`);
+
+    if (repair.status !== 'pending') {
+      throw new BadRequestException(
+        `Repair request ${id} cannot be approved from status '${repair.status}'`,
+      );
+    }
+
+    const updated = await this.prisma.repairRequest.update({
+      where: { id },
+      data: {
+        status: 'approved',
+        approvedAt: new Date(),
+        approvedByUserId,
+      },
+    });
+
+    await this.audit.log({
+      userId: approvedByUserId,
+      action: 'repair.approve',
+      entity: 'RepairRequest',
+      entityId: id,
+      oldValue: { status: 'pending' },
+      newValue: { status: 'approved' },
+    });
+
+    const [withAsset] = await this.attachAssets([updated]);
     return withAsset;
   }
 

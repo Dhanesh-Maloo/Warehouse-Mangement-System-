@@ -41,13 +41,28 @@ export class RepairController {
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(
     @Query('clientId') clientId?: string,
+    @Query('status') status?: string,
+    @Query('repairType') repairType?: string,
+    @Query('serviceCenterName') serviceCenterName?: string,
+    @Query('assetSearch') assetSearch?: string,
+    @Query('ticketSearch') ticketSearch?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<RepairService['findAll']> {
     const effectiveClientId =
       user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
-    return this.repairService.findAll(effectiveClientId);
+    return this.repairService.findAll(effectiveClientId, {
+      status,
+      repairType,
+      serviceCenterName,
+      assetSearch,
+      ticketSearch,
+      fromDate,
+      toDate,
+    });
   }
 
   @Get('asset/:assetId')
@@ -83,6 +98,18 @@ export class RepairController {
       dto.clientId = user.clientId;
     }
     return this.repairService.create(dto, user.sub);
+  }
+
+  // Approval is an authority gate — editors/operators excluded; client_admin
+  // may approve within their own client.
+  @Patch(':id/approve')
+  @Roles('admin', 'manager', 'client_admin')
+  async approve(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<RepairService['approve']> {
+    await this.assertOwnsRepair(id, user);
+    return this.repairService.approve(id, user.sub);
   }
 
   @Patch(':id/status')
