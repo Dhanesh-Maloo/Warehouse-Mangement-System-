@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
@@ -80,6 +80,9 @@ export function InspectionsPage() {
       if (statusFilter) params.set('status', statusFilter);
       return api.get<Inspection[]>(`/inspections${params.size ? `?${params}` : ''}`);
     },
+    // Keeps showing previous results while a new filter fetch is in flight,
+    // instead of flipping isLoading back to true.
+    placeholderData: keepPreviousData,
   });
 
   // All active assets (for the start panel) — any status except disposed

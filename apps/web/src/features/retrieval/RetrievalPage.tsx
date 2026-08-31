@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
@@ -231,6 +231,10 @@ export function RetrievalPage() {
       if (ticketSearch.trim()) params.set('ticketSearch', ticketSearch.trim());
       return api.get<RetrievalRequest[]>(`/retrieval?${params.toString()}`);
     },
+    // Keeps showing previous results while a new filter/search fetch is in
+    // flight, instead of flipping isLoading back to true (which would unmount
+    // the filter bar's inputs and drop keyboard focus on every keystroke).
+    placeholderData: keepPreviousData,
   });
 
   // Courier zone is derived server-side from the pickup pincode. This is a

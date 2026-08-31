@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
@@ -221,6 +221,10 @@ export function RepairPage() {
       if (toDate) params.set('toDate', toDate);
       return api.get<RepairRequest[]>(`/repair?${params.toString()}`);
     },
+    // Keeps showing previous results while a new filter/search fetch is in
+    // flight, instead of flipping isLoading back to true (which would unmount
+    // the filter bar's inputs and drop keyboard focus on every keystroke).
+    placeholderData: keepPreviousData,
   });
 
   // ── Mutations ─────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
 import { Plus, X, Pencil, User } from 'lucide-react';
@@ -59,6 +59,10 @@ export function EndUsersPage() {
   const { data: endUsers = [], isLoading } = useQuery({
     queryKey: ['end-users', isClientScoped ? user?.clientId : null, search],
     queryFn: () => api.get<EndUser[]>(`/end-users?${queryParams.toString()}`),
+    // Keeps showing previous results while a new search fetch is in flight,
+    // instead of flipping isLoading back to true (which would unmount the
+    // search input and drop keyboard focus on every keystroke).
+    placeholderData: keepPreviousData,
   });
 
   const { data: clients = [] } = useQuery({

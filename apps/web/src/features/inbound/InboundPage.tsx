@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
@@ -77,6 +77,10 @@ export function InboundPage() {
       if (poSearch.trim()) params.set('search', poSearch.trim());
       return api.get<Delivery[]>(`/inbound/deliveries?${params.toString()}`);
     },
+    // Keeps showing previous results while a new search fetch is in flight,
+    // instead of flipping isLoading back to true (which would unmount the
+    // search input and drop keyboard focus on every keystroke).
+    placeholderData: keepPreviousData,
   });
 
   const statusChangeMutation = useMutation({
