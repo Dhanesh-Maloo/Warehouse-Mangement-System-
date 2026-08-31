@@ -66,7 +66,7 @@ const DISPOSAL_TYPE_META: Record<
     description: 'Decommission with no data wipe certificate',
   },
   certified_blanco: {
-    label: 'Certified Data Destruction - Blanco',
+    label: 'Certified Data Destruction',
     price: '₹550 + GST',
     description: 'Certified wipe + destruction certificate',
   },
