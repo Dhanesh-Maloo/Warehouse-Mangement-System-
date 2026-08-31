@@ -40,13 +40,15 @@ export class DeploymentController {
   @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
   findAll(
     @Query('clientId') clientId?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<DeploymentService['findAll']> {
     const effectiveClientId =
       user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
         ? (user.clientId ?? undefined)
         : clientId;
-    return this.deploymentService.findAll(effectiveClientId);
+    return this.deploymentService.findAll(effectiveClientId, search, status);
   }
 
   @Get(':id')

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, DeploymentOrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { RateCardService } from '../rate-card/rate-card.service';
@@ -26,11 +26,29 @@ export class DeploymentService {
    */
   findAll(
     clientId?: string,
+    search?: string,
+    status?: string,
   ): Prisma.PrismaPromise<
     Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>[]
   > {
+    const searchFilter = search
+      ? {
+          OR: [
+            { ivalueTicketNumber: { contains: search, mode: 'insensitive' as const } },
+            { clientTicketNumber: { contains: search, mode: 'insensitive' as const } },
+            { trackingNumber: { contains: search, mode: 'insensitive' as const } },
+            { asset: { serialNumber: { contains: search, mode: 'insensitive' as const } } },
+            { asset: { assetTag: { contains: search, mode: 'insensitive' as const } } },
+            { endUser: { name: { contains: search, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {};
     return this.prisma.deploymentOrder.findMany({
-      where: clientId ? { clientId } : {},
+      where: {
+        ...(clientId ? { clientId } : {}),
+        ...(status ? { status: status as DeploymentOrderStatus } : {}),
+        ...searchFilter,
+      },
       include: { asset: true, endUser: true },
       orderBy: { requestedAt: 'desc' },
     });

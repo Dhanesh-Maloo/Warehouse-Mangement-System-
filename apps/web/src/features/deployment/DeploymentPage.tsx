@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Plus, X, Truck } from 'lucide-react';
+import { Plus, X, Truck, Search } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,6 +47,8 @@ interface DeploymentOrder {
   contactName: string;
   contactPhone: string;
   trackingNumber?: string;
+  ivalueTicketNumber?: string;
+  clientTicketNumber?: string;
   notes?: string;
   requestedAt: string;
 }
@@ -145,6 +147,10 @@ export function DeploymentPage() {
   // Filter / search client (admin view)
   const [filterClientId, setFilterClientId] = useState('');
 
+  // Orders list filters
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState('');
+
   // ---------------------------------------------------------------------------
   // Queries
   // ---------------------------------------------------------------------------
@@ -185,10 +191,12 @@ export function DeploymentPage() {
   });
 
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ['deployment-orders', activeClientId],
+    queryKey: ['deployment-orders', activeClientId, orderSearch, orderStatusFilter],
     queryFn: () => {
       const params = new URLSearchParams();
       if (activeClientId) params.set('clientId', activeClientId);
+      if (orderSearch.trim()) params.set('search', orderSearch.trim());
+      if (orderStatusFilter) params.set('status', orderStatusFilter);
       return api.get<DeploymentOrder[]>(`/deployment?${params.toString()}`);
     },
   });
@@ -830,6 +838,49 @@ export function DeploymentPage() {
         <div className="text-sm text-gray-400">Loading…</div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          {/* Filters */}
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-3 flex-wrap">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Status
+            </label>
+            <select
+              value={orderStatusFilter}
+              onChange={(e) => setOrderStatusFilter(e.target.value)}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+            >
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="in_transit">In Transit</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+
+            <div className="relative ml-auto">
+              <Search
+                size={14}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                type="text"
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                placeholder="Search asset, ticket no, or tracking no…"
+                className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white w-72"
+              />
+            </div>
+            {(orderSearch || orderStatusFilter) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOrderSearch('');
+                  setOrderStatusFilter('');
+                }}
+                className="text-xs text-gray-500 hover:text-gray-700 underline"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -839,6 +890,8 @@ export function DeploymentPage() {
                   <th className="text-left px-5 py-3">Delivery Address</th>
                   <th className="text-left px-5 py-3">Courier Zone</th>
                   <th className="text-left px-5 py-3">Status</th>
+                  <th className="text-left px-5 py-3">iValue Ticket #</th>
+                  <th className="text-left px-5 py-3">Client Ticket #</th>
                   <th className="text-left px-5 py-3">Tracking No.</th>
                   <th className="text-left px-5 py-3">Requested</th>
                   <th className="px-5 py-3" />
@@ -927,6 +980,16 @@ export function DeploymentPage() {
                             {STATUS_LABELS[order.status] ?? order.status}
                           </span>
                         )}
+                      </td>
+
+                      {/* iValue Ticket # */}
+                      <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                        {order.ivalueTicketNumber || <span className="text-gray-300">-</span>}
+                      </td>
+
+                      {/* Client Ticket # */}
+                      <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                        {order.clientTicketNumber || <span className="text-gray-300">-</span>}
                       </td>
 
                       {/* Tracking number — inline editable */}
@@ -1018,8 +1081,10 @@ export function DeploymentPage() {
                 })}
                 {orders.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-gray-400 text-sm">
-                      No deployment orders yet. Create one above.
+                    <td colSpan={10} className="px-5 py-12 text-center text-gray-400 text-sm">
+                      {orderSearch || orderStatusFilter
+                        ? 'No deployment orders match the selected filters.'
+                        : 'No deployment orders yet. Create one above.'}
                     </td>
                   </tr>
                 )}
