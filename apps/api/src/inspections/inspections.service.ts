@@ -20,6 +20,9 @@ import { businessMinutesBetween, addBusinessMinutes } from '../common/business-h
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
 const PDFDocument = require('pdfkit') as typeof import('pdfkit');
 
+// Minimum evidence photos required to complete an inspection.
+const MIN_COMPLETION_PHOTOS = 3;
+
 // Mirrors the checklist shown on the inspection detail page
 // (apps/web/src/features/inspections/InspectionDetailPage.tsx) so the report
 // wording matches what staff filled in on screen.
@@ -346,13 +349,15 @@ export class InspectionsService {
       throw new BadRequestException('Inspection is not in progress');
     }
 
-    // Require at least one photo
+    // Require at least MIN_COMPLETION_PHOTOS photos
     const photoCount = await this.prisma.inspectionPhoto.count({
       where: { inspectionId: id },
     });
     const incomingPhotos = dto.photoKeys?.length ?? 0;
-    if (photoCount + incomingPhotos < 1) {
-      throw new BadRequestException('At least one photo is required to complete an inspection');
+    if (photoCount + incomingPhotos < MIN_COMPLETION_PHOTOS) {
+      throw new BadRequestException(
+        `At least ${MIN_COMPLETION_PHOTOS} photos are required to complete an inspection`,
+      );
     }
 
     const completedAt = new Date();

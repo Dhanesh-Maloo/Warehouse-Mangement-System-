@@ -107,7 +107,7 @@ describe('InspectionsService', () => {
           .mockImplementation((args) => Promise.resolve({ id: 'inspection-new', ...args.data })),
       },
       inspectionPhoto: {
-        count: jest.fn().mockResolvedValue(1),
+        count: jest.fn().mockResolvedValue(3),
         createMany: jest.fn().mockResolvedValue({}),
       },
       asset: {
@@ -248,6 +248,34 @@ describe('InspectionsService', () => {
       await expect(
         service.complete('inspection-1', { ...cleanDto, photoKeys: undefined }, 'user-1'),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException with fewer than the required minimum of 3 photos', async () => {
+      mockPrisma.inspection.findUnique.mockResolvedValue({
+        ...baseInspection,
+        sourceRetrievalId: null,
+      });
+      mockPrisma.inspectionPhoto.count.mockResolvedValue(1);
+
+      await expect(
+        service.complete('inspection-1', { ...cleanDto, photoKeys: ['photo-1'] }, 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('allows completion with exactly the required minimum of 3 photos', async () => {
+      mockPrisma.inspection.findUnique.mockResolvedValue({
+        ...baseInspection,
+        sourceRetrievalId: null,
+      });
+      mockPrisma.inspectionPhoto.count.mockResolvedValue(0);
+
+      await expect(
+        service.complete(
+          'inspection-1',
+          { ...cleanDto, photoKeys: ['photo-1', 'photo-2', 'photo-3'] },
+          'user-1',
+        ),
+      ).resolves.toBeDefined();
     });
   });
 

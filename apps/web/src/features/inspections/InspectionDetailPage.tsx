@@ -217,6 +217,9 @@ const CHECKLIST_SECTIONS: { title: string; items: ChecklistItem[] }[] = [
 
 const ALL_ITEMS = CHECKLIST_SECTIONS.flatMap((s) => s.items);
 
+// Mirrors MIN_COMPLETION_PHOTOS in apps/api/src/inspections/inspections.service.ts
+const MIN_COMPLETION_PHOTOS = 3;
+
 function isPass(item: ChecklistItem, value: boolean | null): boolean {
   if (value === null) return true; // N/A counts as not a failure
   return item.yesIsGood ? value === true : value === false;
@@ -423,8 +426,9 @@ export function InspectionDetailPage() {
       setError('Select a condition grade.');
       return;
     }
-    if (photos.length === 0) {
-      setError('At least one photo is required to complete an inspection.');
+    const totalPhotoCount = (inspection?.photos.length ?? 0) + photos.length;
+    if (totalPhotoCount < MIN_COMPLETION_PHOTOS) {
+      setError(`At least ${MIN_COMPLETION_PHOTOS} photos are required to complete an inspection.`);
       return;
     }
     completeMutation.mutate();
@@ -1108,7 +1112,8 @@ export function InspectionDetailPage() {
                 className="w-full border-2 border-dashed border-gray-200 rounded-lg py-8 text-center text-sm text-gray-400 hover:border-[#E86F2C] hover:text-[#E86F2C] transition-colors"
               >
                 <Camera size={20} className="mx-auto mb-1" />
-                Upload up to 10 images - top, bottom, front, sides, etc.
+                Upload at least {MIN_COMPLETION_PHOTOS} images (up to 10) - top, bottom, front,
+                sides, etc.
               </button>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -1164,8 +1169,10 @@ export function InspectionDetailPage() {
 
           <div className="flex items-center justify-between pt-1">
             <span className="text-sm text-gray-500">
-              {passCount}/{ALL_ITEMS.length} items pass · {photos.length} photo
-              {photos.length !== 1 ? 's' : ''}
+              {passCount}/{ALL_ITEMS.length} items pass ·{' '}
+              {(inspection?.photos.length ?? 0) + photos.length} photo
+              {(inspection?.photos.length ?? 0) + photos.length !== 1 ? 's' : ''}{' '}
+              <span className="text-gray-400">(min {MIN_COMPLETION_PHOTOS})</span>
             </span>
             <button
               type="submit"
