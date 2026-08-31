@@ -62,19 +62,18 @@ const DISPOSAL_TYPE_META: Record<
 > = {
   non_certified: {
     label: 'Non-Certified Disposal',
-    price: '₹450',
+    price: '₹450 + GST',
     description: 'Decommission with no data wipe certificate',
   },
   certified_blanco: {
     label: 'Certified Data Destruction - Blanco',
-    price: '₹550',
+    price: '₹550 + GST',
     description: 'Certified wipe + destruction certificate',
   },
   itad_bundled: {
     label: 'Retrieval + ITAD Bundled',
-    price: '₹1,750',
-    description:
-      'Retrieve device + disposal handling, single fee - certification is a separate add-on',
+    price: '₹1,750 + GST',
+    description: 'Retrieve device + disposal handling, single fee',
   },
 };
 
@@ -103,7 +102,6 @@ export function DisposalPage() {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [disposalType, setDisposalType] = useState<DisposalType>('non_certified');
-  const [requiresCertification, setRequiresCertification] = useState(false);
   const [ivalueTicketNumber, setIvalueTicketNumber] = useState('');
   const [clientTicketNumber, setClientTicketNumber] = useState('');
   const [notes, setNotes] = useState('');
@@ -185,7 +183,6 @@ export function DisposalPage() {
     setSelectedClientId('');
     setSelectedAssetId('');
     setDisposalType('non_certified');
-    setRequiresCertification(false);
     setIvalueTicketNumber('');
     setClientTicketNumber('');
     setNotes('');
@@ -197,7 +194,6 @@ export function DisposalPage() {
       clientId: effectiveClientId,
       assetId: selectedAssetId,
       disposalType,
-      requiresCertification: disposalType === 'certified_blanco' ? false : requiresCertification,
       ivalueTicketNumber: ivalueTicketNumber.trim() || undefined,
       clientTicketNumber: clientTicketNumber.trim() || undefined,
       notes: notes.trim() || undefined,
@@ -348,20 +344,6 @@ export function DisposalPage() {
                 ))}
               </div>
             </div>
-
-            {/* Certification add-on — not applicable when Certified Blanco already includes it */}
-            {disposalType !== 'certified_blanco' && (
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={requiresCertification}
-                  onChange={(e) => setRequiresCertification(e.target.checked)}
-                  className="w-4 h-4 rounded accent-[#E86F2C]"
-                />
-                Add certification (wipe certificate + destruction certificate){' '}
-                <span className="text-xs text-gray-500">({CERTIFICATION_ADDON_PRICE})</span>
-              </label>
-            )}
 
             {/* Notes */}
             <div>
