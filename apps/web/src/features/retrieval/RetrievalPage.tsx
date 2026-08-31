@@ -180,6 +180,11 @@ export function RetrievalPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [selectedClientId, setSelectedClientId] = useState('');
+  const [formError, setFormError] = useState('');
+
+  // Redeploy end-user combobox (search existing or create inline)
+  const [endUserInput, setEndUserInput] = useState('');
+  const [showEndUserDrop, setShowEndUserDrop] = useState(false);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('');
@@ -275,6 +280,38 @@ export function RetrievalPage() {
   });
   const zonePreview = zoneData?.zone;
 
+  // Same auto-resolution for the Full Cycle redeploy destination pincode —
+  // preview only; the deployment order created after a clean inspection
+  // re-resolves its own zone server-side.
+  const {
+    data: redeployZoneData,
+    isError: redeployZoneIsError,
+    error: redeployZoneError,
+    refetch: refetchRedeployZone,
+  } = useQuery({
+    queryKey: ['courier-zone-preview', form.redeployPincode],
+    queryFn: () =>
+      api.get<{ zone: CourierZone }>(
+        `/logistics/resolve-zone?pincode=${encodeURIComponent(form.redeployPincode)}`,
+      ),
+    enabled: showForm && form.bundleType === 'full_cycle' && /^\d{6}$/.test(form.redeployPincode),
+    retry: 2,
+    retryDelay: 1000,
+  });
+  const redeployZonePreview = redeployZoneData?.zone;
+
+  const createEndUserMutation = useMutation({
+    mutationFn: ({ name, clientId: cid }: { name: string; clientId: string }) =>
+      api.post<EndUser>('/end-users', { name, clientId: cid }),
+    onSuccess: (newUser) => {
+      void qc.invalidateQueries({ queryKey: ['end-users'] });
+      setField('redeployEndUserId', newUser.id);
+      setEndUserInput(newUser.name);
+      setShowEndUserDrop(false);
+    },
+    onError: (e: Error) => setFormError(e.message),
+  });
+
   // Create mutation
   const createMutation = useMutation({
     mutationFn: (payload: unknown) => api.post('/retrieval', payload),
@@ -286,6 +323,8 @@ export function RetrievalPage() {
       setShowForm(false);
       setForm({ ...EMPTY_FORM });
       setSelectedClientId('');
+      setEndUserInput('');
+      setFormError('');
     },
   });
 
@@ -301,10 +340,46 @@ export function RetrievalPage() {
     onError: (e: Error) => alert(e.message),
   });
 
-  function handleCreate(e: React.FormEvent) {
+  async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    setFormError('');
     const cid = isClientScoped ? (user?.clientId ?? '') : selectedClientId;
     const isFullCycle = form.bundleType === 'full_cycle';
+
+    // If the user typed an end-user name but never explicitly selected or
+    // created it (e.g. tabbed past the dropdown), resolve it now — matching
+    // an existing name, or creating a new end user on the fly.
+    let resolvedEndUserId = form.redeployEndUserId || undefined;
+    if (isFullCycle) {
+      const typedName = endUserInput.trim();
+      if (typedName && !resolvedEndUserId) {
+        const match = endUsers.find((eu) => eu.name.toLowerCase() === typedName.toLowerCase());
+        if (match) {
+          resolvedEndUserId = match.id;
+        } else {
+          if (!cid) {
+            setFormError('Select a client before creating an end user.');
+            return;
+          }
+          try {
+            const newUser = await api.post<EndUser>('/end-users', {
+              name: typedName,
+              clientId: cid,
+            });
+            void qc.invalidateQueries({ queryKey: ['end-users'] });
+            resolvedEndUserId = newUser.id;
+          } catch {
+            setFormError(`Could not create end user "${typedName}".`);
+            return;
+          }
+        }
+      }
+      if (!resolvedEndUserId) {
+        setFormError('Select or create a redeploy end user.');
+        return;
+      }
+    }
+
     createMutation.mutate({
       clientId: cid,
       assetId: form.assetId,
@@ -324,7 +399,7 @@ export function RetrievalPage() {
       requiresWipe: form.requiresWipe,
       wipeType: form.requiresWipe ? form.wipeType || undefined : undefined,
       requiresRedeploySetup: isFullCycle ? form.requiresRedeploySetup : undefined,
-      redeployEndUserId: isFullCycle ? form.redeployEndUserId || undefined : undefined,
+      redeployEndUserId: isFullCycle ? resolvedEndUserId : undefined,
       redeployDeliveryAddress: isFullCycle
         ? {
             line1: form.redeployAddressLine1,
@@ -698,23 +773,85 @@ export function RetrievalPage() {
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                  <div className="relative">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      New end user
+                      New end user <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      required
-                      value={form.redeployEndUserId}
-                      onChange={(e) => setField('redeployEndUserId', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
-                    >
-                      <option value="">Select end user…</option>
-                      {endUsers.map((eu) => (
-                        <option key={eu.id} value={eu.id}>
-                          {eu.name}
-                        </option>
-                      ))}
-                    </select>
+                    <input
+                      type="text"
+                      value={endUserInput}
+                      onChange={(e) => {
+                        setEndUserInput(e.target.value);
+                        setField('redeployEndUserId', '');
+                        setShowEndUserDrop(true);
+                      }}
+                      onFocus={() => setShowEndUserDrop(true)}
+                      onBlur={() => setTimeout(() => setShowEndUserDrop(false), 150)}
+                      placeholder="Search or type a name…"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                    />
+                    {form.redeployEndUserId && (
+                      <span className="absolute right-3 top-[2.15rem] text-xs text-emerald-600 font-medium pointer-events-none">
+                        ✓ linked
+                      </span>
+                    )}
+                    {showEndUserDrop && (
+                      <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {endUsers
+                          .filter((eu) =>
+                            eu.name.toLowerCase().includes(endUserInput.toLowerCase()),
+                          )
+                          .map((eu) => (
+                            <button
+                              key={eu.id}
+                              type="button"
+                              onMouseDown={() => {
+                                setField('redeployEndUserId', eu.id);
+                                setEndUserInput(eu.name);
+                                setShowEndUserDrop(false);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-800 hover:bg-[#E86F2C]/10 hover:text-[#E86F2C] transition-colors"
+                            >
+                              {eu.name}
+                            </button>
+                          ))}
+                        {endUserInput.trim() &&
+                          !endUsers.some(
+                            (eu) => eu.name.toLowerCase() === endUserInput.trim().toLowerCase(),
+                          ) && (
+                            <button
+                              type="button"
+                              onMouseDown={() => {
+                                const cid = isClientScoped
+                                  ? (user?.clientId ?? '')
+                                  : (assetClientId ?? '');
+                                if (!cid) {
+                                  setFormError('Select a client before creating an end user.');
+                                  return;
+                                }
+                                createEndUserMutation.mutate({
+                                  name: endUserInput.trim(),
+                                  clientId: cid,
+                                });
+                              }}
+                              disabled={createEndUserMutation.isPending}
+                              className="w-full text-left px-4 py-2 text-sm text-[#E86F2C] font-medium hover:bg-[#E86F2C]/10 transition-colors border-t border-gray-100"
+                            >
+                              {createEndUserMutation.isPending
+                                ? 'Creating…'
+                                : `+ Create "${endUserInput.trim()}"`}
+                            </button>
+                          )}
+                        {endUsers.filter((eu) =>
+                          eu.name.toLowerCase().includes(endUserInput.toLowerCase()),
+                        ).length === 0 &&
+                          !endUserInput.trim() && (
+                            <p className="px-4 py-3 text-xs text-gray-400">
+                              No end users yet. Type a name to create one.
+                            </p>
+                          )}
+                      </div>
+                    )}
                   </div>
                   <label className="flex items-center gap-2 mt-6 cursor-pointer text-sm text-gray-700">
                     <input
@@ -762,6 +899,37 @@ export function RetrievalPage() {
                     placeholder="Pincode (6 digits)"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                   />
+                  <div>
+                    <div
+                      className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                        redeployZoneIsError
+                          ? 'border-red-200 bg-red-50 text-red-700'
+                          : 'border-gray-200 bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      {!/^\d{6}$/.test(form.redeployPincode)
+                        ? 'Enter the pincode above to preview courier zone/rate'
+                        : redeployZonePreview === 'intra_state'
+                          ? 'City - ₹1,500 (billed when redeployed)'
+                          : redeployZonePreview === 'inter_state'
+                            ? 'Interstate - ₹2,500 (billed when redeployed)'
+                            : redeployZonePreview === 'rural'
+                              ? 'Rural - ₹3,200 (billed when redeployed)'
+                              : redeployZoneIsError
+                                ? ((redeployZoneError as Error)?.message ??
+                                  'Could not resolve zone')
+                                : 'Resolving…'}
+                    </div>
+                    {redeployZoneIsError && (
+                      <button
+                        type="button"
+                        onClick={() => void refetchRedeployZone()}
+                        className="text-xs text-[#E86F2C] font-medium mt-1 hover:underline"
+                      >
+                        Retry
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -817,6 +985,7 @@ export function RetrievalPage() {
               <span className="font-bold text-[#E86F2C]">Total: {formatRupees(totalPaise)}</span>
             </div>
 
+            {formError && <p className="text-sm text-red-600">{formError}</p>}
             {createMutation.error && (
               <p className="text-sm text-red-600">{(createMutation.error as Error).message}</p>
             )}
