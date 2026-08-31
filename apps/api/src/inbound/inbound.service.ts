@@ -32,7 +32,7 @@ export class InboundService {
     Prisma.ExpectedDeliveryGetPayload<{
       include: {
         items: true;
-        grns: { include: { assets: true } };
+        grns: { include: { assets: { include: { asset: true } } } };
         client: { select: { id: true; name: true } };
       };
     }>[]
@@ -73,7 +73,7 @@ export class InboundService {
       where: { ...(clientId ? { clientId } : {}), ...dateFilter, ...searchFilter },
       include: {
         items: true,
-        grns: { include: { assets: true } },
+        grns: { include: { assets: { include: { asset: true } } } },
         client: { select: { id: true, name: true } },
       },
       orderBy: { expectedArrivalDate: 'desc' },

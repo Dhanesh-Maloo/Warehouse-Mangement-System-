@@ -31,9 +31,8 @@ export class ReceivedDeviceDto {
   @IsString()
   referenceName?: string;
 
-  @IsOptional()
   @IsString()
-  vendorName?: string;
+  vendorName!: string;
 
   @IsBoolean()
   requiresInspection!: boolean;

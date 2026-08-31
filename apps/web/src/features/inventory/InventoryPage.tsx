@@ -998,6 +998,7 @@ export function InventoryPage() {
                   )}
                   <th className="text-left px-4 py-3 whitespace-nowrap">Date Added</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Asset Tag</th>
+                  <th className="text-left px-4 py-3 whitespace-nowrap">Vendor</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Serial No.</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Condition</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Category</th>
@@ -1073,6 +1074,11 @@ export function InventoryPage() {
                       {/* 2. Asset Tag */}
                       <td className="px-4 py-3 font-mono text-xs text-gray-700 whitespace-nowrap">
                         {a.assetTag ?? <span className="text-gray-300">-</span>}
+                      </td>
+
+                      {/* 2b. Vendor */}
+                      <td className="px-4 py-3 text-xs text-gray-700 whitespace-nowrap">
+                        {a.vendorName ?? <span className="text-gray-300">-</span>}
                       </td>
 
                       {/* 3. Serial No. — now adjacent to Asset Tag */}
@@ -1297,7 +1303,7 @@ export function InventoryPage() {
                 {(data?.data ?? []).length === 0 && (
                   <tr>
                     <td
-                      colSpan={canEdit ? 15 : 13}
+                      colSpan={canEdit ? 16 : 14}
                       className="px-5 py-12 text-center text-gray-400 text-sm"
                     >
                       <Package size={24} className="mx-auto mb-2 text-gray-300" />

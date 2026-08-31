@@ -21,7 +21,17 @@ interface Delivery {
   expectedArrivalDate: string;
   status: string;
   items: { category: string; quantity: number; receivedQuantity: number }[];
-  grns: { deviceCount: number }[];
+  grns: { deviceCount: number; assets: { asset: { vendorName: string | null } }[] }[];
+}
+
+function vendorNamesFor(delivery: Delivery): string {
+  const names = new Set<string>();
+  for (const grn of delivery.grns ?? []) {
+    for (const { asset } of grn.assets ?? []) {
+      if (asset.vendorName) names.add(asset.vendorName);
+    }
+  }
+  return names.size > 0 ? Array.from(names).join(', ') : '-';
 }
 
 const EMPTY_ITEM: DeliveryItem = { category: 'laptop', model: '', manufacturer: '', quantity: 1 };
@@ -374,6 +384,7 @@ export function InboundPage() {
             <thead>
               <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
                 <th className="text-left px-5 py-3">PO Reference</th>
+                <th className="text-left px-5 py-3">Vendor</th>
                 <th className="text-left px-5 py-3">Expected arrival</th>
                 <th className="text-left px-5 py-3">Items</th>
                 <th className="text-left px-5 py-3">Status</th>
@@ -392,6 +403,7 @@ export function InboundPage() {
                     <td className="px-5 py-3.5 font-mono font-semibold text-gray-900">
                       {d.purchaseOrderRef}
                     </td>
+                    <td className="px-5 py-3.5 text-gray-600">{vendorNamesFor(d)}</td>
                     <td className="px-5 py-3.5 text-gray-600">
                       {new Date(d.expectedArrivalDate).toLocaleDateString('en-IN')}
                     </td>
@@ -429,7 +441,7 @@ export function InboundPage() {
               })}
               {filteredDeliveries.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={5} className="px-5 py-12 text-center text-gray-400 text-sm">
                     {statusFilter === 'all'
                       ? 'No deliveries yet. Create one above.'
                       : 'No deliveries match the selected filter.'}

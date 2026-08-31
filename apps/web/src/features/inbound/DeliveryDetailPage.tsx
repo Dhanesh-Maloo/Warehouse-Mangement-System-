@@ -19,6 +19,15 @@ interface Grn {
   receivedAt: string;
   deviceCount: number;
   courierRef: string | null;
+  assets: { asset: { vendorName: string | null } }[];
+}
+
+function vendorNamesFor(grn: Grn): string {
+  const names = new Set<string>();
+  for (const { asset } of grn.assets ?? []) {
+    if (asset.vendorName) names.add(asset.vendorName);
+  }
+  return names.size > 0 ? Array.from(names).join(', ') : '-';
 }
 
 interface Delivery {
@@ -205,6 +214,7 @@ export function DeliveryDetailPage() {
               <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
                 <th className="text-left px-5 py-3">GRN number</th>
                 <th className="text-left px-5 py-3">Received at</th>
+                <th className="text-left px-5 py-3">Vendor</th>
                 <th className="text-left px-5 py-3">Courier ref</th>
                 <th className="text-right px-5 py-3">Devices</th>
                 <th className="px-5 py-3" />
@@ -224,6 +234,7 @@ export function DeliveryDetailPage() {
                       minute: '2-digit',
                     })}
                   </td>
+                  <td className="px-5 py-3.5 text-gray-600">{vendorNamesFor(grn)}</td>
                   <td className="px-5 py-3.5 text-gray-600">{grn.courierRef ?? '-'}</td>
                   <td className="px-5 py-3.5 text-right font-semibold text-gray-900">
                     {grn.deviceCount}

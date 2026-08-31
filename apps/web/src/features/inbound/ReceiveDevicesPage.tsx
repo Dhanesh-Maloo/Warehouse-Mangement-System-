@@ -149,7 +149,7 @@ export function ReceiveDevicesPage() {
             category,
             assetTag: assetTag.trim() || undefined,
             referenceName: referenceName.trim() || undefined,
-            vendorName: vendorName.trim() || undefined,
+            vendorName: vendorName.trim(),
             requiresInspection,
           }),
         ),
@@ -182,6 +182,11 @@ export function ReceiveDevicesPage() {
     const invalid = devices.find((d) => !d.model || !d.manufacturer);
     if (invalid) {
       setSubmitError(`Device ${invalid.serialNumber} is missing model or manufacturer.`);
+      return;
+    }
+    const missingVendor = devices.find((d) => !d.vendorName.trim());
+    if (missingVendor) {
+      setSubmitError(`Device ${missingVendor.serialNumber} is missing vendor name.`);
       return;
     }
     submitMutation.mutate();
@@ -304,6 +309,19 @@ export function ReceiveDevicesPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Vendor <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={device.vendorName}
+                        onChange={(e) => updateDevice(device.key, 'vendorName', e.target.value)}
+                        placeholder="iValue, or other vendor"
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
                         Category
                       </label>
                       <select
@@ -361,18 +379,6 @@ export function ReceiveDevicesPage() {
                         value={device.referenceName}
                         onChange={(e) => updateDevice(device.key, 'referenceName', e.target.value)}
                         placeholder="Client's own reference"
-                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
-                        Vendor <span className="text-gray-400">(opt.)</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={device.vendorName}
-                        onChange={(e) => updateDevice(device.key, 'vendorName', e.target.value)}
-                        placeholder="iValue, or other vendor"
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
                       />
                     </div>
