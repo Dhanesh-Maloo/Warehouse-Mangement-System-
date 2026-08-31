@@ -168,7 +168,7 @@ export function RetrievalPage() {
   const [ownerFilter, setOwnerFilter] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [ticketSearch, setTicketSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const isClientUser = user?.role === 'client_user';
   const isEditor = user?.role === 'editor';
@@ -219,7 +219,7 @@ export function RetrievalPage() {
       ownerFilter,
       fromDate,
       toDate,
-      ticketSearch,
+      searchQuery,
     ],
     queryFn: () => {
       const params = new URLSearchParams();
@@ -228,7 +228,7 @@ export function RetrievalPage() {
       if (ownerFilter) params.set('ownerId', ownerFilter);
       if (fromDate) params.set('fromDate', fromDate);
       if (toDate) params.set('toDate', toDate);
-      if (ticketSearch.trim()) params.set('ticketSearch', ticketSearch.trim());
+      if (searchQuery.trim()) params.set('search', searchQuery.trim());
       return api.get<RetrievalRequest[]>(`/retrieval?${params.toString()}`);
     },
     // Keeps showing previous results while a new filter/search fetch is in
@@ -823,24 +823,24 @@ export function RetrievalPage() {
           />
         </div>
         <div className="relative">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Ticket number</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Search</label>
           <Search size={13} className="absolute left-2.5 top-[1.9rem] text-gray-400" />
           <input
             type="text"
-            value={ticketSearch}
-            onChange={(e) => setTicketSearch(e.target.value)}
-            placeholder="iValue or client ticket #"
-            className="pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] w-48"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Asset, owner, ticket #, tracking #, notes…"
+            className="pl-7 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] w-64"
           />
         </div>
-        {(statusFilter || ownerFilter || fromDate || toDate || ticketSearch) && (
+        {(statusFilter || ownerFilter || fromDate || toDate || searchQuery) && (
           <button
             onClick={() => {
               setStatusFilter('');
               setOwnerFilter('');
               setFromDate('');
               setToDate('');
-              setTicketSearch('');
+              setSearchQuery('');
             }}
             className="text-xs text-gray-500 hover:text-gray-700 underline mb-1"
           >
@@ -1014,7 +1014,7 @@ export function RetrievalPage() {
               {retrievals.length === 0 && (
                 <tr>
                   <td colSpan={13} className="px-5 py-12 text-center text-gray-400 text-sm">
-                    {statusFilter || ownerFilter || fromDate || toDate || ticketSearch
+                    {statusFilter || ownerFilter || fromDate || toDate || searchQuery
                       ? 'No retrieval requests match the selected filters.'
                       : 'No retrieval requests yet. Create one above.'}
                   </td>

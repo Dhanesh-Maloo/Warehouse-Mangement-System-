@@ -27,7 +27,7 @@ export class RetrievalService {
       ownerId?: string;
       fromDate?: string;
       toDate?: string;
-      ticketSearch?: string;
+      search?: string;
     },
   ): Prisma.PrismaPromise<
     Prisma.RetrievalRequestGetPayload<{
@@ -42,14 +42,29 @@ export class RetrievalService {
         })()
       : null;
 
-    const ticketFilter = filters?.ticketSearch
+    // Broad search across asset identity, tickets, tracking, notes, and
+    // owner name — not just ticket numbers.
+    const searchFilter = filters?.search
       ? {
           OR: [
+            { ivalueTicketNumber: { contains: filters.search, mode: 'insensitive' as const } },
+            { clientTicketNumber: { contains: filters.search, mode: 'insensitive' as const } },
+            { trackingNumber: { contains: filters.search, mode: 'insensitive' as const } },
+            { notes: { contains: filters.search, mode: 'insensitive' as const } },
             {
-              ivalueTicketNumber: { contains: filters.ticketSearch, mode: 'insensitive' as const },
+              asset: {
+                OR: [
+                  { serialNumber: { contains: filters.search, mode: 'insensitive' as const } },
+                  { model: { contains: filters.search, mode: 'insensitive' as const } },
+                  { manufacturer: { contains: filters.search, mode: 'insensitive' as const } },
+                  { assetTag: { contains: filters.search, mode: 'insensitive' as const } },
+                ],
+              },
             },
             {
-              clientTicketNumber: { contains: filters.ticketSearch, mode: 'insensitive' as const },
+              createdByUser: {
+                fullName: { contains: filters.search, mode: 'insensitive' as const },
+              },
             },
           ],
         }
@@ -68,7 +83,7 @@ export class RetrievalService {
               },
             }
           : {}),
-        ...ticketFilter,
+        ...searchFilter,
       },
       include: { asset: true, createdByUser: { select: { id: true, fullName: true } } },
       orderBy: { requestedAt: 'desc' },

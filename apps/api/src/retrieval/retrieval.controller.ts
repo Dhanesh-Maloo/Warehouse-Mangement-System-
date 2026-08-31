@@ -44,7 +44,7 @@ export class RetrievalController {
     @Query('ownerId') ownerId?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
-    @Query('ticketSearch') ticketSearch?: string,
+    @Query('search') search?: string,
     @CurrentUser() user?: JwtPayload,
   ): ReturnType<RetrievalService['findAll']> {
     const effectiveClientId =
@@ -56,7 +56,7 @@ export class RetrievalController {
       ownerId,
       fromDate,
       toDate,
-      ticketSearch,
+      search,
     });
   }
 
