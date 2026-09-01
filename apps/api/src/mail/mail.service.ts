@@ -51,6 +51,8 @@ export class MailService {
         const body = await response.text();
         throw new Error(`ZeptoMail API responded ${response.status}: ${body}`);
       }
+
+      this.logger.log(`Sent mail to ${input.to}: ${input.subject}`);
     } catch (err) {
       this.logger.error(`Failed to send mail to ${input.to}: ${(err as Error).message}`);
     }
