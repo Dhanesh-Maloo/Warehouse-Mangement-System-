@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { InspectionsService } from './inspections.service';
 import { InspectionsController } from './inspections.controller';
+import { InspectionsScheduler } from './inspections.scheduler';
 import { LedgerModule } from '../ledger/ledger.module';
 import { RateCardModule } from '../rate-card/rate-card.module';
 import { AuditModule } from '../audit/audit.module';
@@ -10,6 +12,7 @@ import { AssetStatusHistoryModule } from '../asset-status-history/asset-status-h
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     LedgerModule,
     RateCardModule,
     AuditModule,
@@ -17,7 +20,7 @@ import { AssetStatusHistoryModule } from '../asset-status-history/asset-status-h
     DeploymentModule,
     AssetStatusHistoryModule,
   ],
-  providers: [InspectionsService],
+  providers: [InspectionsService, InspectionsScheduler],
   controllers: [InspectionsController],
   exports: [InspectionsService],
 })

@@ -13,6 +13,8 @@ import { AuditService } from '../audit/audit.service';
 import { DeploymentService } from '../deployment/deployment.service';
 import { R2Service } from '../r2/r2.service';
 import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
+import { MailService } from '../mail/mail.service';
+import { inspectionSlaBreachEmail } from '../mail/templates/inspection-sla-breach';
 import type { CreateInspectionDto } from './dto/create-inspection.dto';
 import type { CompleteInspectionDto } from './dto/complete-inspection.dto';
 import type { CreateDeploymentOrderDto } from '../deployment/dto/create-deployment-order.dto';
@@ -22,6 +24,9 @@ const PDFDocument = require('pdfkit') as typeof import('pdfkit');
 
 // Minimum evidence photos required to complete an inspection.
 const MIN_COMPLETION_PHOTOS = 3;
+
+// Hardcoded per Dhanesh (2026-09-01) — not tied to a user role.
+const SLA_BREACH_RECIPIENTS = ['sales.bo@ivalueindia.com', 'dhanesh@ivalueindia.com'];
 
 // Mirrors the checklist shown on the inspection detail page
 // (apps/web/src/features/inspections/InspectionDetailPage.tsx) so the report
@@ -105,7 +110,41 @@ export class InspectionsService {
     private readonly deployment: DeploymentService,
     private readonly r2: R2Service,
     private readonly assetStatusHistory: AssetStatusHistoryService,
+    private readonly mail: MailService,
   ) {}
+
+  /**
+   * Finds in_progress inspections whose SLA target has passed and haven't
+   * been notified yet, emails SLA_BREACH_RECIPIENTS once each, then marks
+   * them notified so a re-run of this (every 15 min, see InspectionsScheduler)
+   * never sends a duplicate for the same breach.
+   */
+  async findAndNotifyBreachedInspections(): Promise<number> {
+    const breached = await this.prisma.inspection.findMany({
+      where: {
+        status: 'in_progress',
+        slaTargetAt: { lt: new Date() },
+        slaBreachNotifiedAt: null,
+      },
+      include: { asset: true },
+    });
+
+    for (const inspection of breached) {
+      const { subject, html, text } = inspectionSlaBreachEmail({
+        assetLabel: `${inspection.asset.manufacturer} ${inspection.asset.model} (${inspection.asset.serialNumber})`,
+        slaTargetAt: inspection.slaTargetAt as Date,
+      });
+      for (const to of SLA_BREACH_RECIPIENTS) {
+        await this.mail.send({ to, subject, html, text });
+      }
+      await this.prisma.inspection.update({
+        where: { id: inspection.id },
+        data: { slaBreachNotifiedAt: new Date() },
+      });
+    }
+
+    return breached.length;
+  }
 
   /**
    * Best-effort damage signal from the completed checklist. Assumption

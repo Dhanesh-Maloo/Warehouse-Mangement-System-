@@ -6,9 +6,17 @@ import { LedgerModule } from '../ledger/ledger.module';
 import { RateCardModule } from '../rate-card/rate-card.module';
 import { AuditModule } from '../audit/audit.module';
 import { AssetStatusHistoryModule } from '../asset-status-history/asset-status-history.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
-  imports: [PrismaModule, LedgerModule, RateCardModule, AuditModule, AssetStatusHistoryModule],
+  imports: [
+    PrismaModule,
+    LedgerModule,
+    RateCardModule,
+    AuditModule,
+    AssetStatusHistoryModule,
+    UsersModule,
+  ],
   providers: [DisposalService],
   controllers: [DisposalController],
   exports: [DisposalService],

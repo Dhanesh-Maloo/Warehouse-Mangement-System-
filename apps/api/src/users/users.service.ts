@@ -7,6 +7,8 @@ import {
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { MailService } from '../mail/mail.service';
+import { welcomeEmail } from '../mail/templates/welcome';
 import type { CreateUserDto } from './dto/create-user.dto';
 import type { UpdateUserDto } from './dto/update-user.dto';
 
@@ -44,6 +46,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly mail: MailService,
   ) {}
 
   async findAll(
@@ -84,6 +87,18 @@ export class UsersService {
     });
   }
 
+  /**
+   * Active users' emails for the given roles — used to notify approvers
+   * (e.g. manager/admin) of events like a new disposal or resale request.
+   */
+  async findEmailsByRoles(roles: string[]): Promise<string[]> {
+    const users = await this.prisma.user.findMany({
+      where: { status: 'active', role: { in: roles as never[] } },
+      select: { email: true },
+    });
+    return users.map((u) => u.email);
+  }
+
   async findOne(id: string): Promise<SafeUser> {
     const user = await this.prisma.user.findUnique({ where: { id }, select: SELECT_SAFE });
     if (!user) throw new NotFoundException(`User ${id} not found`);
@@ -115,6 +130,10 @@ export class UsersService {
       entityId: user.id,
       newValue: { email: user.email, role: user.role },
     });
+
+    const { subject, html, text } = welcomeEmail(user.fullName);
+    void this.mail.send({ to: user.email, subject, html, text });
+
     return user;
   }
 

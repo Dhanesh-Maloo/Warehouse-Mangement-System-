@@ -9,6 +9,8 @@ describe('DisposalService', () => {
   let mockLedger: { create: jest.Mock };
   let mockRateCard: { findEffectiveAt: jest.Mock };
   let mockAudit: { log: jest.Mock };
+  let mockUsers: { findEmailsByRoles: jest.Mock };
+  let mockMail: { send: jest.Mock };
   let service: DisposalService;
 
   const baseAsset = {
@@ -40,6 +42,8 @@ describe('DisposalService', () => {
     mockLedger = { create: jest.fn().mockResolvedValue({ id: 'ledger-1' }) };
     mockRateCard = { findEffectiveAt: jest.fn() };
     mockAudit = { log: jest.fn().mockResolvedValue(undefined) };
+    mockUsers = { findEmailsByRoles: jest.fn().mockResolvedValue([]) };
+    mockMail = { send: jest.fn().mockResolvedValue(undefined) };
 
     service = new DisposalService(
       mockPrisma,
@@ -47,6 +51,8 @@ describe('DisposalService', () => {
       mockRateCard as any,
       mockAudit as any,
       new AssetStatusHistoryService(mockPrisma),
+      mockUsers as any,
+      mockMail as any,
     );
   });
 
@@ -100,6 +106,41 @@ describe('DisposalService', () => {
         expect.objectContaining({ action: 'disposal.create', entityId: 'disposal-1' }),
       );
       expect(result.id).toBe('disposal-1');
+    });
+
+    it('emails every manager/admin approver when the request is created', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
+      mockPrisma.disposalRequest.create.mockResolvedValue({
+        id: 'disposal-1',
+        assetId: 'asset-1',
+        status: 'pending',
+      });
+      mockUsers.findEmailsByRoles.mockResolvedValue(['manager@example.com', 'admin@example.com']);
+
+      await service.create(baseDto as any, 'user-1');
+
+      expect(mockUsers.findEmailsByRoles).toHaveBeenCalledWith(['manager', 'admin']);
+      expect(mockMail.send).toHaveBeenCalledTimes(2);
+      expect(mockMail.send).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'manager@example.com' }),
+      );
+      expect(mockMail.send).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'admin@example.com' }),
+      );
+    });
+
+    it('does not attempt to send mail when there are no approvers', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
+      mockPrisma.disposalRequest.create.mockResolvedValue({
+        id: 'disposal-1',
+        assetId: 'asset-1',
+        status: 'pending',
+      });
+      mockUsers.findEmailsByRoles.mockResolvedValue([]);
+
+      await service.create(baseDto as any, 'user-1');
+
+      expect(mockMail.send).not.toHaveBeenCalled();
     });
 
     it('forces requiresCertification to false for certified_blanco even if the caller requested it', async () => {

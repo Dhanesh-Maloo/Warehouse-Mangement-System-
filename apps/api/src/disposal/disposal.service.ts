@@ -5,7 +5,15 @@ import { LedgerService } from '../ledger/ledger.service';
 import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
 import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
+import { UsersService } from '../users/users.service';
+import { MailService } from '../mail/mail.service';
+import { disposalApprovalNeededEmail } from '../mail/templates/disposal-approval-needed';
 import type { CreateDisposalRequestDto } from './dto/create-disposal-request.dto';
+
+// Roles that approve disposals (SPEC.md: "manager ... Approves disposals").
+// Admins are included too, per Dhanesh (2026-09-01) — they have full access
+// and should also see approval-needed notifications.
+const DISPOSAL_APPROVER_ROLES = ['manager', 'admin'];
 
 @Injectable()
 export class DisposalService {
@@ -15,6 +23,8 @@ export class DisposalService {
     private readonly rateCard: RateCardService,
     private readonly audit: AuditService,
     private readonly assetStatusHistory: AssetStatusHistoryService,
+    private readonly users: UsersService,
+    private readonly mail: MailService,
   ) {}
 
   findAll(
@@ -128,6 +138,18 @@ export class DisposalService {
       entityId: disposal.id,
       newValue: { assetId: dto.assetId, disposalType: dto.disposalType, status: 'pending' },
     });
+
+    const approverEmails = await this.users.findEmailsByRoles(DISPOSAL_APPROVER_ROLES);
+    if (approverEmails.length > 0) {
+      const { subject, html, text } = disposalApprovalNeededEmail({
+        assetLabel: `${asset.manufacturer} ${asset.model} (${asset.serialNumber})`,
+        disposalType: dto.disposalType,
+        ivalueTicketNumber: dto.ivalueTicketNumber,
+      });
+      for (const to of approverEmails) {
+        void this.mail.send({ to, subject, html, text });
+      }
+    }
 
     return disposal;
   }

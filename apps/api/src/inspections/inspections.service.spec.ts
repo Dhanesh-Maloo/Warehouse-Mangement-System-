@@ -10,6 +10,7 @@ describe('InspectionsService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
       findFirst: jest.Mock;
+      findMany: jest.Mock;
       create: jest.Mock;
     };
     inspectionPhoto: { count: jest.Mock; createMany: jest.Mock };
@@ -25,6 +26,7 @@ describe('InspectionsService', () => {
   let mockAudit: { log: jest.Mock };
   let mockDeployment: { create: jest.Mock };
   let mockR2: { getStream: jest.Mock; upload: jest.Mock; delete: jest.Mock };
+  let mockMail: { send: jest.Mock };
   let service: InspectionsService;
 
   const baseInspection = {
@@ -102,6 +104,7 @@ describe('InspectionsService', () => {
           }),
         ),
         findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest
           .fn()
           .mockImplementation((args) => Promise.resolve({ id: 'inspection-new', ...args.data })),
@@ -141,6 +144,7 @@ describe('InspectionsService', () => {
       upload: jest.fn().mockResolvedValue(undefined),
       delete: jest.fn().mockResolvedValue(undefined),
     };
+    mockMail = { send: jest.fn().mockResolvedValue(undefined) };
 
     service = new InspectionsService(
       mockPrisma as unknown as ConstructorParameters<typeof InspectionsService>[0],
@@ -152,6 +156,7 @@ describe('InspectionsService', () => {
       new AssetStatusHistoryService(
         mockPrisma as unknown as ConstructorParameters<typeof AssetStatusHistoryService>[0],
       ),
+      mockMail as unknown as ConstructorParameters<typeof InspectionsService>[7],
     );
   });
 
@@ -607,6 +612,55 @@ describe('InspectionsService', () => {
           data: expect.objectContaining({ uploadedByUserId: 'staff-1' }),
         }),
       );
+    });
+  });
+
+  describe('findAndNotifyBreachedInspections', () => {
+    const breachedInspection = {
+      id: 'inspection-breached',
+      status: 'in_progress',
+      slaTargetAt: new Date('2026-07-01T00:00:00.000Z'),
+      slaBreachNotifiedAt: null,
+      asset: { manufacturer: 'Acme', model: 'ModelX', serialNumber: 'SN-1' },
+    };
+
+    it('emails both SLA-breach recipients per breached inspection and marks it notified', async () => {
+      mockPrisma.inspection.findMany.mockResolvedValue([breachedInspection]);
+
+      const count = await service.findAndNotifyBreachedInspections();
+
+      expect(count).toBe(1);
+      expect(mockPrisma.inspection.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: 'in_progress',
+            slaBreachNotifiedAt: null,
+          }),
+        }),
+      );
+      expect(mockMail.send).toHaveBeenCalledTimes(2);
+      expect(mockMail.send).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'sales.bo@ivalueindia.com' }),
+      );
+      expect(mockMail.send).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'dhanesh@ivalueindia.com' }),
+      );
+      expect(mockPrisma.inspection.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'inspection-breached' },
+          data: expect.objectContaining({ slaBreachNotifiedAt: expect.any(Date) }),
+        }),
+      );
+    });
+
+    it('does nothing when there are no newly breached inspections', async () => {
+      mockPrisma.inspection.findMany.mockResolvedValue([]);
+
+      const count = await service.findAndNotifyBreachedInspections();
+
+      expect(count).toBe(0);
+      expect(mockMail.send).not.toHaveBeenCalled();
+      expect(mockPrisma.inspection.update).not.toHaveBeenCalled();
     });
   });
 });

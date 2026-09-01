@@ -23,6 +23,7 @@ import { ResaleModule } from './resale/resale.module';
 import { StorageModule } from './storage/storage.module';
 import { DocumentsModule } from './documents/documents.module';
 import { R2Module } from './r2/r2.module';
+import { MailModule } from './mail/mail.module';
 import { LogisticsModule } from './logistics/logistics.module';
 import { TicketLookupModule } from './ticket-lookup/ticket-lookup.module';
 
@@ -30,6 +31,7 @@ import { TicketLookupModule } from './ticket-lookup/ticket-lookup.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../../.env', '.env'] }),
     R2Module,
+    MailModule,
     PrismaModule,
     HealthModule,
     LedgerModule,

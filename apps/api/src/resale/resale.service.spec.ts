@@ -7,6 +7,8 @@ import { AssetStatusHistoryService } from '../asset-status-history/asset-status-
 describe('ResaleService', () => {
   let mockPrisma: any;
   let mockAudit: { log: jest.Mock };
+  let mockUsers: { findEmailsByRoles: jest.Mock };
+  let mockMail: { send: jest.Mock };
   let service: ResaleService;
 
   const baseAsset = {
@@ -36,11 +38,15 @@ describe('ResaleService', () => {
       ),
     };
     mockAudit = { log: jest.fn().mockResolvedValue(undefined) };
+    mockUsers = { findEmailsByRoles: jest.fn().mockResolvedValue([]) };
+    mockMail = { send: jest.fn().mockResolvedValue(undefined) };
 
     service = new ResaleService(
       mockPrisma,
       mockAudit as any,
       new AssetStatusHistoryService(mockPrisma),
+      mockUsers as any,
+      mockMail as any,
     );
   });
 
@@ -103,6 +109,37 @@ describe('ResaleService', () => {
       // leaked onto the shared prisma mock either.
       expect(mockPrisma.eventLedger).toBeUndefined();
       expect(mockPrisma.rateCardItem).toBeUndefined();
+    });
+
+    it('emails every manager/admin as an FYI when the listing is created', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
+      mockPrisma.resaleListing.create.mockResolvedValue({
+        id: 'listing-1',
+        assetId: 'asset-1',
+        status: 'listed',
+      });
+      mockPrisma.asset.update.mockResolvedValue({ ...baseAsset, currentStatus: 'for_resale' });
+      mockUsers.findEmailsByRoles.mockResolvedValue(['manager@example.com', 'admin@example.com']);
+
+      await service.create(dto as any, 'user-1');
+
+      expect(mockUsers.findEmailsByRoles).toHaveBeenCalledWith(['manager', 'admin']);
+      expect(mockMail.send).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not attempt to send mail when there are no recipients', async () => {
+      mockPrisma.asset.findUnique.mockResolvedValue(baseAsset);
+      mockPrisma.resaleListing.create.mockResolvedValue({
+        id: 'listing-1',
+        assetId: 'asset-1',
+        status: 'listed',
+      });
+      mockPrisma.asset.update.mockResolvedValue({ ...baseAsset, currentStatus: 'for_resale' });
+      mockUsers.findEmailsByRoles.mockResolvedValue([]);
+
+      await service.create(dto as any, 'user-1');
+
+      expect(mockMail.send).not.toHaveBeenCalled();
     });
   });
 

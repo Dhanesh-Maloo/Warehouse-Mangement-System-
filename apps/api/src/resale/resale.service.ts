@@ -3,8 +3,16 @@ import type { Asset, ResaleListing } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
+import { UsersService } from '../users/users.service';
+import { MailService } from '../mail/mail.service';
+import { resaleListingCreatedEmail } from '../mail/templates/resale-listing-created';
 import type { CreateResaleListingDto } from './dto/create-resale-listing.dto';
 import type { UpdateResaleStatusDto } from './dto/update-resale-status.dto';
+
+// Notified as an FYI when a listing is created — mirrors disposal's
+// approver roles, but this is informational only: resale has no approval
+// gate (per Dhanesh, 2026-09-01).
+const RESALE_NOTIFY_ROLES = ['manager', 'admin'];
 
 // ResaleListing has no Prisma relation fields to Asset/Client/User (plain
 // FK-shaped columns only, mirroring EventSuppression/RuralPincode), so we
@@ -24,6 +32,8 @@ export class ResaleService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly assetStatusHistory: AssetStatusHistoryService,
+    private readonly users: UsersService,
+    private readonly mail: MailService,
   ) {}
 
   async findAll(
@@ -149,6 +159,17 @@ export class ResaleService {
       entityId: listing.id,
       newValue: { assetId: dto.assetId, listedPricePaise: dto.listedPricePaise, status: 'listed' },
     });
+
+    const notifyEmails = await this.users.findEmailsByRoles(RESALE_NOTIFY_ROLES);
+    if (notifyEmails.length > 0) {
+      const { subject, html, text } = resaleListingCreatedEmail({
+        assetLabel: `${asset.manufacturer} ${asset.model} (${asset.serialNumber})`,
+        listedPricePaise: listing.listedPricePaise,
+      });
+      for (const to of notifyEmails) {
+        void this.mail.send({ to, subject, html, text });
+      }
+    }
 
     return { ...listing, asset: updatedAsset };
   }

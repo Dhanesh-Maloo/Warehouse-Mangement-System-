@@ -473,6 +473,9 @@ model Inspection {
   // Business-hours minutes from startedAt to completedAt (IST, Mon-Fri 09-18)
   slaMinutes       Int?             @map("sla_minutes")
   slaTargetAt      DateTime?        @map("sla_target_at") @db.Timestamptz
+  // Set once the SLA-breach email has fired, so the periodic check never
+  // re-notifies for the same breach.
+  slaBreachNotifiedAt DateTime?     @map("sla_breach_notified_at") @db.Timestamptz
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
