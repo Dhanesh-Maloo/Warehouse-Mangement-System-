@@ -19,6 +19,8 @@ import {
   Wrench,
   Tag,
   Map,
+  Hourglass,
+  Ticket,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -197,6 +199,21 @@ const MODULES: ModuleInfo[] = [
       'Everyone can view (scoped to their own client for client-scoped roles); Admin/Manager/Operator/Editor/Client admin can add or edit.',
   },
   {
+    id: 'stock-ageing',
+    title: 'Stock Ageing',
+    icon: Hourglass,
+    summary:
+      'Idle stock report - every in-storage asset, grouped by how many days it has sat there uninterrupted (0-7, 8-30, 31-60, 61-90, 90+).',
+    steps: [
+      'Click a bucket tile to filter the table to just that age range - click again to clear it.',
+      'Filter further by client (internal roles) and category.',
+      'Click a row to jump to that asset’s full profile.',
+      '"Idle since" is when the device most recently entered storage - not when it was first received, if it left and came back.',
+    ],
+    roles:
+      'Everyone can view, scoped to their own client for client-scoped roles; there is nothing to create or edit here.',
+  },
+  {
     id: 'inspections',
     title: 'Inspections',
     icon: ClipboardCheck,
@@ -219,6 +236,7 @@ const MODULES: ModuleInfo[] = [
       'Click "New Deployment Order", choose the client, the in-storage asset, and the end user (or create one inline).',
       'Fill in the delivery address, bundle type (standard vs. full prep/labeling/repacking), and courier zone.',
       'As the order progresses, update its status, courier zone, and tracking number from the list.',
+      'Once an order is "delivered", download a Delivery Challan (DC) PDF from the list - proof of delivery with the asset, client, contact, tracking and ticket details.',
     ],
     roles:
       'Client user only views; Admin/Manager/Operator/Editor/Client admin can create and progress orders - scoped to their own client for Editor/Client admin.',
@@ -232,8 +250,10 @@ const MODULES: ModuleInfo[] = [
     steps: [
       'Click "New Retrieval Request", pick the client and the deployed asset, then fill in pickup address and bundle type.',
       'Check "Requires data wipe" if the client has confirmed the device needs wiping - this is optional and decided per retrieval, not automatic.',
+      'Owner is set automatically to whoever is logged in and creates the request - it is not a picker.',
       'Track status from pending → initiated → in transit → received → completed.',
       'A diagnostic Inspection is always auto-created the moment a device is marked "received" - this cannot be skipped, since Esevel needs a diagnostic report on every retrieval.',
+      'Once a request is "received" or "completed", download a Retrieval Confirmation PDF (asset details, owner, tickets, tracking, diagnostic result) from the list.',
     ],
     roles:
       'Client user only views; Admin/Manager/Operator/Editor/Client admin can create and progress requests - scoped to their own client for Editor/Client admin.',
@@ -249,6 +269,7 @@ const MODULES: ModuleInfo[] = [
       'For Non-Certified or ITAD Bundled requests, optionally add the Certification add-on (₹550 + GST) for a destruction certificate - Certified Blanco already includes certification, so the add-on isn’t offered on that type.',
       'A Manager, Admin, or the owning client’s Client admin approves the request.',
       'Once approved, mark it "in progress" and then "complete" - completing it marks the asset disposed permanently.',
+      'Once a request is "completed", download a Certificate of Disposal PDF from the list - disposal type, certification status, approver and the disposed asset’s details.',
     ],
     roles:
       'Client user only views; Admin/Manager/Operator/Editor/Client admin can file requests and progress them; only Admin/Manager/Client admin (own client) can approve.',
@@ -265,7 +286,8 @@ const MODULES: ModuleInfo[] = [
       'Optionally add an estimate cost and notes, then submit.',
       'The SLA target date is set automatically based on the repair type: In-House Software defaults to 3 business days (Mon-Sat, 09:00-18:00 IST, excluding holidays); OEM/Warranty and In-House Hardware have no fixed default since they depend on the OEM/parts timeline - enter or revise the target date once it becomes known.',
       'A request past its SLA target is flagged "Overdue" wherever it’s listed. Requests with no target set yet are never flagged.',
-      'Progress the request from pending → sent → in repair → returned → completed (or cancel at any point before completed) using the status dropdown.',
+      'Progress the request from pending → sent → in repair → returned using the status dropdown. From "returned", completing it requires uploading the service center’s own Delivery Challan (DC) as proof.',
+      'Once a request is "completed", download a system-generated Repair Report PDF from the list - service center, repair type, cost estimate and the repaired asset’s details (separate from the service center’s uploaded DC).',
     ],
     roles:
       'Client user only views; Admin/Manager/Operator/Editor/Client admin can file and progress requests, and revise the SLA target - scoped to their own client for Editor/Client admin.',
@@ -350,6 +372,19 @@ const MODULES: ModuleInfo[] = [
     ],
     roles:
       'Admin/Manager/Operator/Editor/Client admin can view current pricing; only Admin can create new rates (this is deliberately locked down since it affects every client’s bill).',
+  },
+  {
+    id: 'ticket-lookup',
+    title: 'Ticket Lookup',
+    icon: Ticket,
+    summary:
+      'Search by an iValue or client ticket number to see everything that happened under it, across every module.',
+    steps: [
+      'Type a ticket number and search - it checks Inbound, Retrieval, Inspections, Deployment, Disposal and Repair all at once.',
+      'If the same ticket number was used on more than one module (e.g. an Inbound delivery and a later Retrieval), every match shows up as its own row, tagged with which module it came from - nothing is merged or hidden.',
+      'Each row links straight to that record, and shows its ledger charges and a combined total at the bottom.',
+    ],
+    roles: 'Everyone can use it, scoped to their own client for client-scoped roles.',
   },
   {
     id: 'clients',
