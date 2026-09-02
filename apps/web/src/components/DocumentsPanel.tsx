@@ -59,7 +59,8 @@ export function DocumentsPanel({ entityType, entityId, readOnly = false }: Docum
       const form = new FormData();
       form.append('file', file);
       const token = localStorage.getItem('wh_token');
-      const uploadUrl = `/api/v1${listUrl}`;
+      const base = import.meta.env.VITE_API_URL ?? '';
+      const uploadUrl = `${base}/api/v1${listUrl}`;
       const res = await fetch(uploadUrl, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -85,6 +86,22 @@ export function DocumentsPanel({ entityType, entityId, readOnly = false }: Docum
     mutationFn: (id: string) => api.del(`/documents/${id}`),
     onSuccess: () => void qc.invalidateQueries({ queryKey }),
   });
+
+  async function downloadDocument(id: string, originalName: string) {
+    const token = localStorage.getItem('wh_token');
+    const base = import.meta.env.VITE_API_URL ?? '';
+    const res = await fetch(`${base}/api/v1/documents/${id}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = originalName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -177,15 +194,14 @@ export function DocumentsPanel({ entityType, entityId, readOnly = false }: Docum
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <a
-                    href={`/api/v1/documents/${doc.id}/download`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => void downloadDocument(doc.id, doc.originalName)}
                     className="p-1.5 rounded-lg text-gray-400 hover:text-[#E86F2C] hover:bg-[#E86F2C]/5 transition-colors"
                     title="Download"
                   >
                     <Download size={14} />
-                  </a>
+                  </button>
                   {!readOnly && (
                     <button
                       type="button"

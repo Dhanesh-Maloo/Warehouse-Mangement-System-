@@ -77,9 +77,21 @@ export function LedgerPage() {
   const entries = data ?? [];
   const runningTotal = entries.reduce((sum, e) => sum + Number(e.amountPaise), 0);
 
-  function handleExport() {
+  async function handleExport() {
     const p = new URLSearchParams(params);
-    window.open(`/api/v1/ledger/export?${p.toString()}`, '_blank');
+    const token = localStorage.getItem('wh_token');
+    const base = import.meta.env.VITE_API_URL ?? '';
+    const res = await fetch(`${base}/api/v1/ledger/export?${p.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ledger-export.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -102,7 +114,7 @@ export function LedgerPage() {
             </button>
           )}
           <button
-            onClick={handleExport}
+            onClick={() => void handleExport()}
             className="flex items-center gap-2 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50"
           >
             <Download size={16} />

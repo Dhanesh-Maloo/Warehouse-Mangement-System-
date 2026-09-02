@@ -781,7 +781,8 @@ export function InspectionDetailPage() {
                       type="button"
                       onClick={async () => {
                         const token = localStorage.getItem('wh_token');
-                        const res = await fetch(src, {
+                        const base = import.meta.env.VITE_API_URL ?? '';
+                        const res = await fetch(`${base}${src}`, {
                           headers: token ? { Authorization: `Bearer ${token}` } : {},
                         });
                         if (!res.ok) return;
