@@ -11,6 +11,7 @@ export interface ClientAccrualResult {
   totalDeviceCount: number;
   laptopAmountPaise: bigint;
   peripheralAmountPaise: bigint;
+  commitmentAmountPaise: bigint;
   totalAmountPaise: bigint;
   skipped: boolean;
   skipReason?: string;
@@ -82,6 +83,7 @@ export class StorageService {
           totalDeviceCount: 0,
           laptopAmountPaise: 0n,
           peripheralAmountPaise: 0n,
+          commitmentAmountPaise: 0n,
           totalAmountPaise: 0n,
           skipped: true,
           skipReason: `Error: ${String(err)}`,
@@ -121,6 +123,11 @@ export class StorageService {
       orderBy: { createdAt: 'desc' },
     });
 
+    // A representative asset (any status) to satisfy the EventLedger FK for a
+    // client-level flat commitment charge that isn't tied to a specific device.
+    const findRepresentativeAsset = (): Promise<{ id: string } | null> =>
+      this.prisma.asset.findFirst({ where: { clientId }, select: { id: true } });
+
     // If a run already exists for this month, reverse its ledger entries first so we
     // can post fresh ones with the current device count. This keeps the ledger append-only
     // while ensuring the month's storage charge always reflects live inventory.
@@ -140,14 +147,14 @@ export class StorageService {
             eventType: 'STORAGE_LAPTOP',
             asset: { connect: { id: representativeAsset.id } },
             client: { connect: { id: clientId } },
-            quantity: -existingRun.laptopCount,
+            quantity: -existingRun.billableLaptopCount,
             unitRatePaise: laptopRatePaise,
             amountPaise: -existingRun.laptopAmountPaise,
             occurredAt,
             createdBy: 'system:storage-accrual',
             referenceId: existingRun.id,
             referenceType: 'storage_accrual_reversal',
-            notes: `Reversal of previous ${reversedMonthLabel} laptop storage charge (${existingRun.laptopCount} devices)`,
+            notes: `Reversal of previous ${reversedMonthLabel} laptop storage charge (${existingRun.billableLaptopCount} billed device(s))`,
           });
         }
       }
@@ -161,14 +168,32 @@ export class StorageService {
             eventType: 'STORAGE_PERIPHERAL',
             asset: { connect: { id: representativePeripheral.id } },
             client: { connect: { id: clientId } },
-            quantity: -existingRun.peripheralCount,
+            quantity: -existingRun.billablePeripheralCount,
             unitRatePaise: peripheralRatePaise,
             amountPaise: -existingRun.peripheralAmountPaise,
             occurredAt,
             createdBy: 'system:storage-accrual',
             referenceId: existingRun.id,
             referenceType: 'storage_accrual_reversal',
-            notes: `Reversal of previous ${reversedMonthLabel} peripheral storage charge (${existingRun.peripheralCount} devices)`,
+            notes: `Reversal of previous ${reversedMonthLabel} peripheral storage charge (${existingRun.billablePeripheralCount} billed device(s))`,
+          });
+        }
+      }
+      if (existingRun.commitmentAmountPaise > 0n) {
+        const representativeAsset = await findRepresentativeAsset();
+        if (representativeAsset) {
+          await this.ledger.create({
+            eventType: 'STORAGE_COMMITMENT',
+            asset: { connect: { id: representativeAsset.id } },
+            client: { connect: { id: clientId } },
+            quantity: -1,
+            unitRatePaise: existingRun.commitmentAmountPaise,
+            amountPaise: -existingRun.commitmentAmountPaise,
+            occurredAt,
+            createdBy: 'system:storage-accrual',
+            referenceId: existingRun.id,
+            referenceType: 'storage_accrual_reversal',
+            notes: `Reversal of previous ${reversedMonthLabel} minimum commitment charge`,
           });
         }
       }
@@ -192,12 +217,40 @@ export class StorageService {
       },
     });
 
-    const laptopAmountPaise = BigInt(laptopCount) * laptopRatePaise;
-    const peripheralAmountPaise = BigInt(peripheralCount) * peripheralRatePaise;
-    const totalAmountPaise = laptopAmountPaise + peripheralAmountPaise;
+    // Monthly minimum committed spend (SPEC.md "Commitment"): when configured
+    // for this client, the flat amount is always billed, and only devices
+    // beyond each threshold are billed per-device on top of it.
+    const client = await this.prisma.client.findUnique({
+      where: { id: clientId },
+      select: {
+        commitmentAmountPaise: true,
+        commitmentLaptopCount: true,
+        commitmentPeripheralCount: true,
+      },
+    });
+    const hasCommitment =
+      client?.commitmentAmountPaise != null &&
+      client.commitmentLaptopCount != null &&
+      client.commitmentPeripheralCount != null;
+    const commitmentAmountPaise = client?.commitmentAmountPaise ?? 0n;
+    const commitmentLaptopCount = client?.commitmentLaptopCount ?? 0;
+    const commitmentPeripheralCount = client?.commitmentPeripheralCount ?? 0;
+    const billableLaptopCount = hasCommitment
+      ? Math.max(0, laptopCount - commitmentLaptopCount)
+      : laptopCount;
+    const billablePeripheralCount = hasCommitment
+      ? Math.max(0, peripheralCount - commitmentPeripheralCount)
+      : peripheralCount;
+
+    const laptopAmountPaise = BigInt(billableLaptopCount) * laptopRatePaise;
+    const peripheralAmountPaise = BigInt(billablePeripheralCount) * peripheralRatePaise;
+    const totalAmountPaise = commitmentAmountPaise + laptopAmountPaise + peripheralAmountPaise;
     const totalDeviceCount = laptopCount + peripheralCount;
 
-    if (totalDeviceCount === 0) {
+    // A commitment is a minimum spend regardless of device count, so it still
+    // bills even with zero devices in storage — only skip entirely when there's
+    // truly nothing to bill (no commitment and no devices).
+    if (totalDeviceCount === 0 && !hasCommitment) {
       // Still record the run even if no devices, but skip ledger events
       await this.prisma.storageAccrualRun.create({
         data: {
@@ -206,9 +259,12 @@ export class StorageService {
           periodEnd,
           laptopCount: 0,
           peripheralCount: 0,
+          billableLaptopCount: 0,
+          billablePeripheralCount: 0,
           totalDeviceCount: 0,
           laptopAmountPaise: 0n,
           peripheralAmountPaise: 0n,
+          commitmentAmountPaise: 0n,
           totalAmountPaise: 0n,
         },
       });
@@ -221,15 +277,38 @@ export class StorageService {
         totalDeviceCount: 0,
         laptopAmountPaise: 0n,
         peripheralAmountPaise: 0n,
+        commitmentAmountPaise: 0n,
         totalAmountPaise: 0n,
         skipped: true,
         skipReason: 'No devices in storage',
       };
     }
 
-    // Post STORAGE_LAPTOP ledger event (one bulk row per client)
-    if (laptopCount > 0) {
-      // Find a representative asset to satisfy the EventLedger FK — use first laptop/monitor in storage
+    // Post STORAGE_COMMITMENT ledger event (flat minimum spend)
+    if (commitmentAmountPaise > 0n) {
+      const representativeAsset = await findRepresentativeAsset();
+      if (representativeAsset) {
+        await this.ledger.create({
+          eventType: 'STORAGE_COMMITMENT',
+          asset: { connect: { id: representativeAsset.id } },
+          client: { connect: { id: clientId } },
+          quantity: 1,
+          unitRatePaise: commitmentAmountPaise,
+          amountPaise: commitmentAmountPaise,
+          occurredAt,
+          createdBy: 'system:storage-accrual',
+          referenceType: 'storage_accrual',
+          notes: `Monthly minimum commitment (covers up to ${commitmentLaptopCount} laptops, ${commitmentPeripheralCount} peripherals)`,
+        });
+      } else {
+        this.logger.warn(
+          `Client ${clientId} has a storage commitment configured but no asset exists to attach the ledger charge to — skipped this month.`,
+        );
+      }
+    }
+
+    // Post STORAGE_LAPTOP ledger event for billable (over-commitment) laptops
+    if (billableLaptopCount > 0) {
       const representativeAsset = await this.prisma.asset.findFirst({
         where: {
           clientId,
@@ -244,19 +323,21 @@ export class StorageService {
           eventType: 'STORAGE_LAPTOP',
           asset: { connect: { id: representativeAsset.id } },
           client: { connect: { id: clientId } },
-          quantity: laptopCount,
+          quantity: billableLaptopCount,
           unitRatePaise: laptopRatePaise,
           amountPaise: laptopAmountPaise,
           occurredAt,
           createdBy: 'system:storage-accrual',
           referenceType: 'storage_accrual',
-          notes: `Monthly storage accrual: ${laptopCount} laptop/monitor device(s) @ ₹${Number(laptopRatePaise) / 100}/device`,
+          notes: hasCommitment
+            ? `Monthly storage accrual: ${billableLaptopCount} laptop/monitor device(s) over the ${commitmentLaptopCount}-device commitment @ ₹${Number(laptopRatePaise) / 100}/device`
+            : `Monthly storage accrual: ${billableLaptopCount} laptop/monitor device(s) @ ₹${Number(laptopRatePaise) / 100}/device`,
         });
       }
     }
 
-    // Post STORAGE_PERIPHERAL ledger event (one bulk row per client)
-    if (peripheralCount > 0) {
+    // Post STORAGE_PERIPHERAL ledger event for billable (over-commitment) peripherals
+    if (billablePeripheralCount > 0) {
       const representativePeripheral = await this.prisma.asset.findFirst({
         where: {
           clientId,
@@ -271,13 +352,15 @@ export class StorageService {
           eventType: 'STORAGE_PERIPHERAL',
           asset: { connect: { id: representativePeripheral.id } },
           client: { connect: { id: clientId } },
-          quantity: peripheralCount,
+          quantity: billablePeripheralCount,
           unitRatePaise: peripheralRatePaise,
           amountPaise: peripheralAmountPaise,
           occurredAt,
           createdBy: 'system:storage-accrual',
           referenceType: 'storage_accrual',
-          notes: `Monthly storage accrual: ${peripheralCount} peripheral device(s) @ ₹${Number(peripheralRatePaise) / 100}/device`,
+          notes: hasCommitment
+            ? `Monthly storage accrual: ${billablePeripheralCount} peripheral device(s) over the ${commitmentPeripheralCount}-device commitment @ ₹${Number(peripheralRatePaise) / 100}/device`
+            : `Monthly storage accrual: ${billablePeripheralCount} peripheral device(s) @ ₹${Number(peripheralRatePaise) / 100}/device`,
         });
       }
     }
@@ -290,9 +373,12 @@ export class StorageService {
         periodEnd,
         laptopCount,
         peripheralCount,
+        billableLaptopCount,
+        billablePeripheralCount,
         totalDeviceCount,
         laptopAmountPaise,
         peripheralAmountPaise,
+        commitmentAmountPaise,
         totalAmountPaise,
       },
     });
@@ -305,6 +391,7 @@ export class StorageService {
       totalDeviceCount,
       laptopAmountPaise,
       peripheralAmountPaise,
+      commitmentAmountPaise,
       totalAmountPaise,
       skipped: false,
     };
@@ -336,8 +423,14 @@ export class StorageService {
     peripheralCount: number;
     laptopProjectedPaise: string;
     peripheralProjectedPaise: string;
+    commitmentProjectedPaise: string;
     totalProjectedPaise: string;
     rates: { laptopPerDevicePaise: string; peripheralPerDevicePaise: string };
+    commitment: {
+      amountPaise: string;
+      laptopCount: number;
+      peripheralCount: number;
+    } | null;
     lastAccrualRun: {
       id: string;
       periodStart: Date;
@@ -363,7 +456,13 @@ export class StorageService {
       }),
       this.prisma.client.findUnique({
         where: { id: clientId },
-        select: { id: true, name: true },
+        select: {
+          id: true,
+          name: true,
+          commitmentAmountPaise: true,
+          commitmentLaptopCount: true,
+          commitmentPeripheralCount: true,
+        },
       }),
     ]);
 
@@ -374,9 +473,23 @@ export class StorageService {
     const laptopRatePaise = laptopRate ? laptopRate.unitRatePaise : BigInt(11400);
     const peripheralRatePaise = peripheralRate ? peripheralRate.unitRatePaise : BigInt(2800);
 
-    const laptopAmountPaise = BigInt(laptopCount) * laptopRatePaise;
-    const peripheralAmountPaise = BigInt(peripheralCount) * peripheralRatePaise;
-    const projectedTotalPaise = laptopAmountPaise + peripheralAmountPaise;
+    const hasCommitment =
+      client?.commitmentAmountPaise != null &&
+      client.commitmentLaptopCount != null &&
+      client.commitmentPeripheralCount != null;
+    const commitmentAmountPaise = client?.commitmentAmountPaise ?? 0n;
+    const commitmentLaptopCount = client?.commitmentLaptopCount ?? 0;
+    const commitmentPeripheralCount = client?.commitmentPeripheralCount ?? 0;
+    const billableLaptopCount = hasCommitment
+      ? Math.max(0, laptopCount - commitmentLaptopCount)
+      : laptopCount;
+    const billablePeripheralCount = hasCommitment
+      ? Math.max(0, peripheralCount - commitmentPeripheralCount)
+      : peripheralCount;
+
+    const laptopAmountPaise = BigInt(billableLaptopCount) * laptopRatePaise;
+    const peripheralAmountPaise = BigInt(billablePeripheralCount) * peripheralRatePaise;
+    const projectedTotalPaise = commitmentAmountPaise + laptopAmountPaise + peripheralAmountPaise;
 
     // Last run for this client
     const lastRun = await this.prisma.storageAccrualRun.findFirst({
@@ -391,11 +504,19 @@ export class StorageService {
       peripheralCount,
       laptopProjectedPaise: laptopAmountPaise.toString(),
       peripheralProjectedPaise: peripheralAmountPaise.toString(),
+      commitmentProjectedPaise: commitmentAmountPaise.toString(),
       totalProjectedPaise: projectedTotalPaise.toString(),
       rates: {
         laptopPerDevicePaise: laptopRatePaise.toString(),
         peripheralPerDevicePaise: peripheralRatePaise.toString(),
       },
+      commitment: hasCommitment
+        ? {
+            amountPaise: commitmentAmountPaise.toString(),
+            laptopCount: commitmentLaptopCount,
+            peripheralCount: commitmentPeripheralCount,
+          }
+        : null,
       lastAccrualRun: lastRun
         ? {
             id: lastRun.id,

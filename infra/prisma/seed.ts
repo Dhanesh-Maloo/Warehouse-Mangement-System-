@@ -63,6 +63,11 @@ async function seedClient(): Promise<void> {
       contactEmail: 'ops@esevel.com',
       contactPhone: '+6500000000',
       isActive: true,
+      // Negotiated commitment per the rate contract: ₹42,750/month flat,
+      // covering up to 300 laptops and 300 peripherals.
+      commitmentAmountPaise: BigInt(4275000),
+      commitmentLaptopCount: 300,
+      commitmentPeripheralCount: 300,
     },
   });
 

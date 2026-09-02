@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, Matches, IsObject } from 'class-validator';
+import { IsString, IsEmail, IsOptional, Matches, IsObject, IsInt, Min } from 'class-validator';
 
 const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
@@ -29,4 +29,21 @@ export class CreateClientDto {
   @IsOptional()
   @IsString()
   contactPhone?: string;
+
+  // Monthly minimum committed storage spend — all three must be set together
+  // to enable a commitment (see StorageService); omit all three for none.
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  commitmentAmountPaise?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  commitmentLaptopCount?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  commitmentPeripheralCount?: number;
 }

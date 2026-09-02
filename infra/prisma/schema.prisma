@@ -200,6 +200,14 @@ model Client {
   contactEmail                String?      @map("contact_email")
   contactPhone                String?      @map("contact_phone")
   isActive                    Boolean      @default(true) @map("is_active")
+  // Monthly minimum committed storage spend (SPEC.md "Commitment"). Null means
+  // no commitment — storage bills purely per-device, same as before this existed.
+  // When set, all three fields are used together: the flat amount is billed
+  // regardless of device count, and only devices beyond each threshold are
+  // billed per-device on top of it (see StorageService).
+  commitmentAmountPaise       BigInt?      @map("commitment_amount_paise")
+  commitmentLaptopCount       Int?         @map("commitment_laptop_count")
+  commitmentPeripheralCount   Int?         @map("commitment_peripheral_count")
   createdAt                   DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                   DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -740,8 +748,17 @@ model StorageAccrualRun {
   laptopCount            Int      @map("laptop_count")
   peripheralCount        Int      @map("peripheral_count")
   totalDeviceCount       Int      @map("total_device_count")
+  // Actually billed quantities (laptopCount/peripheralCount minus whatever a
+  // commitment covers for free). Equal to laptopCount/peripheralCount when no
+  // commitment applies. Kept separate so a later reversal bills back exactly
+  // what was charged, not the raw physical device count.
+  billableLaptopCount     Int      @default(0) @map("billable_laptop_count")
+  billablePeripheralCount Int      @default(0) @map("billable_peripheral_count")
   laptopAmountPaise      BigInt   @map("laptop_amount_paise")
   peripheralAmountPaise  BigInt   @map("peripheral_amount_paise")
+  // Flat minimum-commitment charge included in totalAmountPaise, if the
+  // client had a commitment configured for this run. 0 when none applied.
+  commitmentAmountPaise  BigInt   @default(0) @map("commitment_amount_paise")
   totalAmountPaise       BigInt   @map("total_amount_paise")
   createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
 

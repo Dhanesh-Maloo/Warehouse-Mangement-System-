@@ -13,6 +13,9 @@ interface Client {
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
+  commitmentAmountPaise: string | null;
+  commitmentLaptopCount: number | null;
+  commitmentPeripheralCount: number | null;
   createdAt: string;
 }
 
@@ -25,6 +28,9 @@ const EMPTY = {
   contactName: '',
   contactEmail: '',
   contactPhone: '',
+  commitmentAmountRupees: '',
+  commitmentLaptopCount: '',
+  commitmentPeripheralCount: '',
 };
 
 export function ClientsPage() {
@@ -56,6 +62,10 @@ export function ClientsPage() {
       contactName: c.contactName ?? '',
       contactEmail: c.contactEmail ?? '',
       contactPhone: c.contactPhone ?? '',
+      commitmentAmountRupees:
+        c.commitmentAmountPaise != null ? (Number(c.commitmentAmountPaise) / 100).toString() : '',
+      commitmentLaptopCount: c.commitmentLaptopCount?.toString() ?? '',
+      commitmentPeripheralCount: c.commitmentPeripheralCount?.toString() ?? '',
     });
     setEditing(c);
     setFormError('');
@@ -66,6 +76,20 @@ export function ClientsPage() {
     mutationFn: () => {
       if (form.gstin && !GSTIN_RE.test(form.gstin))
         throw new Error('Invalid GSTIN format (must be 15 chars, e.g. 29AABCE1234F1Z5)');
+
+      const commitmentFields = [
+        form.commitmentAmountRupees,
+        form.commitmentLaptopCount,
+        form.commitmentPeripheralCount,
+      ];
+      const anyCommitmentField = commitmentFields.some((v) => v.trim() !== '');
+      const allCommitmentFields = commitmentFields.every((v) => v.trim() !== '');
+      if (anyCommitmentField && !allCommitmentFields) {
+        throw new Error(
+          'Set the commitment amount, laptop count and peripheral count together, or leave all three blank.',
+        );
+      }
+
       const payload = {
         name: form.name,
         slug: form.slug,
@@ -73,6 +97,13 @@ export function ClientsPage() {
         contactName: form.contactName || undefined,
         contactEmail: form.contactEmail || undefined,
         contactPhone: form.contactPhone || undefined,
+        ...(allCommitmentFields
+          ? {
+              commitmentAmountPaise: Math.round(Number(form.commitmentAmountRupees) * 100),
+              commitmentLaptopCount: Number(form.commitmentLaptopCount),
+              commitmentPeripheralCount: Number(form.commitmentPeripheralCount),
+            }
+          : {}),
       };
       return editing ? api.patch(`/clients/${editing.id}`, payload) : api.post('/clients', payload);
     },
@@ -152,6 +183,60 @@ export function ClientsPage() {
               </div>
             ))}
           </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-sm font-medium text-gray-700">
+              Monthly storage commitment{' '}
+              <span className="text-gray-400 font-normal">(optional)</span>
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5 mb-3">
+              Minimum spend billed flat regardless of device count, covering up to these device
+              counts — leave all three blank for pure per-device billing.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Commitment amount (₹/month)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.commitmentAmountRupees}
+                  onChange={(e) => field('commitmentAmountRupees', e.target.value)}
+                  placeholder="42750"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Covers up to (laptops)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.commitmentLaptopCount}
+                  onChange={(e) => field('commitmentLaptopCount', e.target.value)}
+                  placeholder="300"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Covers up to (peripherals)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.commitmentPeripheralCount}
+                  onChange={(e) => field('commitmentPeripheralCount', e.target.value)}
+                  placeholder="300"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+            </div>
+          </div>
+
           {formError && <p className="text-sm text-red-600">{formError}</p>}
           <div className="flex gap-3">
             <button
@@ -244,6 +329,15 @@ export function ClientsPage() {
                     <div className="text-gray-400 mb-0.5">Contact</div>
                     <div>
                       {c.contactName} · {c.contactEmail}
+                    </div>
+                  </div>
+                )}
+                {c.commitmentAmountPaise != null && (
+                  <div className="col-span-2">
+                    <div className="text-gray-400 mb-0.5">Storage commitment</div>
+                    <div>
+                      ₹{(Number(c.commitmentAmountPaise) / 100).toLocaleString('en-IN')}/mo · up to{' '}
+                      {c.commitmentLaptopCount} laptops, {c.commitmentPeripheralCount} peripherals
                     </div>
                   </div>
                 )}

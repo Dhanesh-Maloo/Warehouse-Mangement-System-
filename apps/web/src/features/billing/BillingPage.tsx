@@ -32,8 +32,14 @@ interface StorageSummary {
   peripheralCount: number;
   laptopProjectedPaise: string;
   peripheralProjectedPaise: string;
+  commitmentProjectedPaise: string;
   totalProjectedPaise: string;
   rates: { laptopPerDevicePaise: string; peripheralPerDevicePaise: string };
+  commitment: {
+    amountPaise: string;
+    laptopCount: number;
+    peripheralCount: number;
+  } | null;
   lastAccrualRun: {
     id: string;
     periodStart: string;
@@ -129,6 +135,7 @@ const EVENT_LABELS: Record<string, string> = {
   DISPOSAL_ITAD: 'Disposal (ITAD)',
   STORAGE_LAPTOP: 'Storage - Laptop',
   STORAGE_PERIPHERAL: 'Storage - Peripheral',
+  STORAGE_COMMITMENT: 'Storage - Minimum Commitment',
   STORAGE_LAPTOP_REVERSAL: 'Storage Reversal - Laptop',
   STORAGE_PERIPHERAL_REVERSAL: 'Storage Reversal - Peripheral',
 };
@@ -151,6 +158,7 @@ const EVENT_CATEGORY: Record<string, string> = {
   DISPOSAL_ITAD: 'Disposal',
   STORAGE_LAPTOP: 'Storage',
   STORAGE_PERIPHERAL: 'Storage',
+  STORAGE_COMMITMENT: 'Storage',
   STORAGE_LAPTOP_REVERSAL: 'Storage',
   STORAGE_PERIPHERAL_REVERSAL: 'Storage',
 };
@@ -267,7 +275,11 @@ export function BillingPage() {
   const summaryParams = new URLSearchParams();
   if (effectiveClientId) summaryParams.set('clientId', effectiveClientId);
 
-  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useQuery({
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    refetch: refetchSummary,
+  } = useQuery({
     queryKey: ['storage-summary', effectiveClientId],
     queryFn: () => api.get<StorageSummary>(`/storage/summary?${summaryParams.toString()}`),
     enabled: !!effectiveClientId,
@@ -285,7 +297,11 @@ export function BillingPage() {
     enabled: isAdminOrManager || isEditor || isClientAdmin,
   });
 
-  const { data: ledgerEntries = [], isLoading: ledgerLoading, refetch: refetchLedger } = useQuery({
+  const {
+    data: ledgerEntries = [],
+    isLoading: ledgerLoading,
+    refetch: refetchLedger,
+  } = useQuery({
     queryKey: ['billing-ledger', effectiveClientId, txFromDate, txToDate],
     queryFn: () => {
       const p = new URLSearchParams();
@@ -336,9 +352,7 @@ export function BillingPage() {
       if (effectiveClientId) p.set('clientId', effectiveClientId);
       p.set('search', assetSearch);
       p.set('take', '8');
-      return api
-        .get<{ data: AssetSearchResult[] }>(`/assets?${p.toString()}`)
-        .then((r) => r.data);
+      return api.get<{ data: AssetSearchResult[] }>(`/assets?${p.toString()}`).then((r) => r.data);
     },
     enabled: assetSearch.trim().length >= 2 && !selectedAsset,
     staleTime: 10_000,
@@ -398,7 +412,10 @@ export function BillingPage() {
             title="Sync with inventory"
             className="flex items-center gap-2 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
-            <RefreshCw size={15} className={(summaryLoading || ledgerLoading) ? 'animate-spin' : ''} />
+            <RefreshCw
+              size={15}
+              className={summaryLoading || ledgerLoading ? 'animate-spin' : ''}
+            />
             Sync
           </button>
 
@@ -482,17 +499,62 @@ export function BillingPage() {
           <div className="text-sm text-red-500">Failed to load storage summary.</div>
         ) : (
           <>
+            {summary.commitment && (
+              <div className="bg-[#E86F2C]/5 border border-[#E86F2C]/20 rounded-xl px-5 py-3 text-sm text-gray-700">
+                <span className="font-semibold text-[#E86F2C]">
+                  {formatINR(summary.commitment.amountPaise)}/month minimum commitment
+                </span>{' '}
+                covers up to {summary.commitment.laptopCount} laptops and{' '}
+                {summary.commitment.peripheralCount} peripherals — billed flat regardless of count.
+                {summary.laptopCount > summary.commitment.laptopCount ||
+                summary.peripheralCount > summary.commitment.peripheralCount ? (
+                  <>
+                    {' '}
+                    Currently{' '}
+                    {summary.laptopCount > summary.commitment.laptopCount && (
+                      <strong>
+                        {summary.laptopCount - summary.commitment.laptopCount} laptop
+                        {summary.laptopCount - summary.commitment.laptopCount === 1 ? '' : 's'}
+                      </strong>
+                    )}
+                    {summary.laptopCount > summary.commitment.laptopCount &&
+                      summary.peripheralCount > summary.commitment.peripheralCount &&
+                      ' and '}
+                    {summary.peripheralCount > summary.commitment.peripheralCount && (
+                      <strong>
+                        {summary.peripheralCount - summary.commitment.peripheralCount} peripheral
+                        {summary.peripheralCount - summary.commitment.peripheralCount === 1
+                          ? ''
+                          : 's'}
+                      </strong>
+                    )}{' '}
+                    over the limit, billed per-device on top.
+                  </>
+                ) : (
+                  ' Currently within the commitment — no extra device charges.'
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard
                 icon={<HardDrive size={16} />}
-                label="Laptops in storage"
+                label={
+                  summary.commitment
+                    ? 'Laptops in storage (billable over limit)'
+                    : 'Laptops in storage'
+                }
                 count={summary.laptopCount}
                 projected={summary.laptopProjectedPaise}
                 rateLabel={`₹${(Number(paise(summary.rates?.laptopPerDevicePaise)) / 100).toFixed(0)}/unit/month`}
               />
               <StatCard
                 icon={<Package size={16} />}
-                label="Peripherals in storage"
+                label={
+                  summary.commitment
+                    ? 'Peripherals in storage (billable over limit)'
+                    : 'Peripherals in storage'
+                }
                 count={summary.peripheralCount}
                 projected={summary.peripheralProjectedPaise}
                 rateLabel={`₹${(Number(paise(summary.rates?.peripheralPerDevicePaise)) / 100).toFixed(0)}/unit/month`}
@@ -507,8 +569,12 @@ export function BillingPage() {
                 <p className="text-3xl font-bold text-gray-900 tabular-nums">
                   {formatINR(summary.totalProjectedPaise)}
                 </p>
+                {summary.commitment && (
+                  <p className="text-xs text-gray-400">
+                    Includes {formatINR(summary.commitmentProjectedPaise)} commitment
+                  </p>
+                )}
               </div>
-
             </div>
 
             {/* Last accrual run summary bar */}
@@ -704,7 +770,9 @@ export function BillingPage() {
                         return (
                           <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50/40">
                             <td className="px-5 py-3 whitespace-nowrap">
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${chipCls}`}>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-xs font-medium ${chipCls}`}
+                              >
                                 {EVENT_LABELS[e.eventType] ?? e.eventType}
                               </span>
                             </td>
@@ -720,7 +788,9 @@ export function BillingPage() {
                             <td className="px-5 py-3 text-right tabular-nums text-gray-600 text-xs">
                               {formatINR(e.unitRatePaise)}
                             </td>
-                            <td className={`px-5 py-3 text-right tabular-nums font-semibold text-xs ${isNegative ? 'text-red-600' : 'text-gray-900'}`}>
+                            <td
+                              className={`px-5 py-3 text-right tabular-nums font-semibold text-xs ${isNegative ? 'text-red-600' : 'text-gray-900'}`}
+                            >
                               {formatINR(e.amountPaise)}
                             </td>
                             <td className="px-5 py-3 text-gray-500 text-xs whitespace-nowrap">
@@ -760,7 +830,10 @@ export function BillingPage() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
           {!selectedAsset ? (
             <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
               <input
                 type="text"
                 value={assetSearch}
@@ -887,7 +960,10 @@ export function BillingPage() {
                               const chipCls = CATEGORY_COLORS[cat] ?? 'bg-gray-100 text-gray-600';
                               const amt = paise(e.amountPaise);
                               return (
-                                <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50/40">
+                                <tr
+                                  key={e.id}
+                                  className="border-b border-gray-50 hover:bg-gray-50/40"
+                                >
                                   <td className="px-4 py-2.5 whitespace-nowrap">
                                     <span
                                       className={`px-2 py-0.5 rounded-full text-xs font-medium ${chipCls}`}
