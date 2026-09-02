@@ -254,7 +254,7 @@ async function seedRateCard(): Promise<void> {
     },
     {
       code: 'DISPOSAL_CERTIFIED',
-      description: 'Certified Data Destruction (Blanco)',
+      description: 'Certified Data Destruction',
       basis: 'per_device' as const,
       categoryApplies: 'any' as const,
       unitRatePaise: BigInt(55000),
@@ -325,7 +325,7 @@ async function seedRateCard(): Promise<void> {
     },
     {
       code: 'RETRIEVAL_WIPE_CERTIFIED',
-      description: 'Data Wipe - Certified Data Destruction (Blanco)',
+      description: 'Data Wipe - Certified Data Destruction',
       basis: 'per_device' as const,
       categoryApplies: 'any' as const,
       unitRatePaise: BigInt(55000),

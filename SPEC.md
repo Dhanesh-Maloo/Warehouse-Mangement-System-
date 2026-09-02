@@ -324,7 +324,7 @@ stories below capture the requirements clarified with Esevel via email
 
 **US-DISP-01 — ITAD certification add-on**
 - Certification is selected directly on the disposal request. Included at no
-  extra charge when the disposal type is a certified wipe (Blanco); for other
+  extra charge when the disposal type is a certified wipe; for other
   disposal types, opting in adds a certification line item priced via the
   rate card.
 

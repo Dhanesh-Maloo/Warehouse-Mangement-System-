@@ -263,10 +263,10 @@ const MODULES: ModuleInfo[] = [
     title: 'Disposal',
     icon: Trash2,
     summary:
-      'End-of-life handling - non-certified wipe, certified data destruction (Blanco), or full ITAD (IT Asset Disposition).',
+      'End-of-life handling - non-certified wipe, certified data destruction, or full ITAD (IT Asset Disposition).',
     steps: [
-      'Click "New Disposal Request", pick the client, the in-storage asset, and the disposal type: Non-Certified, Certified Data Destruction (Blanco), or Retrieval + ITAD Bundled.',
-      'For Non-Certified or ITAD Bundled requests, optionally add the Certification add-on (₹550 + GST) for a destruction certificate - Certified Blanco already includes certification, so the add-on isn’t offered on that type.',
+      'Click "New Disposal Request", pick the client, the in-storage asset, and the disposal type: Non-Certified, Certified Data Destruction, or Retrieval + ITAD Bundled.',
+      'For Non-Certified or ITAD Bundled requests, optionally add the Certification add-on (₹550 + GST) for a destruction certificate - Certified Data Destruction already includes certification, so the add-on isn’t offered on that type.',
       'A Manager, Admin, or the owning client’s Client admin approves the request.',
       'Once approved, mark it "in progress" and then "complete" - completing it marks the asset disposed permanently.',
       'Once a request is "completed", download a Certificate of Disposal PDF from the list - disposal type, certification status, approver and the disposed asset’s details.',
