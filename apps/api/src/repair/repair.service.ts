@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import type { RepairRequest } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
@@ -10,6 +15,8 @@ import type { CreateRepairRequestDto } from './dto/create-repair-request.dto';
 import type { UpdateRepairStatusDto } from './dto/update-repair-status.dto';
 import type { UpdateRepairSlaDto } from './dto/update-repair-sla.dto';
 import type { UpdateTicketsDto } from '../common/dto/update-tickets.dto';
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+const PDFDocument = require('pdfkit') as typeof import('pdfkit');
 
 export interface RepairAssetSummary {
   id: string;
@@ -454,5 +461,154 @@ export class RepairService {
 
     const [withAsset] = await this.attachAssets([updated]);
     return withAsset;
+  }
+
+  /**
+   * Repair completion report — proves an asset's repair details, for handoff
+   * to the client. Available once the request is 'completed'. Mirrors
+   * Disposal's certificate / Retrieval's confirmation PDF.
+   */
+  async generateRepairReportPdf(
+    id: string,
+    requestingClientId?: string,
+  ): Promise<{ stream: NodeJS.ReadableStream; filename: string }> {
+    const repair = await this.prisma.repairRequest.findUnique({ where: { id } });
+    if (!repair) throw new NotFoundException(`Repair request ${id} not found`);
+    if (requestingClientId && repair.clientId !== requestingClientId) {
+      throw new ForbiddenException('Cannot download a repair report from another client');
+    }
+    if (repair.status !== 'completed') {
+      throw new BadRequestException(
+        'Repair report is only available once the request has been completed',
+      );
+    }
+
+    const [client, asset, createdByUser] = await Promise.all([
+      this.prisma.client.findUnique({ where: { id: repair.clientId }, select: { name: true } }),
+      this.prisma.asset.findUnique({
+        where: { id: repair.assetId },
+        select: {
+          serialNumber: true,
+          assetTag: true,
+          model: true,
+          category: true,
+          manufacturer: true,
+        },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: repair.createdByUserId },
+        select: { fullName: true },
+      }),
+    ]);
+    if (!client || !asset) {
+      throw new NotFoundException('Related client or asset record not found');
+    }
+
+    const displayNumber = `REP-${repair.id.slice(-8).toUpperCase()}`;
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+
+    // Header
+    doc.fontSize(20).font('Helvetica-Bold').text('IValue WMS', 50, 50);
+    doc
+      .fontSize(10)
+      .font('Helvetica')
+      .fillColor('#666666')
+      .text('Warehouse Management System', 50, 74);
+    doc.fillColor('#000000').fontSize(18).font('Helvetica-Bold').text('Repair Report', 50, 100);
+
+    // Metadata box
+    doc.rect(50, 130, 495, 80).stroke('#cccccc');
+    doc.fontSize(9).font('Helvetica-Bold').text('Report Number', 60, 140);
+    doc.font('Helvetica').fontSize(12).text(displayNumber, 60, 153);
+    doc.fontSize(9).font('Helvetica-Bold').text('Client', 220, 140);
+    doc.font('Helvetica').fontSize(11).text(client.name, 220, 153);
+    doc.fontSize(9).font('Helvetica-Bold').text('Completed at', 400, 140);
+    doc
+      .font('Helvetica')
+      .fontSize(10)
+      .text(
+        (repair.completedAt ?? repair.updatedAt).toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        400,
+        153,
+      );
+    doc.fontSize(9).font('Helvetica-Bold').text('Ticket (iValue)', 60, 178);
+    doc.font('Helvetica').text(repair.ivalueTicketNumber ?? '—', 60, 191);
+    doc.fontSize(9).font('Helvetica-Bold').text('Ticket (client)', 220, 178);
+    doc.font('Helvetica').text(repair.clientTicketNumber ?? '—', 220, 191);
+    doc.fontSize(9).font('Helvetica-Bold').text('Owner', 400, 178);
+    doc.font('Helvetica').text(createdByUser?.fullName ?? '—', 400, 191);
+
+    let cursorY = 222;
+    doc.fontSize(9).font('Helvetica-Bold').text('Service center:', 50, cursorY);
+    doc.font('Helvetica').text(repair.serviceCenterName, 155, cursorY);
+    cursorY += 15;
+    doc.fontSize(9).font('Helvetica-Bold').text('Repair type:', 50, cursorY);
+    const repairTypeLabel =
+      repair.repairType === 'oem_warranty'
+        ? 'OEM Warranty'
+        : repair.repairType === 'out_of_warranty'
+          ? 'Out of Warranty'
+          : `In-House${repair.repairCategory ? ` (${repair.repairCategory})` : ''}`;
+    doc.font('Helvetica').text(repairTypeLabel, 155, cursorY);
+    cursorY += 15;
+    if (repair.estimateCostPaise != null) {
+      doc.fontSize(9).font('Helvetica-Bold').text('Estimated cost:', 50, cursorY);
+      doc
+        .font('Helvetica')
+        .text(`₹${(Number(repair.estimateCostPaise) / 100).toLocaleString('en-IN')}`, 155, cursorY);
+      cursorY += 15;
+    }
+
+    // Asset details table
+    const tableTop = cursorY + 10;
+    doc.fontSize(10).font('Helvetica-Bold').text('Repaired asset', 50, tableTop);
+
+    const tableStart = tableTop + 18;
+    doc.rect(50, tableStart, 495, 20).fill('#1A2B3C');
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+    doc.text('Serial number', 55, tableStart + 6);
+    doc.text('Asset tag', 210, tableStart + 6);
+    doc.text('Model', 320, tableStart + 6);
+    doc.text('Category', 440, tableStart + 6);
+    doc.fillColor('#000000');
+
+    const rowY = tableStart + 20;
+    doc.rect(50, rowY, 495, 22).fill('#f8f8f8');
+    doc.fillColor('#000000').font('Helvetica').fontSize(8);
+    doc.text(asset.serialNumber, 55, rowY + 7, { width: 145 });
+    doc.text(asset.assetTag ?? '—', 210, rowY + 7, { width: 100 });
+    doc.text(`${asset.manufacturer} ${asset.model}`, 320, rowY + 7, { width: 115 });
+    doc.text(asset.category, 440, rowY + 7);
+
+    if (repair.notes) {
+      doc
+        .fontSize(9)
+        .font('Helvetica-Bold')
+        .text('Notes:', 50, rowY + 40);
+      doc.font('Helvetica').text(repair.notes, 50, rowY + 54, { width: 495 });
+    }
+
+    // Footer
+    const footerY = Math.max(rowY + (repair.notes ? 100 : 60), 680);
+    doc.moveTo(50, footerY).lineTo(545, footerY).stroke('#cccccc');
+    doc
+      .fontSize(8)
+      .fillColor('#888888')
+      .text(
+        `Generated by IValue WMS · ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`,
+        50,
+        footerY + 8,
+        { align: 'center', width: 495 },
+      );
+
+    doc.end();
+    return { stream: doc, filename: `${displayNumber}.pdf` };
   }
 }

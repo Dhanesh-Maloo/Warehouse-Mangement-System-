@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Download } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -200,6 +200,22 @@ export function DisposalPage() {
       void qc.invalidateQueries({ queryKey: ['inventory-summary'] });
     },
   });
+
+  async function downloadCertificatePdf(id: string) {
+    const token = localStorage.getItem('wh_token');
+    const base = import.meta.env.VITE_API_URL ?? '';
+    const res = await fetch(`${base}/api/v1/disposal/${id}/certificate`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `disposal-${id.slice(-8)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -641,7 +657,19 @@ export function DisposalPage() {
                       {new Date(d.createdAt).toLocaleDateString('en-IN')}
                     </td>
 
-                    <td />
+                    <td className="px-5 py-3.5">
+                      {d.status === 'completed' && (
+                        <button
+                          type="button"
+                          onClick={() => void downloadCertificatePdf(d.id)}
+                          className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#E86F2C]"
+                          title="Download certificate of disposal"
+                        >
+                          <Download size={12} />
+                          PDF
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

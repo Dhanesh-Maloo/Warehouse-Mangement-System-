@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Plus, Upload, FileText, Search } from 'lucide-react';
+import { Plus, Upload, FileText, Search, Download } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -286,6 +286,22 @@ export function RepairPage() {
     },
     onError: (e: Error) => setDcError(e.message),
   });
+
+  async function downloadRepairReportPdf(id: string) {
+    const token = localStorage.getItem('wh_token');
+    const base = import.meta.env.VITE_API_URL ?? '';
+    const res = await fetch(`${base}/api/v1/repair/${id}/report`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `repair-${id.slice(-8)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function closeDcModal() {
     setDcModalRepairId(null);
@@ -915,7 +931,19 @@ export function RepairPage() {
                       )}
                     </td>
 
-                    <td />
+                    <td className="px-5 py-3.5">
+                      {r.status === 'completed' && (
+                        <button
+                          type="button"
+                          onClick={() => void downloadRepairReportPdf(r.id)}
+                          className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#E86F2C]"
+                          title="Download repair report"
+                        >
+                          <Download size={12} />
+                          PDF
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

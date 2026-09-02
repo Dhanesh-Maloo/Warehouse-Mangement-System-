@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
@@ -9,6 +14,14 @@ import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
 import { disposalApprovalNeededEmail } from '../mail/templates/disposal-approval-needed';
 import type { CreateDisposalRequestDto } from './dto/create-disposal-request.dto';
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+const PDFDocument = require('pdfkit') as typeof import('pdfkit');
+
+const DISPOSAL_TYPE_LABELS: Record<string, string> = {
+  non_certified: 'Non-Certified Disposal',
+  certified_blanco: 'Certified Data Destruction',
+  itad_bundled: 'ITAD Bundled Disposal',
+};
 
 // Roles that approve disposals (SPEC.md: "manager ... Approves disposals").
 // Admins are included too, per Dhanesh (2026-09-01) — they have full access
@@ -338,5 +351,146 @@ export class DisposalService {
       },
       include: { asset: true },
     });
+  }
+
+  /**
+   * Certificate of Disposal — proves an asset was disposed of, for handoff
+   * to the client. Available once the request is 'completed'. Mirrors
+   * Retrieval's confirmation PDF / Inbound's GRN.
+   */
+  async generateDisposalCertificatePdf(
+    id: string,
+    requestingClientId?: string,
+  ): Promise<{ stream: NodeJS.ReadableStream; filename: string }> {
+    const disposal = await this.prisma.disposalRequest.findUnique({
+      where: { id },
+      include: {
+        client: true,
+        asset: {
+          select: {
+            serialNumber: true,
+            assetTag: true,
+            model: true,
+            category: true,
+            manufacturer: true,
+          },
+        },
+        createdBy: { select: { fullName: true } },
+        approvedBy: { select: { fullName: true } },
+      },
+    });
+    if (!disposal) throw new NotFoundException(`Disposal request ${id} not found`);
+    if (requestingClientId && disposal.clientId !== requestingClientId) {
+      throw new ForbiddenException('Cannot download a disposal certificate from another client');
+    }
+    if (disposal.status !== 'completed') {
+      throw new BadRequestException(
+        'Disposal certificate is only available once the request has been completed',
+      );
+    }
+
+    const displayNumber = `DISP-${disposal.id.slice(-8).toUpperCase()}`;
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+
+    // Header
+    doc.fontSize(20).font('Helvetica-Bold').text('IValue WMS', 50, 50);
+    doc
+      .fontSize(10)
+      .font('Helvetica')
+      .fillColor('#666666')
+      .text('Warehouse Management System', 50, 74);
+    doc
+      .fillColor('#000000')
+      .fontSize(18)
+      .font('Helvetica-Bold')
+      .text('Certificate of Disposal', 50, 100);
+
+    // Metadata box
+    doc.rect(50, 130, 495, 80).stroke('#cccccc');
+    doc.fontSize(9).font('Helvetica-Bold').text('Certificate Number', 60, 140);
+    doc.font('Helvetica').fontSize(12).text(displayNumber, 60, 153);
+    doc.fontSize(9).font('Helvetica-Bold').text('Client', 220, 140);
+    doc.font('Helvetica').fontSize(11).text(disposal.client.name, 220, 153);
+    doc.fontSize(9).font('Helvetica-Bold').text('Completed at', 400, 140);
+    doc
+      .font('Helvetica')
+      .fontSize(10)
+      .text(
+        (disposal.completedAt ?? disposal.updatedAt).toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        400,
+        153,
+      );
+    doc.fontSize(9).font('Helvetica-Bold').text('Ticket (iValue)', 60, 178);
+    doc.font('Helvetica').text(disposal.ivalueTicketNumber ?? '—', 60, 191);
+    doc.fontSize(9).font('Helvetica-Bold').text('Ticket (client)', 220, 178);
+    doc.font('Helvetica').text(disposal.clientTicketNumber ?? '—', 220, 191);
+    doc.fontSize(9).font('Helvetica-Bold').text('Disposal type', 400, 178);
+    doc
+      .font('Helvetica')
+      .text(DISPOSAL_TYPE_LABELS[disposal.disposalType] ?? disposal.disposalType, 400, 191);
+
+    let cursorY = 222;
+    doc.fontSize(9).font('Helvetica-Bold').text('Certification:', 50, cursorY);
+    doc
+      .font('Helvetica')
+      .text(
+        disposal.requiresCertification || disposal.disposalType === 'certified_blanco'
+          ? 'Certified'
+          : 'Not certified',
+        155,
+        cursorY,
+      );
+    cursorY += 15;
+    if (disposal.approvedBy) {
+      doc.fontSize(9).font('Helvetica-Bold').text('Approved by:', 50, cursorY);
+      doc.font('Helvetica').text(disposal.approvedBy.fullName, 155, cursorY);
+      cursorY += 15;
+    }
+
+    // Asset details table
+    const tableTop = cursorY + 10;
+    doc.fontSize(10).font('Helvetica-Bold').text('Disposed asset', 50, tableTop);
+
+    const tableStart = tableTop + 18;
+    doc.rect(50, tableStart, 495, 20).fill('#1A2B3C');
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+    doc.text('Serial number', 55, tableStart + 6);
+    doc.text('Asset tag', 210, tableStart + 6);
+    doc.text('Model', 320, tableStart + 6);
+    doc.text('Category', 440, tableStart + 6);
+    doc.fillColor('#000000');
+
+    const rowY = tableStart + 20;
+    doc.rect(50, rowY, 495, 22).fill('#f8f8f8');
+    doc.fillColor('#000000').font('Helvetica').fontSize(8);
+    doc.text(disposal.asset.serialNumber, 55, rowY + 7, { width: 145 });
+    doc.text(disposal.asset.assetTag ?? '—', 210, rowY + 7, { width: 100 });
+    doc.text(`${disposal.asset.manufacturer} ${disposal.asset.model}`, 320, rowY + 7, {
+      width: 115,
+    });
+    doc.text(disposal.asset.category, 440, rowY + 7);
+
+    // Footer
+    const footerY = Math.max(rowY + 60, 680);
+    doc.moveTo(50, footerY).lineTo(545, footerY).stroke('#cccccc');
+    doc
+      .fontSize(8)
+      .fillColor('#888888')
+      .text(
+        `Generated by IValue WMS · ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`,
+        50,
+        footerY + 8,
+        { align: 'center', width: 495 },
+      );
+
+    doc.end();
+    return { stream: doc, filename: `${displayNumber}.pdf` };
   }
 }

@@ -464,11 +464,7 @@ export class DeploymentService {
       .font('Helvetica')
       .fillColor('#666666')
       .text('Warehouse Management System', 50, 74);
-    doc
-      .fillColor('#000000')
-      .fontSize(18)
-      .font('Helvetica-Bold')
-      .text('Delivery Challan', 50, 100);
+    doc.fillColor('#000000').fontSize(18).font('Helvetica-Bold').text('Delivery Challan', 50, 100);
 
     // Metadata box
     doc.rect(50, 130, 495, 80).stroke('#cccccc');
@@ -502,13 +498,7 @@ export class DeploymentService {
     // Delivery details
     let cursorY = 222;
     doc.fontSize(9).font('Helvetica-Bold').text('Delivered to:', 50, cursorY);
-    doc
-      .font('Helvetica')
-      .text(
-        `${order.contactName} · ${order.contactPhone}`,
-        155,
-        cursorY,
-      );
+    doc.font('Helvetica').text(`${order.contactName} · ${order.contactPhone}`, 155, cursorY);
     cursorY += 15;
     const addressLine = [address.street, address.city, address.state, address.pincode]
       .filter(Boolean)

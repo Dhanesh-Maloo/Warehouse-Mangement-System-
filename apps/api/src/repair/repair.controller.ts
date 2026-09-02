@@ -6,9 +6,11 @@ import {
   Param,
   Body,
   Query,
+  Res,
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { RepairService } from './repair.service';
 import { CreateRepairRequestDto } from './dto/create-repair-request.dto';
 import { UpdateRepairStatusDto } from './dto/update-repair-status.dto';
@@ -143,5 +145,24 @@ export class RepairController {
   ): ReturnType<RepairService['updateTickets']> {
     await this.assertOwnsRepair(id, user);
     return this.repairService.updateTickets(id, dto);
+  }
+
+  @Get(':id/report')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
+  async downloadReport(
+    @Param('id') id: string,
+    @Res() res: Response,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<void> {
+    const requestingClientId = RepairController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    const { stream, filename } = await this.repairService.generateRepairReportPdf(
+      id,
+      requestingClientId,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    stream.pipe(res);
   }
 }

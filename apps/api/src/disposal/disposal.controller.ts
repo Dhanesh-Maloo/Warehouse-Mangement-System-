@@ -6,9 +6,11 @@ import {
   Param,
   Body,
   Query,
+  Res,
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { DisposalService } from './disposal.service';
 import { CreateDisposalRequestDto } from './dto/create-disposal-request.dto';
 import { UpdateTicketsDto } from '../common/dto/update-tickets.dto';
@@ -134,5 +136,24 @@ export class DisposalController {
   ): ReturnType<DisposalService['updateTickets']> {
     await this.assertOwnsDisposal(id, user);
     return this.disposalService.updateTickets(id, dto);
+  }
+
+  @Get(':id/certificate')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
+  async downloadCertificate(
+    @Param('id') id: string,
+    @Res() res: Response,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<void> {
+    const requestingClientId = DisposalController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    const { stream, filename } = await this.disposalService.generateDisposalCertificatePdf(
+      id,
+      requestingClientId,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    stream.pipe(res);
   }
 }
