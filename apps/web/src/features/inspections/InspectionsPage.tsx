@@ -342,7 +342,7 @@ export function InspectionsPage() {
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
                 In progress ({inProgress.length})
               </h2>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
@@ -413,7 +413,7 @@ export function InspectionsPage() {
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
                 {statusFilter ? 'Results' : 'Completed'} ({completed.length})
               </h2>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">

@@ -506,55 +506,59 @@ export function AssetDetailPage() {
             <ClipboardCheck size={15} className="text-gray-400" />
             <h2 className="text-sm font-semibold text-gray-700">Inspections</h2>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
-                <th className="text-left px-5 py-3">Type</th>
-                <th className="text-left px-5 py-3">Started</th>
-                <th className="text-left px-5 py-3">Status</th>
-                <th className="text-left px-5 py-3">Grade</th>
-                <th className="text-left px-5 py-3">SLA (min)</th>
-                <th className="px-5 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {asset.inspections.map((ins) => (
-                <tr key={ins.id} className="border-b border-gray-50">
-                  <td className="px-5 py-3 capitalize text-gray-700">{ins.type}</td>
-                  <td className="px-5 py-3 text-gray-600 whitespace-nowrap">
-                    {fmtDateTime(ins.startedAt)}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        ins.status === 'completed'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : ins.status === 'failed'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-amber-100 text-amber-700'
-                      }`}
-                    >
-                      {ins.status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td
-                    className={`px-5 py-3 font-bold ${GRADE_COLORS[ins.conditionGrade ?? ''] ?? 'text-gray-400'}`}
-                  >
-                    {ins.conditionGrade ?? '-'}
-                  </td>
-                  <td className="px-5 py-3 tabular-nums text-gray-600">{ins.slaMinutes ?? '-'}</td>
-                  <td className="px-5 py-3 text-right">
-                    <Link
-                      to={`/inspections/${ins.id}`}
-                      className="text-xs text-[#E86F2C] hover:underline"
-                    >
-                      Open
-                    </Link>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
+                  <th className="text-left px-5 py-3">Type</th>
+                  <th className="text-left px-5 py-3">Started</th>
+                  <th className="text-left px-5 py-3">Status</th>
+                  <th className="text-left px-5 py-3">Grade</th>
+                  <th className="text-left px-5 py-3">SLA (min)</th>
+                  <th className="px-5 py-3" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {asset.inspections.map((ins) => (
+                  <tr key={ins.id} className="border-b border-gray-50">
+                    <td className="px-5 py-3 capitalize text-gray-700">{ins.type}</td>
+                    <td className="px-5 py-3 text-gray-600 whitespace-nowrap">
+                      {fmtDateTime(ins.startedAt)}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                          ins.status === 'completed'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : ins.status === 'failed'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-amber-100 text-amber-700'
+                        }`}
+                      >
+                        {ins.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td
+                      className={`px-5 py-3 font-bold ${GRADE_COLORS[ins.conditionGrade ?? ''] ?? 'text-gray-400'}`}
+                    >
+                      {ins.conditionGrade ?? '-'}
+                    </td>
+                    <td className="px-5 py-3 tabular-nums text-gray-600">
+                      {ins.slaMinutes ?? '-'}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <Link
+                        to={`/inspections/${ins.id}`}
+                        className="text-xs text-[#E86F2C] hover:underline"
+                      >
+                        Open
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

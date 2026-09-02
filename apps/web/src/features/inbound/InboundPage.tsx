@@ -386,84 +386,86 @@ export function InboundPage() {
               />
             </div>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
-                <th className="text-left px-5 py-3">PO Reference</th>
-                <th className="text-left px-5 py-3">Vendor</th>
-                <th className="text-left px-5 py-3">IValue Ticket #</th>
-                <th className="text-left px-5 py-3">Client Ticket #</th>
-                <th className="text-left px-5 py-3">Expected arrival</th>
-                <th className="text-left px-5 py-3">Items</th>
-                <th className="text-left px-5 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDeliveries.map((d) => {
-                const totalExpected = d.items.reduce((s, i) => s + i.quantity, 0);
-                const totalReceived = (d.grns ?? []).reduce((s, g) => s + g.deviceCount, 0);
-                return (
-                  <tr
-                    key={d.id}
-                    onClick={() => navigate(`/inbound/${d.id}`)}
-                    className="border-b border-gray-50 hover:bg-orange-50/40 cursor-pointer transition-colors"
-                  >
-                    <td className="px-5 py-3.5 font-mono font-semibold text-gray-900">
-                      {d.purchaseOrderRef}
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-600">{vendorNamesFor(d)}</td>
-                    <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
-                      {d.ivalueTicketNumber || <span className="text-gray-300">-</span>}
-                    </td>
-                    <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
-                      {d.clientTicketNumber || <span className="text-gray-300">-</span>}
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-600">
-                      {new Date(d.expectedArrivalDate).toLocaleDateString('en-IN')}
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-600 flex items-center gap-1">
-                      <Package size={14} className="text-gray-400" />
-                      {totalReceived}/{totalExpected}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <select
-                        value={d.status === 'completed' ? 'completed' : 'not_received'}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          if (e.target.value === 'completed') {
-                            // Marking a delivery "Received" must go through the
-                            // receive-devices flow so assets/GRN/ledger entries get created.
-                            navigate(`/inbound/${d.id}/receive`);
-                            return;
-                          }
-                          statusChangeMutation.mutate({ id: d.id, status: 'pending' });
-                        }}
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#E86F2C] appearance-none pr-6 ${
-                          d.status === 'completed'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}
-                        style={{ backgroundImage: 'none' }}
-                      >
-                        <option value="not_received">Not Received</option>
-                        <option value="completed">Received</option>
-                      </select>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
+                  <th className="text-left px-5 py-3">PO Reference</th>
+                  <th className="text-left px-5 py-3">Vendor</th>
+                  <th className="text-left px-5 py-3">IValue Ticket #</th>
+                  <th className="text-left px-5 py-3">Client Ticket #</th>
+                  <th className="text-left px-5 py-3">Expected arrival</th>
+                  <th className="text-left px-5 py-3">Items</th>
+                  <th className="text-left px-5 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDeliveries.map((d) => {
+                  const totalExpected = d.items.reduce((s, i) => s + i.quantity, 0);
+                  const totalReceived = (d.grns ?? []).reduce((s, g) => s + g.deviceCount, 0);
+                  return (
+                    <tr
+                      key={d.id}
+                      onClick={() => navigate(`/inbound/${d.id}`)}
+                      className="border-b border-gray-50 hover:bg-orange-50/40 cursor-pointer transition-colors"
+                    >
+                      <td className="px-5 py-3.5 font-mono font-semibold text-gray-900">
+                        {d.purchaseOrderRef}
+                      </td>
+                      <td className="px-5 py-3.5 text-gray-600">{vendorNamesFor(d)}</td>
+                      <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                        {d.ivalueTicketNumber || <span className="text-gray-300">-</span>}
+                      </td>
+                      <td className="px-5 py-3.5 text-xs font-mono text-gray-600">
+                        {d.clientTicketNumber || <span className="text-gray-300">-</span>}
+                      </td>
+                      <td className="px-5 py-3.5 text-gray-600">
+                        {new Date(d.expectedArrivalDate).toLocaleDateString('en-IN')}
+                      </td>
+                      <td className="px-5 py-3.5 text-gray-600 flex items-center gap-1">
+                        <Package size={14} className="text-gray-400" />
+                        {totalReceived}/{totalExpected}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <select
+                          value={d.status === 'completed' ? 'completed' : 'not_received'}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            if (e.target.value === 'completed') {
+                              // Marking a delivery "Received" must go through the
+                              // receive-devices flow so assets/GRN/ledger entries get created.
+                              navigate(`/inbound/${d.id}/receive`);
+                              return;
+                            }
+                            statusChangeMutation.mutate({ id: d.id, status: 'pending' });
+                          }}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#E86F2C] appearance-none pr-6 ${
+                            d.status === 'completed'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}
+                          style={{ backgroundImage: 'none' }}
+                        >
+                          <option value="not_received">Not Received</option>
+                          <option value="completed">Received</option>
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredDeliveries.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-12 text-center text-gray-400 text-sm">
+                      {statusFilter === 'all'
+                        ? 'No deliveries yet. Create one above.'
+                        : 'No deliveries match the selected filter.'}
                     </td>
                   </tr>
-                );
-              })}
-              {filteredDeliveries.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-gray-400 text-sm">
-                    {statusFilter === 'all'
-                      ? 'No deliveries yet. Create one above.'
-                      : 'No deliveries match the selected filter.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

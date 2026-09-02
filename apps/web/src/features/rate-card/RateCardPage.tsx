@@ -123,7 +123,10 @@ export function RateCardPage() {
               {editingCode ? `Edit rate - ${editingCode}` : 'Add new rate'}
             </h2>
             <button
-              onClick={() => { setShowForm(false); setEditingCode(null); }}
+              onClick={() => {
+                setShowForm(false);
+                setEditingCode(null);
+              }}
               className="p-1 text-gray-400 hover:text-gray-600"
             >
               <X size={18} />
@@ -237,7 +240,7 @@ export function RateCardPage() {
       {isLoading ? (
         <div className="text-sm text-gray-400">Loading…</div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
@@ -252,7 +255,10 @@ export function RateCardPage() {
             </thead>
             <tbody>
               {(data ?? []).map((item) => (
-                <tr key={item.id} className="border-b border-gray-50 hover:bg-orange-50/40 group transition-colors">
+                <tr
+                  key={item.id}
+                  className="border-b border-gray-50 hover:bg-orange-50/40 group transition-colors"
+                >
                   <td className="px-5 py-3 font-mono font-semibold text-gray-900 text-xs">
                     {item.code}
                   </td>
@@ -280,7 +286,10 @@ export function RateCardPage() {
               ))}
               {(data ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={isAdmin ? 7 : 6} className="px-5 py-12 text-center text-gray-400 text-sm">
+                  <td
+                    colSpan={isAdmin ? 7 : 6}
+                    className="px-5 py-12 text-center text-gray-400 text-sm"
+                  >
                     No rates yet. Add the first rate above.
                   </td>
                 </tr>

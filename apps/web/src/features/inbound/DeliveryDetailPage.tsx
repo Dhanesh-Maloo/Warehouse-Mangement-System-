@@ -170,37 +170,39 @@ export function DeliveryDetailPage() {
         <div className="px-5 py-4 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-700">Expected items</h2>
         </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
-              <th className="text-left px-5 py-3">Category</th>
-              <th className="text-left px-5 py-3">Model</th>
-              <th className="text-left px-5 py-3">Manufacturer</th>
-              <th className="text-right px-5 py-3">Expected</th>
-              <th className="text-right px-5 py-3">Received</th>
-            </tr>
-          </thead>
-          <tbody>
-            {delivery.items.map((item) => (
-              <tr key={item.id} className="border-b border-gray-50">
-                <td className="px-5 py-3.5 capitalize text-gray-700">{item.category}</td>
-                <td className="px-5 py-3.5 font-medium text-gray-900">{item.model}</td>
-                <td className="px-5 py-3.5 text-gray-600">{item.manufacturer}</td>
-                <td className="px-5 py-3.5 text-right text-gray-700">{item.quantity}</td>
-                <td className="px-5 py-3.5 text-right font-semibold text-emerald-600">
-                  {item.receivedQuantity}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
+                <th className="text-left px-5 py-3">Category</th>
+                <th className="text-left px-5 py-3">Model</th>
+                <th className="text-left px-5 py-3">Manufacturer</th>
+                <th className="text-right px-5 py-3">Expected</th>
+                <th className="text-right px-5 py-3">Received</th>
               </tr>
-            ))}
-            {delivery.items.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-gray-400">
-                  No line items on this delivery.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {delivery.items.map((item) => (
+                <tr key={item.id} className="border-b border-gray-50">
+                  <td className="px-5 py-3.5 capitalize text-gray-700">{item.category}</td>
+                  <td className="px-5 py-3.5 font-medium text-gray-900">{item.model}</td>
+                  <td className="px-5 py-3.5 text-gray-600">{item.manufacturer}</td>
+                  <td className="px-5 py-3.5 text-right text-gray-700">{item.quantity}</td>
+                  <td className="px-5 py-3.5 text-right font-semibold text-emerald-600">
+                    {item.receivedQuantity}
+                  </td>
+                </tr>
+              ))}
+              {delivery.items.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-8 text-center text-gray-400">
+                    No line items on this delivery.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* GRNs received so far */}
@@ -209,49 +211,51 @@ export function DeliveryDetailPage() {
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="text-sm font-semibold text-gray-700">Receipts recorded</h2>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
-                <th className="text-left px-5 py-3">GRN number</th>
-                <th className="text-left px-5 py-3">Received at</th>
-                <th className="text-left px-5 py-3">Vendor</th>
-                <th className="text-left px-5 py-3">Courier ref</th>
-                <th className="text-right px-5 py-3">Devices</th>
-                <th className="px-5 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {delivery.grns.map((grn) => (
-                <tr key={grn.id} className="border-b border-gray-50">
-                  <td className="px-5 py-3.5 font-mono text-sm font-semibold text-gray-900">
-                    {grn.grnNumber ?? grn.id.slice(0, 8).toUpperCase()}
-                  </td>
-                  <td className="px-5 py-3.5 text-gray-700">
-                    {new Date(grn.receivedAt).toLocaleString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </td>
-                  <td className="px-5 py-3.5 text-gray-600">{vendorNamesFor(grn)}</td>
-                  <td className="px-5 py-3.5 text-gray-600">{grn.courierRef ?? '-'}</td>
-                  <td className="px-5 py-3.5 text-right font-semibold text-gray-900">
-                    {grn.deviceCount}
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <button
-                      onClick={() => downloadGrnPdf(grn.id, grn.grnNumber ?? 'grn')}
-                      className="inline-flex items-center gap-1.5 text-xs font-medium text-[#E86F2C] hover:text-[#D05E1E] border border-[#E86F2C]/30 hover:border-[#E86F2C] px-2.5 py-1.5 rounded-lg transition-colors"
-                    >
-                      <Download size={12} />
-                      PDF
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
+                  <th className="text-left px-5 py-3">GRN number</th>
+                  <th className="text-left px-5 py-3">Received at</th>
+                  <th className="text-left px-5 py-3">Vendor</th>
+                  <th className="text-left px-5 py-3">Courier ref</th>
+                  <th className="text-right px-5 py-3">Devices</th>
+                  <th className="px-5 py-3" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {delivery.grns.map((grn) => (
+                  <tr key={grn.id} className="border-b border-gray-50">
+                    <td className="px-5 py-3.5 font-mono text-sm font-semibold text-gray-900">
+                      {grn.grnNumber ?? grn.id.slice(0, 8).toUpperCase()}
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-700">
+                      {new Date(grn.receivedAt).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-600">{vendorNamesFor(grn)}</td>
+                    <td className="px-5 py-3.5 text-gray-600">{grn.courierRef ?? '-'}</td>
+                    <td className="px-5 py-3.5 text-right font-semibold text-gray-900">
+                      {grn.deviceCount}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <button
+                        onClick={() => downloadGrnPdf(grn.id, grn.grnNumber ?? 'grn')}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-[#E86F2C] hover:text-[#D05E1E] border border-[#E86F2C]/30 hover:border-[#E86F2C] px-2.5 py-1.5 rounded-lg transition-colors"
+                      >
+                        <Download size={12} />
+                        PDF
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

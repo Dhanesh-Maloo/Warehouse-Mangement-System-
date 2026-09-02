@@ -639,66 +639,68 @@ export function InspectionDetailPage() {
               <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
                 <h2 className="text-sm font-semibold text-gray-700">{section.title}</h2>
               </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left px-5 py-2 text-xs font-medium text-gray-500 w-full">
-                      Device
-                    </th>
-                    <th className="text-center px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">
-                      Yes
-                    </th>
-                    <th className="text-center px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">
-                      No
-                    </th>
-                    {section.items.some((i) => i.threeWay) && (
-                      <th className="text-center px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">
-                        N/A
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left px-5 py-2 text-xs font-medium text-gray-500 w-full">
+                        Device
                       </th>
-                    )}
-                    <th className="px-4 py-2 text-xs font-medium text-gray-500 text-center">
-                      Result
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {section.items.map((item) => {
-                    const val = inspection[item.key] as boolean | null;
-                    const pass = isPass(item, val);
-                    return (
-                      <tr key={item.key as string} className="hover:bg-gray-50">
-                        <td className="px-5 py-3 text-gray-700">{item.label}</td>
-                        <td className="px-4 py-3 text-center">
-                          {val === true && (
-                            <span className="inline-block w-4 h-4 rounded-full bg-[#E86F2C]" />
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {val === false && (
-                            <span className="inline-block w-4 h-4 rounded-full bg-gray-400" />
-                          )}
-                        </td>
-                        {section.items.some((i) => i.threeWay) && (
+                      <th className="text-center px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">
+                        Yes
+                      </th>
+                      <th className="text-center px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">
+                        No
+                      </th>
+                      {section.items.some((i) => i.threeWay) && (
+                        <th className="text-center px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">
+                          N/A
+                        </th>
+                      )}
+                      <th className="px-4 py-2 text-xs font-medium text-gray-500 text-center">
+                        Result
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {section.items.map((item) => {
+                      const val = inspection[item.key] as boolean | null;
+                      const pass = isPass(item, val);
+                      return (
+                        <tr key={item.key as string} className="hover:bg-gray-50">
+                          <td className="px-5 py-3 text-gray-700">{item.label}</td>
                           <td className="px-4 py-3 text-center">
-                            {item.threeWay && val === null && (
-                              <span className="inline-block w-4 h-4 rounded-full bg-gray-300" />
+                            {val === true && (
+                              <span className="inline-block w-4 h-4 rounded-full bg-[#E86F2C]" />
                             )}
                           </td>
-                        )}
-                        <td className="px-4 py-3 text-center">
-                          {val === null ? (
-                            <MinusCircle size={16} className="text-gray-300 mx-auto" />
-                          ) : pass ? (
-                            <CheckCircle2 size={16} className="text-emerald-500 mx-auto" />
-                          ) : (
-                            <XCircle size={16} className="text-red-400 mx-auto" />
+                          <td className="px-4 py-3 text-center">
+                            {val === false && (
+                              <span className="inline-block w-4 h-4 rounded-full bg-gray-400" />
+                            )}
+                          </td>
+                          {section.items.some((i) => i.threeWay) && (
+                            <td className="px-4 py-3 text-center">
+                              {item.threeWay && val === null && (
+                                <span className="inline-block w-4 h-4 rounded-full bg-gray-300" />
+                              )}
+                            </td>
                           )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          <td className="px-4 py-3 text-center">
+                            {val === null ? (
+                              <MinusCircle size={16} className="text-gray-300 mx-auto" />
+                            ) : pass ? (
+                              <CheckCircle2 size={16} className="text-emerald-500 mx-auto" />
+                            ) : (
+                              <XCircle size={16} className="text-red-400 mx-auto" />
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ))}
 
@@ -917,75 +919,77 @@ export function InspectionDetailPage() {
                     {section.items.length} marked Yes/No
                   </span>
                 </div>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100">
-                      <th className="text-left px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-full">
-                        Device
-                      </th>
-                      <th className="text-center px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                        Yes
-                      </th>
-                      <th className="text-center px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                        No
-                      </th>
-                      {hasThreeWay && (
-                        <th className="text-center px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                          N/A
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="text-left px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-full">
+                          Device
                         </th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {section.items.map((item) => {
-                      const current = checks[item.key as string];
-                      return (
-                        <tr
-                          key={item.key as string}
-                          className="hover:bg-orange-50/30 transition-colors"
-                        >
-                          <td className="px-5 py-3.5 text-gray-700">{item.label}</td>
-                          {/* Yes */}
-                          <td className="px-5 py-3.5 text-center">
-                            <input
-                              type="radio"
-                              name={item.key as string}
-                              checked={current === true}
-                              onChange={() => setCheck(item.key as string, true)}
-                              className="w-4 h-4 accent-[#E86F2C] cursor-pointer"
-                            />
-                          </td>
-                          {/* No */}
-                          <td className="px-5 py-3.5 text-center">
-                            <input
-                              type="radio"
-                              name={item.key as string}
-                              checked={current === false}
-                              onChange={() => setCheck(item.key as string, false)}
-                              className="w-4 h-4 accent-[#E86F2C] cursor-pointer"
-                            />
-                          </td>
-                          {/* N/A — only for three-way items */}
-                          {hasThreeWay && (
+                        <th className="text-center px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                          Yes
+                        </th>
+                        <th className="text-center px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                          No
+                        </th>
+                        {hasThreeWay && (
+                          <th className="text-center px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                            N/A
+                          </th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {section.items.map((item) => {
+                        const current = checks[item.key as string];
+                        return (
+                          <tr
+                            key={item.key as string}
+                            className="hover:bg-orange-50/30 transition-colors"
+                          >
+                            <td className="px-5 py-3.5 text-gray-700">{item.label}</td>
+                            {/* Yes */}
                             <td className="px-5 py-3.5 text-center">
-                              {item.threeWay ? (
-                                <input
-                                  type="radio"
-                                  name={item.key as string}
-                                  checked={current === null}
-                                  onChange={() => setCheck(item.key as string, null)}
-                                  className="w-4 h-4 accent-[#E86F2C] cursor-pointer"
-                                />
-                              ) : (
-                                <span className="text-gray-200">-</span>
-                              )}
+                              <input
+                                type="radio"
+                                name={item.key as string}
+                                checked={current === true}
+                                onChange={() => setCheck(item.key as string, true)}
+                                className="w-4 h-4 accent-[#E86F2C] cursor-pointer"
+                              />
                             </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            {/* No */}
+                            <td className="px-5 py-3.5 text-center">
+                              <input
+                                type="radio"
+                                name={item.key as string}
+                                checked={current === false}
+                                onChange={() => setCheck(item.key as string, false)}
+                                className="w-4 h-4 accent-[#E86F2C] cursor-pointer"
+                              />
+                            </td>
+                            {/* N/A — only for three-way items */}
+                            {hasThreeWay && (
+                              <td className="px-5 py-3.5 text-center">
+                                {item.threeWay ? (
+                                  <input
+                                    type="radio"
+                                    name={item.key as string}
+                                    checked={current === null}
+                                    onChange={() => setCheck(item.key as string, null)}
+                                    className="w-4 h-4 accent-[#E86F2C] cursor-pointer"
+                                  />
+                                ) : (
+                                  <span className="text-gray-200">-</span>
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             );
           })}
