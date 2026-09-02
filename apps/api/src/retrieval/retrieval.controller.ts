@@ -6,9 +6,11 @@ import {
   Param,
   Body,
   Query,
+  Res,
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { RetrievalService } from './retrieval.service';
 import { CreateRetrievalRequestDto } from './dto/create-retrieval-request.dto';
 import { UpdateRetrievalStatusDto } from './dto/update-retrieval-status.dto';
@@ -128,5 +130,24 @@ export class RetrievalController {
   ): ReturnType<RetrievalService['updateTickets']> {
     await this.assertOwnsRetrieval(id, user);
     return this.retrievalService.updateTickets(id, dto);
+  }
+
+  @Get(':id/pdf')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
+  async downloadRetrievalPdf(
+    @Param('id') id: string,
+    @Res() res: Response,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<void> {
+    const requestingClientId = RetrievalController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    const { stream, filename } = await this.retrievalService.generateRetrievalPdf(
+      id,
+      requestingClientId,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    stream.pipe(res);
   }
 }

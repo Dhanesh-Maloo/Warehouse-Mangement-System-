@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
@@ -8,6 +13,8 @@ import { CourierZoneService } from '../logistics/courier-zone.service';
 import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateRetrievalRequestDto } from './dto/create-retrieval-request.dto';
 import type { UpdateRetrievalStatusDto } from './dto/update-retrieval-status.dto';
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+const PDFDocument = require('pdfkit') as typeof import('pdfkit');
 
 @Injectable()
 export class RetrievalService {
@@ -395,5 +402,140 @@ export class RetrievalService {
       },
       include: { asset: true },
     });
+  }
+
+  /**
+   * Confirmation document proving a specific asset has been physically
+   * retrieved, for handoff to the client — mirrors Inbound's GRN, but for a
+   * single-asset retrieval rather than a multi-device delivery batch.
+   */
+  async generateRetrievalPdf(
+    id: string,
+    requestingClientId?: string,
+  ): Promise<{ stream: NodeJS.ReadableStream; filename: string }> {
+    const retrieval = await this.prisma.retrievalRequest.findUnique({
+      where: { id },
+      include: {
+        client: true,
+        asset: {
+          select: {
+            serialNumber: true,
+            assetTag: true,
+            model: true,
+            category: true,
+            manufacturer: true,
+          },
+        },
+        createdByUser: { select: { fullName: true } },
+      },
+    });
+    if (!retrieval) throw new NotFoundException(`Retrieval request ${id} not found`);
+    if (requestingClientId && retrieval.clientId !== requestingClientId) {
+      throw new ForbiddenException('Cannot download a retrieval confirmation from another client');
+    }
+    if (retrieval.status !== 'received' && retrieval.status !== 'completed') {
+      throw new BadRequestException(
+        'Retrieval confirmation is only available once the asset has been received back',
+      );
+    }
+
+    const displayNumber = `RTRV-${retrieval.id.slice(-8).toUpperCase()}`;
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+
+    // Header
+    doc.fontSize(20).font('Helvetica-Bold').text('IValue WMS', 50, 50);
+    doc
+      .fontSize(10)
+      .font('Helvetica')
+      .fillColor('#666666')
+      .text('Warehouse Management System', 50, 74);
+    doc
+      .fillColor('#000000')
+      .fontSize(18)
+      .font('Helvetica-Bold')
+      .text('Retrieval Confirmation', 50, 100);
+
+    // Metadata box
+    doc.rect(50, 130, 495, 80).stroke('#cccccc');
+    doc.fontSize(9).font('Helvetica-Bold').text('Reference', 60, 140);
+    doc.font('Helvetica').fontSize(12).text(displayNumber, 60, 153);
+    doc.fontSize(9).font('Helvetica-Bold').text('Client', 220, 140);
+    doc.font('Helvetica').fontSize(11).text(retrieval.client.name, 220, 153);
+    doc.fontSize(9).font('Helvetica-Bold').text('Received at', 400, 140);
+    doc
+      .font('Helvetica')
+      .fontSize(10)
+      .text(
+        (retrieval.receivedAt ?? retrieval.updatedAt).toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        400,
+        153,
+      );
+    doc.fontSize(9).font('Helvetica-Bold').text('Ticket (iValue)', 60, 178);
+    doc.font('Helvetica').text(retrieval.ivalueTicketNumber ?? '—', 60, 191);
+    doc.fontSize(9).font('Helvetica-Bold').text('Ticket (client)', 220, 178);
+    doc.font('Helvetica').text(retrieval.clientTicketNumber ?? '—', 220, 191);
+    doc.fontSize(9).font('Helvetica-Bold').text('Owner', 400, 178);
+    doc.font('Helvetica').text(retrieval.createdByUser.fullName, 400, 191);
+
+    if (retrieval.trackingNumber) {
+      doc.fontSize(9).font('Helvetica-Bold').text('Tracking reference:', 50, 222);
+      doc.font('Helvetica').text(retrieval.trackingNumber, 155, 222);
+    }
+
+    // Asset details table
+    const tableTop = retrieval.trackingNumber ? 245 : 228;
+    doc.fontSize(10).font('Helvetica-Bold').text('Retrieved asset', 50, tableTop);
+
+    const tableStart = tableTop + 18;
+    doc.rect(50, tableStart, 495, 20).fill('#1A2B3C');
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+    doc.text('Serial number', 55, tableStart + 6);
+    doc.text('Asset tag', 210, tableStart + 6);
+    doc.text('Model', 320, tableStart + 6);
+    doc.text('Category', 440, tableStart + 6);
+    doc.fillColor('#000000');
+
+    const rowY = tableStart + 20;
+    doc.rect(50, rowY, 495, 22).fill('#f8f8f8');
+    doc.fillColor('#000000').font('Helvetica').fontSize(8);
+    doc.text(retrieval.asset.serialNumber, 55, rowY + 7, { width: 145 });
+    doc.text(retrieval.asset.assetTag ?? '—', 210, rowY + 7, { width: 100 });
+    doc.text(`${retrieval.asset.manufacturer} ${retrieval.asset.model}`, 320, rowY + 7, {
+      width: 115,
+    });
+    doc.text(retrieval.asset.category, 440, rowY + 7);
+
+    if (retrieval.damageFound !== null) {
+      doc
+        .fontSize(9)
+        .font('Helvetica-Bold')
+        .text('Diagnostic result:', 50, rowY + 40);
+      doc
+        .font('Helvetica')
+        .text(retrieval.damageFound ? 'Damage found' : 'No damage found', 155, rowY + 40);
+    }
+
+    // Footer
+    const footerY = Math.max(rowY + 90, 680);
+    doc.moveTo(50, footerY).lineTo(545, footerY).stroke('#cccccc');
+    doc
+      .fontSize(8)
+      .fillColor('#888888')
+      .text(
+        `Generated by IValue WMS · ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`,
+        50,
+        footerY + 8,
+        { align: 'center', width: 495 },
+      );
+
+    doc.end();
+    return { stream: doc, filename: `${displayNumber}.pdf` };
   }
 }
