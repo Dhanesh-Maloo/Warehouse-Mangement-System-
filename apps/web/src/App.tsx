@@ -11,6 +11,7 @@ import { DeliveryDetailPage } from './features/inbound/DeliveryDetailPage';
 import { ReceiveDevicesPage } from './features/inbound/ReceiveDevicesPage';
 import { InventoryPage } from './features/inventory/InventoryPage';
 import { AssetDetailPage } from './features/inventory/AssetDetailPage';
+import { AgeingPage } from './features/inventory/AgeingPage';
 import { InspectionsPage } from './features/inspections/InspectionsPage';
 import { InspectionDetailPage } from './features/inspections/InspectionDetailPage';
 import { LedgerPage } from './features/ledger/LedgerPage';
@@ -59,6 +60,7 @@ export function App() {
                 <Route path="inbound/:id" element={<DeliveryDetailPage />} />
                 <Route path="inbound/:id/receive" element={<ReceiveDevicesPage />} />
                 <Route path="inventory" element={<InventoryPage />} />
+                <Route path="inventory/ageing" element={<AgeingPage />} />
                 <Route path="inventory/:id" element={<AssetDetailPage />} />
                 <Route path="inspections" element={<InspectionsPage />} />
                 <Route path="inspections/:id" element={<InspectionDetailPage />} />

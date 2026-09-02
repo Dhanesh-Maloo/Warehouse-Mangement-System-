@@ -47,4 +47,18 @@ export class InventoryController {
         : clientId;
     return this.inventoryService.summary(effectiveClientId);
   }
+
+  @Get('ageing')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
+  ageing(
+    @Query('clientId') clientId?: string,
+    @Query('category') category?: string,
+    @CurrentUser() user?: JwtPayload,
+  ): ReturnType<InventoryService['ageing']> {
+    const effectiveClientId =
+      user?.role === 'client_user' || user?.role === 'editor' || user?.role === 'client_admin'
+        ? (user.clientId ?? undefined)
+        : clientId;
+    return this.inventoryService.ageing({ clientId: effectiveClientId, category });
+  }
 }

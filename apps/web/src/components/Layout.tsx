@@ -33,6 +33,7 @@ import {
   Wrench,
   Tag,
   Ticket,
+  Hourglass,
 } from 'lucide-react';
 
 type NavItem = {
@@ -65,6 +66,7 @@ const navGroups: NavGroup[] = [
     group: 'Inventory',
     items: [
       { to: '/inventory', label: 'Inventory', icon: Package },
+      { to: '/inventory/ageing', label: 'Stock Ageing', icon: Hourglass },
       { to: '/locations', label: 'Locations', icon: MapPin },
     ],
   },
