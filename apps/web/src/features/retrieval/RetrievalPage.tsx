@@ -1100,8 +1100,8 @@ export function RetrievalPage() {
       {isLoading ? (
         <div className="text-sm text-gray-400">Loading…</div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+          <table className="w-full text-sm min-w-[1400px]">
             <thead>
               <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
                 <th className="text-left px-5 py-3">Asset</th>
