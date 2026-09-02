@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Plus, X, Truck, Search } from 'lucide-react';
+import { Plus, X, Truck, Search, Download } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -302,6 +302,22 @@ export function DeploymentPage() {
     },
     onError: (e: Error) => alert(e.message),
   });
+
+  async function downloadDeliveryChallanPdf(id: string) {
+    const token = localStorage.getItem('wh_token');
+    const base = import.meta.env.VITE_API_URL ?? '';
+    const res = await fetch(`${base}/api/v1/deployment/${id}/dc`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dc-${id.slice(-8)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -899,6 +915,7 @@ export function DeploymentPage() {
                   <th className="text-left px-5 py-3">Tracking No.</th>
                   <th className="text-left px-5 py-3">Requested</th>
                   <th className="px-5 py-3" />
+                  <th className="px-5 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -1080,12 +1097,27 @@ export function DeploymentPage() {
                           </div>
                         ) : null}
                       </td>
+
+                      {/* Delivery challan PDF — once delivered */}
+                      <td className="px-5 py-3.5">
+                        {order.status === 'delivered' && (
+                          <button
+                            type="button"
+                            onClick={() => void downloadDeliveryChallanPdf(order.id)}
+                            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#E86F2C]"
+                            title="Download delivery challan"
+                          >
+                            <Download size={12} />
+                            DC
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
                 {orders.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="px-5 py-12 text-center text-gray-400 text-sm">
+                    <td colSpan={11} className="px-5 py-12 text-center text-gray-400 text-sm">
                       {orderSearch || orderStatusFilter
                         ? 'No deployment orders match the selected filters.'
                         : 'No deployment orders yet. Create one above.'}

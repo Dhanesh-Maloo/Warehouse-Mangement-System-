@@ -6,9 +6,11 @@ import {
   Param,
   Body,
   Query,
+  Res,
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { DeploymentService } from './deployment.service';
 import { CreateDeploymentOrderDto } from './dto/create-deployment-order.dto';
 import { UpdateDeploymentStatusDto } from './dto/update-deployment-status.dto';
@@ -116,5 +118,24 @@ export class DeploymentController {
   ): ReturnType<DeploymentService['updateTickets']> {
     await this.assertOwnsOrder(id, user);
     return this.deploymentService.updateTickets(id, dto);
+  }
+
+  @Get(':id/dc')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
+  async downloadDeliveryChallan(
+    @Param('id') id: string,
+    @Res() res: Response,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<void> {
+    const requestingClientId = DeploymentController.isClientScoped(user.role)
+      ? (user.clientId ?? undefined)
+      : undefined;
+    const { stream, filename } = await this.deploymentService.generateDeliveryChallanPdf(
+      id,
+      requestingClientId,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    stream.pipe(res);
   }
 }
