@@ -559,22 +559,11 @@ export function RetrievalPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Owner <span className="text-red-500">*</span>
                 </label>
-                <select
-                  required
-                  value={form.ownerId}
-                  onChange={(e) => setField('ownerId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
-                >
-                  <option value="">Select owner…</option>
-                  {directory.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.fullName}
-                      {u.id === user?.id ? ' (you)' : ''}
-                    </option>
-                  ))}
-                </select>
+                <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-700">
+                  {user?.fullName ?? '—'}
+                </div>
                 <p className="text-xs text-gray-400 mt-1">
-                  Who&apos;s physically handling this retrieval — defaults to you.
+                  Whoever is logged in and creates this ticket is the owner.
                 </p>
               </div>
             </div>
