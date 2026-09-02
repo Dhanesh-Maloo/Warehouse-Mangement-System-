@@ -12,6 +12,7 @@ import { AuditService } from '../audit/audit.service';
 import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateExpectedDeliveryDto } from './dto/create-expected-delivery.dto';
 import type { ReceiveDevicesDto } from './dto/receive-devices.dto';
+import { addBusinessMinutes } from '../common/business-hours.util';
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
 const PDFDocument = require('pdfkit') as typeof import('pdfkit');
 
@@ -23,6 +24,10 @@ export class InboundService {
     private readonly audit: AuditService,
     private readonly assetStatusHistory: AssetStatusHistoryService,
   ) {}
+
+  private getHolidaySet(): Set<string> {
+    return new Set<string>();
+  }
 
   findAllDeliveries(
     clientId?: string,
@@ -219,6 +224,7 @@ export class InboundService {
         );
 
         if (device.requiresInspection) {
+          const slaTargetAt = addBusinessMinutes(occurredAt, 1440, this.getHolidaySet());
           await tx.inspection.create({
             data: {
               assetId: asset.id,
@@ -226,6 +232,7 @@ export class InboundService {
               status: 'in_progress',
               startedAt: occurredAt,
               startedByUserId: receivedByUserId,
+              slaTargetAt,
             },
           });
           inspectionAssetIds.push(asset.id);
