@@ -459,7 +459,7 @@ export class InboundService {
         153,
       );
     doc.fontSize(9).font('Helvetica-Bold').text('PO Reference', 60, 178);
-    doc.font('Helvetica').text(grn.expectedDelivery.purchaseOrderRef, 60, 191);
+    doc.font('Helvetica').text(grn.expectedDelivery.purchaseOrderRef ?? '—', 60, 191);
     doc.fontSize(9).font('Helvetica-Bold').text('Location', 220, 178);
     doc.font('Helvetica').text(grn.receivingLocation.name, 220, 191);
     doc.fontSize(9).font('Helvetica-Bold').text('Received by', 400, 178);

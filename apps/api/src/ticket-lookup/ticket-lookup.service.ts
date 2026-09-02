@@ -234,7 +234,9 @@ export class TicketLookupService {
         id: d.id,
         ivalueTicketNumber: d.ivalueTicketNumber,
         clientTicketNumber: d.clientTicketNumber,
-        workDescription: `Inbound delivery — PO ${d.purchaseOrderRef}`,
+        workDescription: d.purchaseOrderRef
+          ? `Inbound delivery — PO ${d.purchaseOrderRef}`
+          : 'Inbound delivery — no PO reference',
         status: d.status,
         date: d.createdAt,
         asset: null,

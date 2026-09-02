@@ -17,7 +17,7 @@ interface DeliveryItem {
 }
 interface Delivery {
   id: string;
-  purchaseOrderRef: string;
+  purchaseOrderRef: string | null;
   expectedArrivalDate: string;
   status: string;
   ivalueTicketNumber: string | null;
@@ -130,7 +130,7 @@ export function InboundPage() {
     const cid = isClientScoped ? (user?.clientId ?? '') : selectedClientId;
     createMutation.mutate({
       clientId: cid,
-      purchaseOrderRef: poRef,
+      purchaseOrderRef: poRef.trim() || undefined,
       expectedArrivalDate: arrivalDate,
       ivalueTicketNumber: ivalueTicketNumber.trim() || undefined,
       clientTicketNumber: clientTicketNumber.trim() || undefined,
@@ -212,11 +212,10 @@ export function InboundPage() {
               )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  PO reference <span className="text-red-500">*</span>
+                  PO reference <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
-                  required
                   value={poRef}
                   onChange={(e) => setPoRef(e.target.value)}
                   placeholder="PO-2026-001"
@@ -410,7 +409,7 @@ export function InboundPage() {
                       className="border-b border-gray-50 hover:bg-orange-50/40 cursor-pointer transition-colors"
                     >
                       <td className="px-5 py-3.5 font-mono font-semibold text-gray-900">
-                        {d.purchaseOrderRef}
+                        {d.purchaseOrderRef || <span className="text-gray-300">-</span>}
                       </td>
                       <td className="px-5 py-3.5 text-gray-600">{vendorNamesFor(d)}</td>
                       <td className="px-5 py-3.5 text-xs font-mono text-gray-600">

@@ -33,8 +33,9 @@ export class CreateExpectedDeliveryDto {
   @IsUUID()
   clientId!: string;
 
+  @IsOptional()
   @IsString()
-  purchaseOrderRef!: string;
+  purchaseOrderRef?: string;
 
   @IsDateString()
   expectedArrivalDate!: string;

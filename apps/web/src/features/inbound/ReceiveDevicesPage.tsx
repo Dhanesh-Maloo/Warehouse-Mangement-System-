@@ -20,7 +20,7 @@ interface DeliveryItem {
 
 interface Delivery {
   id: string;
-  purchaseOrderRef: string;
+  purchaseOrderRef: string | null;
   items: DeliveryItem[];
 }
 
@@ -208,7 +208,7 @@ export function ReceiveDevicesPage() {
             <p className="text-sm text-gray-500 mt-0.5">
               Against{' '}
               <span className="font-mono font-semibold text-gray-700">
-                {delivery.purchaseOrderRef}
+                {delivery.purchaseOrderRef ?? 'No PO reference'}
               </span>
             </p>
           )}

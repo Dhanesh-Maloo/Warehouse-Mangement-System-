@@ -352,7 +352,7 @@ model AssetStatusHistory {
 model ExpectedDelivery {
   id                  String         @id @default(uuid()) @map("delivery_id")
   clientId            String         @map("client_id")
-  purchaseOrderRef    String         @map("purchase_order_ref")
+  purchaseOrderRef    String?        @map("purchase_order_ref")
   expectedArrivalDate DateTime       @map("expected_arrival_date") @db.Date
   status              DeliveryStatus @default(pending)
   ivalueTicketNumber  String?        @map("ivalue_ticket_number")

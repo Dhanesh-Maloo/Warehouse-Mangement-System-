@@ -32,7 +32,7 @@ function vendorNamesFor(grn: Grn): string {
 
 interface Delivery {
   id: string;
-  purchaseOrderRef: string;
+  purchaseOrderRef: string | null;
   expectedArrivalDate: string;
   status: string;
   notes: string | null;
@@ -97,7 +97,10 @@ export function DeliveryDetailPage() {
   return (
     <div className="space-y-6">
       <Breadcrumbs
-        crumbs={[{ label: 'Inbound', to: '/inbound' }, { label: delivery.purchaseOrderRef }]}
+        crumbs={[
+          { label: 'Inbound', to: '/inbound' },
+          { label: delivery.purchaseOrderRef ?? 'No PO reference' },
+        ]}
       />
       {/* Header */}
       <div className="flex items-start gap-4">
@@ -110,7 +113,9 @@ export function DeliveryDetailPage() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold text-gray-900 font-mono">
-              {delivery.purchaseOrderRef}
+              {delivery.purchaseOrderRef ?? (
+                <span className="text-gray-400 font-normal">No PO reference</span>
+              )}
             </h1>
             <span
               className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${
