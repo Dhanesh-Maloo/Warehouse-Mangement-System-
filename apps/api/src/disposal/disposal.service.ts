@@ -28,6 +28,9 @@ const DISPOSAL_TYPE_LABELS: Record<string, string> = {
 // and should also see approval-needed notifications.
 const DISPOSAL_APPROVER_ROLES = ['manager', 'admin'];
 
+// Per Dhanesh (2026-09-02): always CC on disposal approval-needed emails.
+const DISPOSAL_APPROVAL_CC = ['dewang@ivalueindia.com'];
+
 @Injectable()
 export class DisposalService {
   constructor(
@@ -159,9 +162,7 @@ export class DisposalService {
         disposalType: dto.disposalType,
         ivalueTicketNumber: dto.ivalueTicketNumber,
       });
-      for (const to of approverEmails) {
-        void this.mail.send({ to, subject, html, text });
-      }
+      void this.mail.send({ to: approverEmails, subject, html, text, cc: DISPOSAL_APPROVAL_CC });
     }
 
     return disposal;

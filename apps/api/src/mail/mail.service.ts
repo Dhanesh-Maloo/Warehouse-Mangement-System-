@@ -2,10 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 export type SendMailInput = {
-  to: string;
+  to: string | string[];
   subject: string;
   html: string;
   text?: string;
+  cc?: string[];
 };
 
 const DEFAULT_API_URL = 'https://api.zeptomail.in/v1.1/email';
@@ -30,6 +31,7 @@ export class MailService {
    * business operation (e.g. user creation) that triggered it.
    */
   async send(input: SendMailInput): Promise<void> {
+    const recipients = Array.isArray(input.to) ? input.to : [input.to];
     try {
       const response = await fetch(this.apiUrl, {
         method: 'POST',
@@ -40,7 +42,10 @@ export class MailService {
         },
         body: JSON.stringify({
           from: { address: this.fromAddress },
-          to: [{ email_address: { address: input.to } }],
+          to: recipients.map((address) => ({ email_address: { address } })),
+          ...(input.cc && input.cc.length > 0
+            ? { cc: input.cc.map((address) => ({ email_address: { address } })) }
+            : {}),
           subject: input.subject,
           htmlbody: input.html,
           ...(input.text ? { textbody: input.text } : {}),
@@ -52,9 +57,11 @@ export class MailService {
         throw new Error(`ZeptoMail API responded ${response.status}: ${body}`);
       }
 
-      this.logger.log(`Sent mail to ${input.to}: ${input.subject}`);
+      this.logger.log(`Sent mail to ${recipients.join(', ')}: ${input.subject}`);
     } catch (err) {
-      this.logger.error(`Failed to send mail to ${input.to}: ${(err as Error).message}`);
+      this.logger.error(
+        `Failed to send mail to ${recipients.join(', ')}: ${(err as Error).message}`,
+      );
     }
   }
 }

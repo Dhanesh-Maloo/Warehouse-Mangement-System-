@@ -120,12 +120,12 @@ describe('DisposalService', () => {
       await service.create(baseDto as any, 'user-1');
 
       expect(mockUsers.findEmailsByRoles).toHaveBeenCalledWith(['manager', 'admin']);
-      expect(mockMail.send).toHaveBeenCalledTimes(2);
+      expect(mockMail.send).toHaveBeenCalledTimes(1);
       expect(mockMail.send).toHaveBeenCalledWith(
-        expect.objectContaining({ to: 'manager@example.com' }),
-      );
-      expect(mockMail.send).toHaveBeenCalledWith(
-        expect.objectContaining({ to: 'admin@example.com' }),
+        expect.objectContaining({
+          to: ['manager@example.com', 'admin@example.com'],
+          cc: ['dewang@ivalueindia.com'],
+        }),
       );
     });
 
