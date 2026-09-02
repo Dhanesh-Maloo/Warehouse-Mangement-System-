@@ -60,7 +60,11 @@ export class LedgerController {
   async findMany(
     @Query() query: LedgerQueryDto,
     @CurrentUser() user: JwtPayload,
-  ): Promise<(EventLedger & { asset: { id: string; serialNumber: string; assetTag: string | null; model: string } })[]> {
+  ): Promise<
+    (EventLedger & {
+      asset: { id: string; serialNumber: string; assetTag: string | null; model: string };
+    })[]
+  > {
     const effectiveClientId =
       user.role === 'client_user' || user.role === 'editor' || user.role === 'client_admin'
         ? (user.clientId ?? undefined)
@@ -77,12 +81,18 @@ export class LedgerController {
         })()
       : null;
 
+    // A suppressed event was replaced by a bundle charge (e.g. Full Prep
+    // suppressing its component INGEST/INSPECT events) — exclude it so the
+    // ledger and any total derived from it don't double-count.
+    const suppressedIds = await this.ledgerService.findSuppressedEventIds();
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return this.ledgerService.findMany({
       where: {
         ...(effectiveClientId ? { clientId: effectiveClientId } : {}),
         ...(query.assetId ? { assetId: query.assetId } : {}),
         ...(query.eventType ? { eventType: query.eventType } : {}),
+        ...(suppressedIds.size > 0 ? { id: { notIn: [...suppressedIds] } } : {}),
         ...(query.fromDate || toDateFilter
           ? {
               occurredAt: {
@@ -112,9 +122,14 @@ export class LedgerController {
         })()
       : null;
 
+    const suppressedIds = await this.ledgerService.findSuppressedEventIds();
+
     const entries = await this.ledgerService.findMany({
       where: {
         ...(query.clientId ? { clientId: query.clientId } : {}),
+        ...(query.assetId ? { assetId: query.assetId } : {}),
+        ...(query.eventType ? { eventType: query.eventType } : {}),
+        ...(suppressedIds.size > 0 ? { id: { notIn: [...suppressedIds] } } : {}),
         ...(query.fromDate || toDateFilter
           ? {
               occurredAt: {

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { LedgerService } from '../ledger/ledger.service';
 
 export interface TicketLookupLedgerEvent {
   eventType: string;
@@ -30,7 +31,10 @@ const ASSET_SELECT = { serialNumber: true, model: true, manufacturer: true } as 
 
 @Injectable()
 export class TicketLookupService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ledger: LedgerService,
+  ) {}
 
   /**
    * Sums ledger amounts posted against a batch of module-record ids, including
@@ -46,12 +50,17 @@ export class TicketLookupService {
     const totals = new Map<string, bigint>();
     if (referenceIds.length === 0) return totals;
 
+    // A suppressed event was replaced by a bundle charge (e.g. Full Prep
+    // suppressing its component INGEST/INSPECT events) — exclude it so the
+    // total doesn't double-count it alongside the bundle charge.
+    const suppressedIds = await this.ledger.findSuppressedEventIds();
+
     const primary = await this.prisma.eventLedger.findMany({
       where: { referenceType, referenceId: { in: referenceIds } },
       select: { id: true, referenceId: true, amountPaise: true, eventType: true, occurredAt: true },
     });
     for (const p of primary) {
-      if (!p.referenceId) continue;
+      if (!p.referenceId || suppressedIds.has(p.id)) continue;
       totals.set(p.referenceId, (totals.get(p.referenceId) ?? BigInt(0)) + p.amountPaise);
     }
 
@@ -80,13 +89,15 @@ export class TicketLookupService {
     const byRecord = new Map<string, TicketLookupLedgerEvent[]>();
     if (referenceIds.length === 0) return byRecord;
 
+    const suppressedIds = await this.ledger.findSuppressedEventIds();
+
     const primary = await this.prisma.eventLedger.findMany({
       where: { referenceType, referenceId: { in: referenceIds } },
       select: { id: true, referenceId: true, amountPaise: true, eventType: true, occurredAt: true },
       orderBy: { occurredAt: 'asc' },
     });
     for (const p of primary) {
-      if (!p.referenceId) continue;
+      if (!p.referenceId || suppressedIds.has(p.id)) continue;
       const list = byRecord.get(p.referenceId) ?? [];
       list.push({ eventType: p.eventType, amountPaise: p.amountPaise, occurredAt: p.occurredAt });
       byRecord.set(p.referenceId, list);

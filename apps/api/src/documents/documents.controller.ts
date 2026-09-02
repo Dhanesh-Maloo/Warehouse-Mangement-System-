@@ -177,6 +177,11 @@ export class DocumentsController {
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<DocumentsService['delete']> {
-    return this.documentsService.delete(id, user.clientId ?? '', user.role);
+    // Only client_admin is client-scoped among the roles allowed here — admin,
+    // manager, and operator are internal staff (clientId: null) and must be
+    // able to delete any client's document.
+    const requestingClientId =
+      user.role === 'client_admin' ? (user.clientId ?? undefined) : undefined;
+    return this.documentsService.delete(id, requestingClientId);
   }
 }

@@ -200,11 +200,8 @@ export class DocumentsService {
     return doc;
   }
 
-  async delete(id: string, requestingClientId: string, role: string): Promise<void> {
-    const doc = await this.findOne(id);
-    if (role !== 'admin' && doc.clientId !== requestingClientId) {
-      throw new ForbiddenException('Cannot delete document from another client');
-    }
+  async delete(id: string, requestingClientId?: string): Promise<void> {
+    const doc = await this.findOne(id, requestingClientId);
     // Delete from R2 — ignore errors if the object is already gone
     await this.r2.delete(doc.storagePath).catch(() => undefined);
     await this.prisma.assetDocument.delete({ where: { id } });

@@ -276,13 +276,19 @@ export class AssetsService {
     const periodEnd =
       new Date(year, monthIndex + 1, 1) < now ? new Date(year, monthIndex + 1, 1) : now;
 
-    const [ledgerEntries, daysInStorage] = await Promise.all([
+    const [rawLedgerEntries, daysInStorage, suppressedIds] = await Promise.all([
       this.ledger.findMany({
         where: { assetId: id, occurredAt: { gte: periodStart, lt: periodEnd } },
         orderBy: { occurredAt: 'desc' },
       }),
       this.assetStatusHistory.getDaysInStatus(id, 'in_storage', periodStart, periodEnd),
+      this.ledger.findSuppressedEventIds(id),
     ]);
+
+    // A suppressed event was replaced by a bundle charge (e.g. Full Prep
+    // suppressing its component INGEST/INSPECT events) — exclude it so it
+    // isn't billed twice.
+    const ledgerEntries = rawLedgerEntries.filter((e) => !suppressedIds.has(e.id));
 
     const totalChargesPaise = ledgerEntries.reduce((sum, e) => sum + e.amountPaise, BigInt(0));
 

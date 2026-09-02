@@ -441,13 +441,14 @@ export function InventoryPage() {
         return next;
       });
     },
-    onError: (_err, vars) => {
+    onError: (err: Error, vars) => {
       const field = Object.keys(vars.patch)[0];
       setSavingCells((prev) => {
         const next = new Set(prev);
         next.delete(`${vars.id}:${field}`);
         return next;
       });
+      alert(err.message || 'Failed to save change.');
     },
   });
 

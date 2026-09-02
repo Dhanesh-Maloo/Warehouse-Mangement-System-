@@ -75,7 +75,7 @@ export function LedgerPage() {
   });
 
   const entries = data ?? [];
-  const runningTotal = entries.reduce((sum, e) => sum + Number(e.amountPaise), 0);
+  const runningTotalPaise = entries.reduce((sum, e) => sum + BigInt(e.amountPaise), 0n);
 
   async function handleExport() {
     const p = new URLSearchParams(params);
@@ -278,12 +278,9 @@ export function LedgerPage() {
                       Period total ({entries.length} events)
                     </td>
                     <td
-                      className={`px-5 py-3 text-right font-bold tabular-nums text-base ${runningTotal < 0 ? 'text-red-600' : 'text-gray-900'}`}
+                      className={`px-5 py-3 text-right font-bold tabular-nums text-base ${runningTotalPaise < 0n ? 'text-red-600' : 'text-gray-900'}`}
                     >
-                      {new Intl.NumberFormat('en-IN', {
-                        style: 'currency',
-                        currency: 'INR',
-                      }).format(runningTotal / 100)}
+                      {formatPaise(runningTotalPaise.toString())}
                     </td>
                     <td colSpan={3} />
                   </tr>

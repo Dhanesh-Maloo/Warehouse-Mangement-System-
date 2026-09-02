@@ -50,7 +50,7 @@ export class LedgerService {
     });
     if (!original) throw new NotFoundException(`Ledger event ${originalEventId} not found`);
 
-    return this.create({
+    const correction = await this.create({
       eventType: `CORRECTION_${original.eventType}`,
       asset: { connect: { id: original.assetId } },
       client: { connect: { id: original.clientId } },
@@ -63,5 +63,14 @@ export class LedgerService {
       referenceType: 'correction',
       notes: reason,
     });
+
+    // If the corrected event was a bundle charge that suppressed component
+    // events (e.g. Full Prep suppressing INGEST/INSPECT), clear those
+    // suppressions so the components are billable again (SPEC.md 6.2).
+    await this.prisma.eventSuppression.deleteMany({
+      where: { suppressedByEventId: originalEventId },
+    });
+
+    return correction;
   }
 }

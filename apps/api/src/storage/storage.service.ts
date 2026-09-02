@@ -125,6 +125,11 @@ export class StorageService {
     // can post fresh ones with the current device count. This keeps the ledger append-only
     // while ensuring the month's storage charge always reflects live inventory.
     if (existingRun) {
+      const reversedMonthLabel = existingRun.periodStart.toLocaleString('en-IN', {
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'Asia/Kolkata',
+      });
       if (existingRun.laptopAmountPaise > 0n) {
         const representativeAsset = await this.prisma.asset.findFirst({
           where: { clientId, category: { in: ['laptop', 'monitor'] } },
@@ -142,7 +147,7 @@ export class StorageService {
             createdBy: 'system:storage-accrual',
             referenceId: existingRun.id,
             referenceType: 'storage_accrual_reversal',
-            notes: `Reversal of previous June laptop storage charge (${existingRun.laptopCount} devices)`,
+            notes: `Reversal of previous ${reversedMonthLabel} laptop storage charge (${existingRun.laptopCount} devices)`,
           });
         }
       }
@@ -163,7 +168,7 @@ export class StorageService {
             createdBy: 'system:storage-accrual',
             referenceId: existingRun.id,
             referenceType: 'storage_accrual_reversal',
-            notes: `Reversal of previous June peripheral storage charge (${existingRun.peripheralCount} devices)`,
+            notes: `Reversal of previous ${reversedMonthLabel} peripheral storage charge (${existingRun.peripheralCount} devices)`,
           });
         }
       }

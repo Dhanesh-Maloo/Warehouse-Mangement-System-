@@ -34,7 +34,11 @@ export function RuralPincodesPage() {
 
   const removeMutation = useMutation({
     mutationFn: (p: string) => api.del(`/logistics/rural-pincodes/${p}`),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['rural-pincodes'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['rural-pincodes'] });
+      setError('');
+    },
+    onError: (e: Error) => setError(e.message),
   });
 
   function handleAdd(e: React.FormEvent) {
