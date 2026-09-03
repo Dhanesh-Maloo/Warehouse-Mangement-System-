@@ -160,6 +160,17 @@ export class InboundService {
     });
     if (!location) throw new NotFoundException(`Location ${dto.receivingLocationId} not found`);
 
+    // Vendor name only applies to new/sealed stock (inspection exempt); old/used
+    // devices go through inspection instead and have no vendor to record.
+    const missingVendor = dto.devices.find(
+      (device) => !device.requiresInspection && !device.vendorName?.trim(),
+    );
+    if (missingVendor) {
+      throw new BadRequestException(
+        `Device ${missingVendor.serialNumber} is missing vendor name`,
+      );
+    }
+
     const occurredAt = new Date();
     const [ingestLaptopRate, ingestPeripheralRate, inspectRate] = await Promise.all([
       this.rateCard.findEffectiveAt('INGEST_LAPTOP', occurredAt),
@@ -202,7 +213,7 @@ export class InboundService {
             serialNumber: device.serialNumber,
             assetTag: device.assetTag,
             referenceName: device.referenceName,
-            vendorName: device.vendorName,
+            vendorName: device.requiresInspection ? null : device.vendorName,
             model: device.model,
             manufacturer: device.manufacturer,
             category: device.category,

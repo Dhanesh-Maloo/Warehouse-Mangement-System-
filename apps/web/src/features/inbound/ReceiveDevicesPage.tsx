@@ -149,7 +149,7 @@ export function ReceiveDevicesPage() {
             category,
             assetTag: assetTag.trim() || undefined,
             referenceName: referenceName.trim() || undefined,
-            vendorName: vendorName.trim(),
+            vendorName: requiresInspection ? undefined : vendorName.trim(),
             requiresInspection,
           }),
         ),
@@ -184,7 +184,7 @@ export function ReceiveDevicesPage() {
       setSubmitError(`Device ${invalid.serialNumber} is missing model or manufacturer.`);
       return;
     }
-    const missingVendor = devices.find((d) => !d.vendorName.trim());
+    const missingVendor = devices.find((d) => !d.requiresInspection && !d.vendorName.trim());
     if (missingVendor) {
       setSubmitError(`Device ${missingVendor.serialNumber} is missing vendor name.`);
       return;
@@ -307,19 +307,21 @@ export function ReceiveDevicesPage() {
 
                   {/* Device fields */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
-                        Vendor <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={device.vendorName}
-                        onChange={(e) => updateDevice(device.key, 'vendorName', e.target.value)}
-                        placeholder="IValue, or other vendor"
-                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
-                      />
-                    </div>
+                    {!device.requiresInspection && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Vendor <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={device.vendorName}
+                          onChange={(e) => updateDevice(device.key, 'vendorName', e.target.value)}
+                          placeholder="IValue, or other vendor"
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
+                        />
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Category
@@ -390,9 +392,13 @@ export function ReceiveDevicesPage() {
                       type="button"
                       role="switch"
                       aria-checked={device.requiresInspection}
-                      onClick={() =>
-                        updateDevice(device.key, 'requiresInspection', !device.requiresInspection)
-                      }
+                      onClick={() => {
+                        const nextRequiresInspection = !device.requiresInspection;
+                        updateDevice(device.key, 'requiresInspection', nextRequiresInspection);
+                        if (nextRequiresInspection) {
+                          updateDevice(device.key, 'vendorName', '');
+                        }
+                      }}
                       className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#E86F2C] focus:ring-offset-1 ${
                         device.requiresInspection ? 'bg-[#E86F2C]' : 'bg-gray-200'
                       }`}
