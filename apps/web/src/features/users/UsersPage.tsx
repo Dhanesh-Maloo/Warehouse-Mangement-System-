@@ -61,7 +61,9 @@ export function UsersPage() {
     mutationFn: () =>
       api.post('/users', {
         email: form.email,
-        password: form.password,
+        // Client-scoped roles are invited by email and set their own
+        // password — never send one along for those.
+        ...(CLIENT_SCOPED_ROLES.has(form.role) ? {} : { password: form.password }),
         fullName: form.fullName,
         phone: form.phone || undefined,
         role: form.role,
@@ -147,20 +149,26 @@ export function UsersPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={form.password}
-                onChange={(e) => field('password', e.target.value)}
-                placeholder="Min 8 characters"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
-              />
-            </div>
+            {CLIENT_SCOPED_ROLES.has(form.role) ? (
+              <div className="sm:col-span-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                This role is invited by email — they&rsquo;ll get a link to set their own password.
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={form.password}
+                  onChange={(e) => field('password', e.target.value)}
+                  placeholder="Min 8 characters"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
               <input
@@ -263,9 +271,15 @@ export function UsersPage() {
                   </td>
                   <td className="px-5 py-3">
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${u.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                        u.status === 'active'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : u.status === 'invited'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-gray-100 text-gray-500'
+                      }`}
                     >
-                      {u.status}
+                      {u.status === 'invited' ? 'invite sent' : u.status}
                     </span>
                   </td>
                   <td className="px-5 py-3 text-gray-500 text-xs">

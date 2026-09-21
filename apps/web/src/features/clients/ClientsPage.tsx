@@ -16,6 +16,7 @@ interface Client {
   commitmentAmountPaise: string | null;
   commitmentLaptopCount: number | null;
   commitmentPeripheralCount: number | null;
+  allowedEmailDomains: string[];
   createdAt: string;
 }
 
@@ -31,6 +32,7 @@ const EMPTY = {
   commitmentAmountRupees: '',
   commitmentLaptopCount: '',
   commitmentPeripheralCount: '',
+  allowedEmailDomains: '',
 };
 
 export function ClientsPage() {
@@ -66,6 +68,7 @@ export function ClientsPage() {
         c.commitmentAmountPaise != null ? (Number(c.commitmentAmountPaise) / 100).toString() : '',
       commitmentLaptopCount: c.commitmentLaptopCount?.toString() ?? '',
       commitmentPeripheralCount: c.commitmentPeripheralCount?.toString() ?? '',
+      allowedEmailDomains: (c.allowedEmailDomains ?? []).join(', '),
     });
     setEditing(c);
     setFormError('');
@@ -97,6 +100,10 @@ export function ClientsPage() {
         contactName: form.contactName || undefined,
         contactEmail: form.contactEmail || undefined,
         contactPhone: form.contactPhone || undefined,
+        allowedEmailDomains: form.allowedEmailDomains
+          .split(',')
+          .map((d) => d.trim())
+          .filter(Boolean),
         ...(allCommitmentFields
           ? {
               commitmentAmountPaise: Math.round(Number(form.commitmentAmountRupees) * 100),
@@ -182,6 +189,23 @@ export function ClientsPage() {
                 />
               </div>
             ))}
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Allowed email domains <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <p className="text-xs text-gray-500 mb-2">
+              When set, an invited client_user/editor/client_admin&rsquo;s email must match one of
+              these domains — comma-separated (e.g. <code>esevel.com</code>). Leave blank to skip
+              the check for this client.
+            </p>
+            <input
+              value={form.allowedEmailDomains}
+              onChange={(e) => field('allowedEmailDomains', e.target.value)}
+              placeholder="esevel.com, esevel.co.in"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+            />
           </div>
 
           <div className="border-t border-gray-100 pt-4">

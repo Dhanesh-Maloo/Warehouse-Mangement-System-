@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useLogin } from '../../api/hooks/useAuth';
 import ivalueLogo from '../../assets/ivalue-logo.png';
 
@@ -75,6 +75,13 @@ export function LoginPage() {
           >
             {login.isPending ? 'Signing in…' : 'Sign in'}
           </button>
+
+          <p className="text-center text-sm text-gray-500">
+            New client with an invite link?{' '}
+            <Link to="/register" className="font-semibold text-[#E86F2C] hover:text-[#D05E1E]">
+              Set up your account
+            </Link>
+          </p>
         </form>
       </div>
     </div>

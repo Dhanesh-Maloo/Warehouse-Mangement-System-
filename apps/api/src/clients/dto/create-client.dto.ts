@@ -1,4 +1,14 @@
-import { IsString, IsEmail, IsOptional, Matches, IsObject, IsInt, Min } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  Matches,
+  IsObject,
+  IsInt,
+  IsArray,
+  Min,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
 
 const GSTIN_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
@@ -46,4 +56,15 @@ export class CreateClientDto {
   @IsInt()
   @Min(0)
   commitmentPeripheralCount?: number;
+
+  // Email domains (e.g. "esevel.com") allowed to self-register as a
+  // client_user of this client via an admin-issued invite. Omit/empty to
+  // skip the domain check entirely for this client.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }: { value: string[] }) =>
+    value?.map((d) => d.toLowerCase().trim().replace(/^@/, '')),
+  )
+  allowedEmailDomains?: string[];
 }

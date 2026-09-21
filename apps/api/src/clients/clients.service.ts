@@ -40,6 +40,7 @@ export class ClientsService {
           dto.commitmentAmountPaise != null ? BigInt(dto.commitmentAmountPaise) : undefined,
         commitmentLaptopCount: dto.commitmentLaptopCount,
         commitmentPeripheralCount: dto.commitmentPeripheralCount,
+        allowedEmailDomains: dto.allowedEmailDomains ?? [],
       },
     });
     await this.audit.log({

@@ -15,9 +15,14 @@ export class CreateUserDto {
   @Transform(({ value }: { value: string }) => value.toLowerCase().trim())
   email!: string;
 
+  // Omitted for client-scoped roles (client_user/editor/client_admin) — those
+  // accounts are invited by email and set their own password via
+  // POST /auth/register. Required for internal roles, which are still
+  // provisioned directly by an admin.
+  @ValidateIf((o: CreateUserDto) => !['client_user', 'editor', 'client_admin'].includes(o.role))
   @IsString()
   @MinLength(8)
-  password!: string;
+  password?: string;
 
   @IsString()
   fullName!: string;

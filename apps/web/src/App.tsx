@@ -5,6 +5,7 @@ import { ThemeProvider } from './lib/theme';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { LoginPage } from './features/auth/LoginPage';
+import { RegisterPage } from './features/auth/RegisterPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { InboundPage } from './features/inbound/InboundPage';
 import { DeliveryDetailPage } from './features/inbound/DeliveryDetailPage';
@@ -48,6 +49,7 @@ export function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
               <Route
                 element={
                   <ProtectedRoute>

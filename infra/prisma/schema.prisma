@@ -28,6 +28,9 @@ enum UserRole {
 enum UserStatus {
   active
   suspended
+  // Account created (client-scoped roles only) but the invite hasn't been
+  // accepted yet — no password set, cannot log in. See AuthService.register.
+  invited
 }
 
 enum AssetCategory {
@@ -200,6 +203,10 @@ model Client {
   contactEmail                String?      @map("contact_email")
   contactPhone                String?      @map("contact_phone")
   isActive                    Boolean      @default(true) @map("is_active")
+  // Email domains (e.g. "esevel.com") allowed to self-register as a
+  // client_user of this client via an admin-issued invite. Empty means the
+  // domain check is skipped for this client (see UsersService.create).
+  allowedEmailDomains         String[]     @default([]) @map("allowed_email_domains")
   // Monthly minimum committed storage spend (SPEC.md "Commitment"). Null means
   // no commitment — storage bills purely per-device, same as before this existed.
   // When set, all three fields are used together: the flat amount is billed
@@ -249,7 +256,8 @@ model User {
   id               String           @id @default(uuid()) @map("user_id")
   // Stored lowercase — lowercased at application layer on write.
   email            String           @unique
-  passwordHash     String           @map("password_hash")
+  // Null while status = invited — the invited person hasn't set one yet.
+  passwordHash     String?          @map("password_hash")
   fullName         String           @map("full_name")
   phone            String?
   role             UserRole
@@ -259,6 +267,10 @@ model User {
   lastLoginAt      DateTime?        @map("last_login_at") @db.Timestamptz
   failedLoginCount Int              @default(0) @map("failed_login_count")
   lockedUntil      DateTime?        @map("locked_until") @db.Timestamptz
+  // Single-use token emailed to invited client-scoped users; consumed by
+  // POST /auth/register. Cleared once the invite is accepted.
+  inviteToken          String?      @unique @map("invite_token")
+  inviteTokenExpiresAt DateTime?    @map("invite_token_expires_at") @db.Timestamptz
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 

@@ -5,12 +5,18 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import * as crypto from 'crypto';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mail/mail.service';
 import { welcomeEmail } from '../mail/templates/welcome';
+import { inviteEmail } from '../mail/templates/invite';
 import type { CreateUserDto } from './dto/create-user.dto';
 import type { UpdateUserDto } from './dto/update-user.dto';
+
+// 7 days to accept an invite before it needs to be reissued.
+const INVITE_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 type SafeUser = {
   id: string;
@@ -47,6 +53,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
+    private readonly config: ConfigService,
   ) {}
 
   async findAll(
@@ -110,6 +117,13 @@ export class UsersService {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new ConflictException('A user with that email already exists');
 
+    if (CLIENT_SCOPED_ROLES.has(dto.role)) {
+      return this.createInvited(dto, email);
+    }
+
+    if (!dto.password) {
+      throw new BadRequestException('password is required for this role');
+    }
     const passwordHash = await argon2.hash(dto.password, { type: argon2.argon2id });
 
     const user = await this.prisma.user.create({
@@ -132,6 +146,66 @@ export class UsersService {
     });
 
     const { subject, html, text } = welcomeEmail(user.fullName);
+    void this.mail.send({ to: user.email, subject, html, text });
+
+    return user;
+  }
+
+  /**
+   * Client-scoped accounts (client_user/editor/client_admin) never get a
+   * password from whoever creates them — they're emailed a one-time link
+   * to set their own (see AuthService.register). The invited email's
+   * domain must match one of the client's allowedEmailDomains, when the
+   * client has any configured, so an admin can't (even by mistake) attach
+   * a stray address to the wrong client.
+   */
+  private async createInvited(dto: CreateUserDto, email: string): Promise<SafeUser> {
+    if (dto.password) {
+      throw new BadRequestException(
+        'This role is invited by email, not assigned a password directly — omit password',
+      );
+    }
+    if (!dto.clientId) {
+      throw new BadRequestException('clientId is required for this role');
+    }
+    const client = await this.prisma.client.findUnique({ where: { id: dto.clientId } });
+    if (!client) throw new NotFoundException(`Client ${dto.clientId} not found`);
+
+    if (client.allowedEmailDomains.length > 0) {
+      const domain = email.split('@')[1];
+      if (!client.allowedEmailDomains.includes(domain)) {
+        throw new BadRequestException(
+          `Email domain "${domain}" is not an allowed domain for ${client.name}`,
+        );
+      }
+    }
+
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        passwordHash: null,
+        fullName: dto.fullName,
+        phone: dto.phone,
+        role: dto.role,
+        clientId: dto.clientId,
+        status: 'invited',
+        inviteToken,
+        inviteTokenExpiresAt: new Date(Date.now() + INVITE_TOKEN_TTL_MS),
+      },
+      select: SELECT_SAFE,
+    });
+    await this.audit.log({
+      userId: user.id,
+      action: 'user.invite',
+      entity: 'User',
+      entityId: user.id,
+      newValue: { email: user.email, role: user.role, clientId: dto.clientId },
+    });
+
+    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173');
+    const registerUrl = `${frontendUrl}/register?token=${inviteToken}`;
+    const { subject, html, text } = inviteEmail(user.fullName, client.name, registerUrl);
     void this.mail.send({ to: user.email, subject, html, text });
 
     return user;
