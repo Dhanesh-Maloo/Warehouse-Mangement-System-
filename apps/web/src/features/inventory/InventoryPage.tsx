@@ -3,7 +3,17 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Search, Package, Plus, X, Pencil, ChevronDown, Loader2, MoveRight } from 'lucide-react';
+import {
+  Search,
+  Package,
+  Plus,
+  X,
+  Pencil,
+  ChevronDown,
+  Loader2,
+  MoveRight,
+  Download,
+} from 'lucide-react';
 
 interface DisposalSummary {
   disposalType: string;
@@ -24,7 +34,7 @@ interface Asset {
   assetTag: string | null;
   referenceName: string | null;
   vendorName: string | null;
-  assetCondition: 'new' | 'used' | 'dead' | null;
+  assetCondition: 'new' | 'used' | 'dead' | 'not_working' | null;
   model: string;
   manufacturer: string;
   category: string;
@@ -282,6 +292,7 @@ export function InventoryPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(() => searchParams.get('status') ?? '');
   const [category, setCategory] = useState('');
+  const [assetConditionFilter, setAssetConditionFilter] = useState<AssetCondition | ''>('');
   const [page, setPage] = useState(0);
 
   useEffect(() => {
@@ -528,17 +539,38 @@ export function InventoryPage() {
   if (search) registerParams.set('search', search);
   if (status) registerParams.set('status', status);
   if (category) registerParams.set('category', category);
+  if (assetConditionFilter) registerParams.set('assetCondition', assetConditionFilter);
   registerParams.set('skip', String(page * take));
   registerParams.set('take', String(take));
 
   const { data, isLoading } = useQuery({
-    queryKey: ['assets', clientId, search, status, category, page],
+    queryKey: ['assets', clientId, search, status, category, assetConditionFilter, page],
     queryFn: () => api.get<AssetsResponse>(`/assets?${registerParams.toString()}`),
     // Keeps showing previous results while a new search/filter fetch is in
     // flight, instead of flipping isLoading back to true (which would unmount
     // the search input and drop keyboard focus on every keystroke).
     placeholderData: keepPreviousData,
   });
+
+  // Always exports the full asset register in scope (role/client-filtered),
+  // ignoring on-screen pagination and filters — per US-INV-05.
+  async function handleExport() {
+    const params = new URLSearchParams();
+    if (clientId) params.set('clientId', clientId);
+    const token = localStorage.getItem('wh_token');
+    const base = import.meta.env.VITE_API_URL ?? '';
+    const res = await fetch(`${base}/api/v1/assets/export?${params.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'asset-register-export.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const disposalLabel: Record<string, string> = {
     non_certified: 'Non-Certified',
@@ -555,6 +587,18 @@ export function InventoryPage() {
     B: 'bg-blue-100 text-blue-700',
     C: 'bg-amber-100 text-amber-700',
     D: 'bg-red-100 text-red-600',
+  };
+  const assetConditionLabels: Record<string, string> = {
+    new: 'New',
+    used: 'Used',
+    dead: 'Dead',
+    not_working: 'Not Working',
+  };
+  const assetConditionColors: Record<string, string> = {
+    new: 'bg-emerald-100 text-emerald-700',
+    used: 'bg-sky-100 text-sky-700',
+    dead: 'bg-gray-100 text-gray-500',
+    not_working: 'bg-red-100 text-red-600',
   };
 
   const fmt = (dt: string | null | undefined) =>
@@ -575,19 +619,28 @@ export function InventoryPage() {
           <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
           <p className="text-sm text-gray-500 mt-1">{data?.total ?? 0} assets total</p>
         </div>
-        {canAdd && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              setShowAddForm((s) => !s);
-              setAddFormError('');
-              setAddForm(EMPTY_ADD_FORM);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#E86F2C] text-white rounded-lg text-sm font-medium hover:bg-[#d4621f] transition-colors"
+            onClick={() => void handleExport()}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            {showAddForm ? <X size={16} /> : <Plus size={16} />}
-            {showAddForm ? 'Cancel' : 'Add asset'}
+            <Download size={16} />
+            Export CSV
           </button>
-        )}
+          {canAdd && (
+            <button
+              onClick={() => {
+                setShowAddForm((s) => !s);
+                setAddFormError('');
+                setAddForm(EMPTY_ADD_FORM);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-[#E86F2C] text-white rounded-lg text-sm font-medium hover:bg-[#d4621f] transition-colors"
+            >
+              {showAddForm ? <X size={16} /> : <Plus size={16} />}
+              {showAddForm ? 'Cancel' : 'Add asset'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Add Asset Form */}
@@ -923,6 +976,20 @@ export function InventoryPage() {
           <option value="returning">Returning</option>
           <option value="disposed">Disposed</option>
         </select>
+        <select
+          value={assetConditionFilter}
+          onChange={(e) => {
+            setAssetConditionFilter(e.target.value as AssetCondition | '');
+            setPage(0);
+          }}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
+        >
+          <option value="">All conditions (New/Used)</option>
+          <option value="new">New</option>
+          <option value="used">Used</option>
+          <option value="dead">Dead</option>
+          <option value="not_working">Not Working</option>
+        </select>
       </div>
 
       {/* Bulk transfer action bar */}
@@ -1006,6 +1073,7 @@ export function InventoryPage() {
                   <th className="text-left px-4 py-3 whitespace-nowrap">Vendor</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Serial No.</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Condition</th>
+                  <th className="text-left px-4 py-3 whitespace-nowrap">New/Used</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Category</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Model</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Status</th>
@@ -1127,6 +1195,48 @@ export function InventoryPage() {
                             className={`px-2 py-0.5 rounded-full text-xs font-bold ${gradeColors[a.conditionGrade] ?? 'bg-gray-100 text-gray-600'}`}
                           >
                             Grade {a.conditionGrade}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">-</span>
+                        )}
+                      </td>
+
+                      {/* 4b. New/Used (assetCondition) — inline editable */}
+                      <td
+                        className="px-4 py-3 whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {canEdit ? (
+                          <InlineSelect
+                            assetId={a.id}
+                            field="assetCondition"
+                            value={a.assetCondition ?? ''}
+                            saving={savingCells.has(`${a.id}:assetCondition`)}
+                            options={[
+                              { value: '', label: '- Not set' },
+                              { value: 'new', label: 'New' },
+                              { value: 'used', label: 'Used' },
+                              { value: 'dead', label: 'Dead' },
+                              { value: 'not_working', label: 'Not Working' },
+                            ]}
+                            onSave={handleInlineSave}
+                            renderBadge={(v) =>
+                              v ? (
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${assetConditionColors[v] ?? 'bg-gray-100 text-gray-600'}`}
+                                >
+                                  {assetConditionLabels[v] ?? v}
+                                </span>
+                              ) : (
+                                <span className="text-gray-300">-</span>
+                              )
+                            }
+                          />
+                        ) : a.assetCondition ? (
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${assetConditionColors[a.assetCondition] ?? 'bg-gray-100 text-gray-600'}`}
+                          >
+                            {assetConditionLabels[a.assetCondition] ?? a.assetCondition}
                           </span>
                         ) : (
                           <span className="text-gray-300">-</span>
@@ -1308,7 +1418,7 @@ export function InventoryPage() {
                 {(data?.data ?? []).length === 0 && (
                   <tr>
                     <td
-                      colSpan={canEdit ? 16 : 14}
+                      colSpan={canEdit ? 17 : 15}
                       className="px-5 py-12 text-center text-gray-400 text-sm"
                     >
                       <Package size={24} className="mx-auto mb-2 text-gray-300" />

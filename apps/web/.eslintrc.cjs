@@ -7,4 +7,13 @@ module.exports = {
     tsconfigRootDir: __dirname,
   },
   root: true,
+  overrides: [
+    {
+      files: ['e2e/**/*.ts'],
+      parserOptions: {
+        project: './tsconfig.e2e.json',
+        tsconfigRootDir: __dirname,
+      },
+    },
+  ],
 };

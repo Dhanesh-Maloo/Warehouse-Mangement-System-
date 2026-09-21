@@ -19,6 +19,7 @@ export interface AssetFilter {
   category?: AssetCategory;
   currentStatus?: AssetStatus;
   conditionGrade?: ConditionGrade;
+  assetCondition?: AssetCondition;
   currentLocationId?: string;
   search?: string;
   skip?: number;
@@ -33,22 +34,13 @@ export class AssetsService {
     private readonly ledger: LedgerService,
   ) {}
 
-  async findAll(filter: AssetFilter): Promise<{
-    data: (Asset & {
-      disposalRequests: Pick<DisposalRequest, 'disposalType' | 'certificateS3Key' | 'status'>[];
-      deploymentOrders: Pick<
-        DeploymentOrder,
-        'dispatchedAt' | 'deliveredAt' | 'trackingNumber' | 'courierName'
-      >[];
-      currentLocation: { id: string; name: string } | null;
-    })[];
-    total: number;
-  }> {
-    const where = {
+  private buildWhere(filter: AssetFilter): Prisma.AssetWhereInput {
+    return {
       ...(filter.clientId ? { clientId: filter.clientId } : {}),
       ...(filter.category ? { category: filter.category } : {}),
       ...(filter.currentStatus ? { currentStatus: filter.currentStatus } : {}),
       ...(filter.conditionGrade ? { conditionGrade: filter.conditionGrade } : {}),
+      ...(filter.assetCondition ? { assetCondition: filter.assetCondition } : {}),
       ...(filter.currentLocationId ? { currentLocationId: filter.currentLocationId } : {}),
       ...(filter.search
         ? {
@@ -62,6 +54,20 @@ export class AssetsService {
           }
         : {}),
     };
+  }
+
+  async findAll(filter: AssetFilter): Promise<{
+    data: (Asset & {
+      disposalRequests: Pick<DisposalRequest, 'disposalType' | 'certificateS3Key' | 'status'>[];
+      deploymentOrders: Pick<
+        DeploymentOrder,
+        'dispatchedAt' | 'deliveredAt' | 'trackingNumber' | 'courierName'
+      >[];
+      currentLocation: { id: string; name: string } | null;
+    })[];
+    total: number;
+  }> {
+    const where = this.buildWhere(filter);
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.asset.findMany({
@@ -92,6 +98,21 @@ export class AssetsService {
     ]);
 
     return { data, total };
+  }
+
+  /**
+   * Full (unpaginated) asset register for CSV export — same scoping as
+   * findAll but ignores skip/take so the export always covers every asset
+   * the caller's role/tenant can see, per US-INV-05.
+   */
+  async findAllForExport(
+    filter: Omit<AssetFilter, 'skip' | 'take'>,
+  ): Promise<(Asset & { currentLocation: { id: string; name: string } | null })[]> {
+    return this.prisma.asset.findMany({
+      where: this.buildWhere(filter),
+      include: { currentLocation: true },
+      orderBy: { updatedAt: 'desc' },
+    });
   }
 
   async findOne(id: string): Promise<Asset & { inspections: unknown[]; ledgerEntries: unknown[] }> {

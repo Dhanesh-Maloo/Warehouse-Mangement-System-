@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { Hourglass } from 'lucide-react';
+import { Hourglass, Download } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -89,16 +89,46 @@ export function AgeingPage() {
   const buckets = data?.buckets;
   const rows = (data?.rows ?? []).filter((r) => !bucketFilter || r.bucket === bucketFilter);
 
+  // Always exports the full ageing view in scope (role/client-filtered, but
+  // ignoring the client-side bucket filter) — per US-INV-05.
+  async function handleExport() {
+    const params = new URLSearchParams();
+    if (effectiveClientId) params.set('clientId', effectiveClientId);
+    if (categoryFilter) params.set('category', categoryFilter);
+    const token = localStorage.getItem('wh_token');
+    const base = import.meta.env.VITE_API_URL ?? '';
+    const res = await fetch(`${base}/api/v1/inventory/ageing/export?${params.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'inventory-ageing-export.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Hourglass size={22} className="text-[#E86F2C]" />
-          Stock Ageing
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Idle stock in storage, grouped by how long it&apos;s been sitting there uninterrupted.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Hourglass size={22} className="text-[#E86F2C]" />
+            Stock Ageing
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Idle stock in storage, grouped by how long it&apos;s been sitting there uninterrupted.
+          </p>
+        </div>
+        <button
+          onClick={() => void handleExport()}
+          className="flex items-center gap-2 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50"
+        >
+          <Download size={16} />
+          Export CSV
+        </button>
       </div>
 
       {/* ── Filters ─────────────────────────────────────────────────────────── */}

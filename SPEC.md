@@ -141,6 +141,25 @@ All tables include standard audit columns (`id`, `created_at`, `updated_at`) unl
 - User prompted at next login to enrol via QR code.
 - Recovery codes (10) generated and shown once at enrolment.
 
+**US-AUTH-03 — Invite-based registration for client-scoped accounts**
+- Confirmed 2026-09-05: client-scoped accounts (`client_user`, `editor`,
+  `client_admin`) are never assigned a password directly by whoever creates
+  them. Instead, creating one sends an email invite with a one-time,
+  7-day-expiring link; the invited person sets their own password on the
+  register page to activate the account (`status: invited` until then).
+  Internal roles (`operator`/`manager`/`admin`) are unaffected — those are
+  still provisioned with a password directly, per US-USR-01.
+- A client can optionally configure `allowedEmailDomains` (e.g.
+  `esevel.com`). When set, an invited email's domain must match one of them
+  or the invite is rejected server-side at creation time — this catches an
+  admin mistake as well as a self-service attempt, so a client_user account
+  can never be attached to the wrong client. Domain matching is skipped
+  entirely for a client with no domains configured.
+- The register page itself has no open signup form — visiting it without a
+  valid invite token shows a message pointing the visitor to their account
+  admin. This is a deliberate multi-tenancy control: nothing on this page
+  lets a visitor pick their own client.
+
 **US-USR-01 — Manage users**
 - Admin can create, edit, suspend, reactivate users.
 - Email unique (case-insensitive); duplicate rejected with clear message.
@@ -218,7 +237,7 @@ All tables include standard audit columns (`id`, `created_at`, `updated_at`) unl
 ### 5.6 Inventory
 
 **US-INV-01 — Browse asset register**
-- Filters: client, category, status, location, condition grade, age in current status.
+- Filters: client, category, status, location, condition grade, asset condition (new/used/dead/not working), age in current status.
 - Search: serial, asset tag, model.
 - Default sort: most recently updated first.
 - Pagination at 50 rows; total count shown.
@@ -236,6 +255,12 @@ All tables include standard audit columns (`id`, `created_at`, `updated_at`) unl
 - Buckets: 0–7 days, 8–30, 31–60, 61–90, 90+.
 - Filterable by client and category.
 - Each row links to the asset profile.
+
+**US-INV-05 — CSV export of inventory views**
+- Export button on the asset register (US-INV-01) and the ageing view (US-INV-04).
+- Always exports the full dataset the caller's role/tenant can see (respects role/client scoping, ignores on-screen pagination, ignores on-screen filters).
+- Same auth/RLS scoping as the underlying list endpoint — a `client_user` can only export their own client's assets.
+- Format: CSV only for now (Excel/other formats out of scope for this story).
 
 ### 5.7 Event ledger
 

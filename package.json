@@ -11,6 +11,7 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "e2e": "playwright test",
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker-compose.yml down",
     "db:generate": "prisma generate --schema infra/prisma/schema.prisma",
@@ -19,6 +20,7 @@
     "db:fix-ingest-rates": "dotenv -e .env -- tsx infra/prisma/fix-ingest-rates.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "argon2": "^0.41.1",

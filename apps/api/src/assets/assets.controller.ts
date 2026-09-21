@@ -6,10 +6,13 @@ import {
   Param,
   Body,
   Query,
+  Res,
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { AssetsService } from './assets.service';
+import { toCsv } from '../common/csv/to-csv';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetStatusDto } from './dto/update-asset-status.dto';
 import { BulkMoveAssetsDto } from './dto/bulk-move-assets.dto';
@@ -78,6 +81,7 @@ export class AssetsController {
     @Query('clientId') clientId?: string,
     @Query('category') category?: string,
     @Query('status') status?: string,
+    @Query('assetCondition') assetCondition?: string,
     @Query('search') search?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
@@ -93,10 +97,91 @@ export class AssetsController {
       clientId: effectiveClientId,
       category: category as never,
       currentStatus: status as never,
+      assetCondition: assetCondition as never,
       search,
       skip: skip ? parseInt(skip, 10) : 0,
       take: take ? Math.min(parseInt(take, 10), 200) : 50,
     });
+  }
+
+  /**
+   * US-INV-05 — CSV export of the asset register. Always the full dataset
+   * the caller's role/tenant can see (filters are applied, but pagination
+   * is not), per the product decision to export everything in scope rather
+   * than only the current page.
+   */
+  @Get('export')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
+  async exportCsv(
+    @Query('clientId') clientId: string | undefined,
+    @Query('category') category: string | undefined,
+    @Query('status') status: string | undefined,
+    @Query('assetCondition') assetCondition: string | undefined,
+    @Query('search') search: string | undefined,
+    @CurrentUser() user: JwtPayload,
+    @Res() res: Response,
+  ): Promise<void> {
+    const effectiveClientId =
+      user.role === 'client_user' || user.role === 'editor' || user.role === 'client_admin'
+        ? (user.clientId ?? undefined)
+        : clientId;
+
+    const assets = await this.assetsService.findAllForExport({
+      clientId: effectiveClientId,
+      category: category as never,
+      currentStatus: status as never,
+      assetCondition: assetCondition as never,
+      search,
+    });
+
+    const csv = toCsv(
+      [
+        'serialNumber',
+        'assetTag',
+        'referenceName',
+        'vendorName',
+        'model',
+        'manufacturer',
+        'category',
+        'clientId',
+        'currentStatus',
+        'assetCondition',
+        'conditionGrade',
+        'currentLocation',
+        'awbNumber',
+        'courierName',
+        'deliveredAt',
+        'disposalType',
+        'hasCertification',
+        'createdAt',
+        'updatedAt',
+      ],
+      assets.map((a) => [
+        a.serialNumber,
+        a.assetTag,
+        a.referenceName,
+        a.vendorName,
+        a.model,
+        a.manufacturer,
+        a.category,
+        a.clientId,
+        a.currentStatus,
+        a.assetCondition,
+        a.conditionGrade,
+        a.currentLocation?.name ?? '',
+        a.awbNumber,
+        a.courierName,
+        a.deliveredAt,
+        a.disposalType,
+        a.hasCertification,
+        a.createdAt,
+        a.updatedAt,
+      ]),
+    );
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="asset-register-export.csv"');
+    res.send(csv);
   }
 
   @Get(':id')
