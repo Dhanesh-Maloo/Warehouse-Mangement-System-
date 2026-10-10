@@ -79,6 +79,21 @@ export function ReceiveDevicesPage() {
     }
   }, [locations, locationId]);
 
+  // A scanner types like a keyboard into whatever has focus. After the operator
+  // picks a location or clicks a button, focus is no longer on the scan box and
+  // the serial would be lost, so redirect printable keystrokes back to it unless
+  // the operator is deliberately typing into another text field.
+  useEffect(() => {
+    function redirectToScan(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
+      const target = e.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+      scanRef.current?.focus();
+    }
+    document.addEventListener('keydown', redirectToScan);
+    return () => document.removeEventListener('keydown', redirectToScan);
+  }, []);
+
   // Keep scan input focused
   function refocusScan() {
     setTimeout(() => scanRef.current?.focus(), 50);
