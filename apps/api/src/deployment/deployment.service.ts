@@ -13,6 +13,11 @@ import { CourierZoneService } from '../logistics/courier-zone.service';
 import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateDeploymentOrderDto } from './dto/create-deployment-order.dto';
 import type { UpdateDeploymentStatusDto } from './dto/update-deployment-status.dto';
+import {
+  formatChallanAddress,
+  formatChallanContact,
+  type DeliveryAddress,
+} from './deployment-challan-format';
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
 const PDFDocument = require('pdfkit') as typeof import('pdfkit');
 
@@ -449,12 +454,7 @@ export class DeploymentService {
     }
 
     const displayNumber = `DC-${order.id.slice(-8).toUpperCase()}`;
-    const address = order.deliveryAddress as {
-      street?: string;
-      city?: string;
-      state?: string;
-      pincode?: string;
-    };
+    const address = order.deliveryAddress as DeliveryAddress;
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
 
     // Header
@@ -498,15 +498,16 @@ export class DeploymentService {
     // Delivery details
     let cursorY = 222;
     doc.fontSize(9).font('Helvetica-Bold').text('Delivered to:', 50, cursorY);
-    doc.font('Helvetica').text(`${order.contactName} · ${order.contactPhone}`, 155, cursorY);
+    doc
+      .font('Helvetica')
+      .text(formatChallanContact(order.contactName, order.contactPhone), 155, cursorY);
     cursorY += 15;
-    const addressLine = [address.street, address.city, address.state, address.pincode]
-      .filter(Boolean)
-      .join(', ');
+    const addressLine = formatChallanAddress(address);
     if (addressLine) {
       doc.fontSize(9).font('Helvetica-Bold').text('Address:', 50, cursorY);
       doc.font('Helvetica').text(addressLine, 155, cursorY, { width: 390 });
-      cursorY += 15;
+      // Long addresses wrap, so advance by the rendered height rather than a fixed step.
+      cursorY += doc.heightOfString(addressLine, { width: 390 }) + 6;
     }
     if (order.trackingNumber) {
       doc.fontSize(9).font('Helvetica-Bold').text('Tracking reference:', 50, cursorY);

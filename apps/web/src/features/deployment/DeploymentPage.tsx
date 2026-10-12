@@ -4,6 +4,13 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
 import { Plus, X, Truck, Search, Download } from 'lucide-react';
+import {
+  type DeploymentOrder,
+  STATUS_LABELS,
+  STATUS_COLORS,
+  formatDeliveryAddress,
+} from './deployment-order';
+import { DeploymentOrderDrawer } from './DeploymentOrderDrawer';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,49 +34,6 @@ interface EndUser {
   name: string;
   clientId: string;
 }
-
-interface DeploymentOrder {
-  id: string;
-  asset: { id: string; serialNumber: string; model: string };
-  endUser: { name: string } | null;
-  deliveryAddress: {
-    line1: string;
-    line2?: string;
-    city: string;
-    state: string;
-    pincode: string;
-  };
-  courierZone: 'intra_state' | 'inter_state' | 'rural';
-  status: 'pending' | 'in_transit' | 'delivered' | 'cancelled';
-  bundleType: 'standard' | 'full_prep';
-  requiresLabeling: boolean;
-  requiresRepacking: boolean;
-  contactName: string;
-  contactPhone: string;
-  trackingNumber?: string;
-  ivalueTicketNumber?: string;
-  clientTicketNumber?: string;
-  notes?: string;
-  requestedAt: string;
-}
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const STATUS_COLORS: Record<DeploymentOrder['status'], string> = {
-  pending: 'bg-gray-100 text-gray-700',
-  in_transit: 'bg-amber-100 text-amber-700',
-  delivered: 'bg-emerald-100 text-emerald-700',
-  cancelled: 'bg-red-100 text-red-700',
-};
-
-const STATUS_LABELS: Record<DeploymentOrder['status'], string> = {
-  pending: 'Pending',
-  in_transit: 'In Transit',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
-};
 
 const VALID_NEXT_STATUSES: Record<DeploymentOrder['status'], DeploymentOrder['status'][]> = {
   pending: ['in_transit', 'delivered'],
@@ -144,6 +108,9 @@ export function DeploymentPage() {
     null,
   );
 
+  // Order shown in the detail drawer (looked up by id so it stays fresh after edits)
+  const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+
   // Filter / search client (admin view)
   const [filterClientId, setFilterClientId] = useState('');
 
@@ -204,6 +171,8 @@ export function DeploymentPage() {
     // unmount the filter bar's input and drop keyboard focus on every keystroke).
     placeholderData: keepPreviousData,
   });
+
+  const detailOrder = orders.find((o) => o.id === detailOrderId);
 
   // Courier zone is derived server-side from the delivery pincode. This is a
   // read-only preview for the cost estimate — the backend re-resolves it
@@ -927,7 +896,13 @@ export function DeploymentPage() {
                   return (
                     <tr
                       key={order.id}
-                      className="border-b border-gray-50 hover:bg-orange-50/40 transition-colors"
+                      // Inline controls (selects, inputs, links, buttons) keep their own behaviour.
+                      onClick={(e) => {
+                        if (!(e.target as HTMLElement).closest('select, input, button, a')) {
+                          setDetailOrderId(order.id);
+                        }
+                      }}
+                      className="border-b border-gray-50 hover:bg-orange-50/40 transition-colors cursor-pointer"
                     >
                       {/* Asset */}
                       <td className="px-5 py-3.5">
@@ -951,7 +926,10 @@ export function DeploymentPage() {
                       </td>
 
                       {/* Delivery address */}
-                      <td className="px-5 py-3.5 text-xs text-gray-600">
+                      <td
+                        className="px-5 py-3.5 text-xs text-gray-600"
+                        title={formatDeliveryAddress(order.deliveryAddress)}
+                      >
                         <p>{order.deliveryAddress.city}</p>
                         <p className="text-gray-400">{order.deliveryAddress.state}</p>
                       </td>
@@ -1133,6 +1111,14 @@ export function DeploymentPage() {
             </div>
           )}
         </div>
+      )}
+
+      {detailOrder && (
+        <DeploymentOrderDrawer
+          order={detailOrder}
+          onClose={() => setDetailOrderId(null)}
+          onDownloadChallan={(id) => void downloadDeliveryChallanPdf(id)}
+        />
       )}
     </div>
   );
