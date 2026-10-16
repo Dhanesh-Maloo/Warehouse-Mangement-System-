@@ -177,11 +177,10 @@ export function InboundPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Client Ticket Number <span className="text-red-500">*</span>
+                  Client Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
-                  required
                   value={clientTicketNumber}
                   onChange={(e) => setClientTicketNumber(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
