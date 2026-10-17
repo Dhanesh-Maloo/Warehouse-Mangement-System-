@@ -91,7 +91,7 @@ const navGroups: NavGroup[] = [
         label: 'Rural Pincodes',
         icon: Map,
         adminOnly: true,
-        extraRoles: ['manager'],
+        extraRoles: ['manager', 'client_admin'],
       },
     ],
   },

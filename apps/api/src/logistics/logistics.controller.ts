@@ -23,13 +23,13 @@ export class LogisticsController {
   }
 
   @Get('rural-pincodes')
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'client_admin')
   listRuralPincodes(): ReturnType<CourierZoneService['listRuralPincodes']> {
     return this.courierZone.listRuralPincodes();
   }
 
   @Post('rural-pincodes')
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'client_admin')
   addRuralPincode(
     @Body() dto: AddRuralPincodeDto,
     @CurrentUser() user: JwtPayload,
@@ -38,7 +38,7 @@ export class LogisticsController {
   }
 
   @Delete('rural-pincodes/:pincode')
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'client_admin')
   removeRuralPincode(
     @Param('pincode') pincode: string,
   ): ReturnType<CourierZoneService['removeRuralPincode']> {
