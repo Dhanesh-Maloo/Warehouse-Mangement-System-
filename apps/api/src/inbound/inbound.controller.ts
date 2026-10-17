@@ -14,6 +14,8 @@ import type { Response } from 'express';
 import { InboundService } from './inbound.service';
 import { CreateExpectedDeliveryDto } from './dto/create-expected-delivery.dto';
 import { ReceiveDevicesDto } from './dto/receive-devices.dto';
+import { UpdateExpectedDeliveryDto } from './dto/update-expected-delivery.dto';
+import { UpdateGrnDto, UpdateReceivedDeviceDto } from './dto/update-grn.dto';
 import { UpdateTicketsDto } from '../common/dto/update-tickets.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -35,6 +37,13 @@ export class InboundController {
     const delivery = await this.inboundService.findOneDelivery(id);
     if (delivery.clientId !== user.clientId) {
       throw new ForbiddenException('Cannot act on a delivery from another client');
+    }
+  }
+
+  private async assertOwnsGrn(id: string, user: JwtPayload): Promise<void> {
+    if (!InboundController.isClientScoped(user.role)) return;
+    if ((await this.inboundService.getGrnClientId(id)) !== user.clientId) {
+      throw new ForbiddenException('Cannot act on a GRN from another client');
     }
   }
 
@@ -104,6 +113,40 @@ export class InboundController {
   ): ReturnType<InboundService['updateDeliveryTickets']> {
     await this.assertOwnsDelivery(id, user);
     return this.inboundService.updateDeliveryTickets(id, dto);
+  }
+
+  @Patch('deliveries/:id')
+  @Roles('admin', 'manager', 'editor', 'client_admin')
+  async updateDelivery(
+    @Param('id') id: string,
+    @Body() dto: UpdateExpectedDeliveryDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<InboundService['updateDelivery']> {
+    await this.assertOwnsDelivery(id, user);
+    return this.inboundService.updateDelivery(id, dto, user.sub);
+  }
+
+  @Patch('grns/:id')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  async updateGrn(
+    @Param('id') id: string,
+    @Body() dto: UpdateGrnDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<InboundService['updateGrn']> {
+    await this.assertOwnsGrn(id, user);
+    return this.inboundService.updateGrn(id, dto, user.sub);
+  }
+
+  @Patch('grns/:id/devices/:assetId')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  async updateReceivedDevice(
+    @Param('id') id: string,
+    @Param('assetId') assetId: string,
+    @Body() dto: UpdateReceivedDeviceDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<InboundService['updateReceivedDevice']> {
+    await this.assertOwnsGrn(id, user);
+    return this.inboundService.updateReceivedDevice(id, assetId, dto, user.sub);
   }
 
   @Get('grns')

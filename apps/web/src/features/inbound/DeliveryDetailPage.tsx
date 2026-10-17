@@ -1,8 +1,12 @@
+import { useState, Fragment } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { Breadcrumbs } from '../../components/Breadcrumbs';
-import { ArrowLeft, PackagePlus, Download, StickyNote } from 'lucide-react';
+import { useAuth } from '../../lib/auth';
+import { EditDeliveryForm } from './EditDeliveryForm';
+import { EditGrnPanel, type EditableDevice } from './EditGrnPanel';
+import { ArrowLeft, PackagePlus, Download, StickyNote, Pencil } from 'lucide-react';
 
 interface DeliveryItem {
   id: string;
@@ -19,7 +23,7 @@ interface Grn {
   receivedAt: string;
   deviceCount: number;
   courierRef: string | null;
-  assets: { asset: { vendorName: string | null } }[];
+  assets: { assetId: string; asset: EditableDevice }[];
 }
 
 function vendorNamesFor(grn: Grn): string {
@@ -36,6 +40,8 @@ interface Delivery {
   expectedArrivalDate: string;
   status: string;
   notes: string | null;
+  ivalueTicketNumber: string | null;
+  clientTicketNumber: string | null;
   items: DeliveryItem[];
   grns: Grn[];
 }
@@ -50,6 +56,12 @@ const STATUS_COLORS: Record<string, string> = {
 export function DeliveryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [editingDelivery, setEditingDelivery] = useState(false);
+  const [editingGrnId, setEditingGrnId] = useState<string | null>(null);
+  // Mirrors the API role lists: operators can fix receipts but not the delivery itself.
+  const canEditDelivery = ['admin', 'manager', 'editor', 'client_admin'].includes(user?.role ?? '');
+  const canEditGrn = canEditDelivery || user?.role === 'operator';
 
   const { data: delivery, isLoading } = useQuery({
     queryKey: ['delivery', id],
@@ -140,6 +152,15 @@ export function DeliveryDetailPage() {
             </div>
           )}
         </div>
+        {canEditDelivery && delivery.status !== 'cancelled' && (
+          <button
+            onClick={() => setEditingDelivery((v) => !v)}
+            className="flex items-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+          >
+            <Pencil size={14} />
+            Edit delivery
+          </button>
+        )}
         {canReceive && (
           <Link
             to={`/inbound/${delivery.id}/receive`}
@@ -150,6 +171,10 @@ export function DeliveryDetailPage() {
           </Link>
         )}
       </div>
+
+      {editingDelivery && (
+        <EditDeliveryForm delivery={delivery} onClose={() => setEditingDelivery(false)} />
+      )}
 
       {/* Progress bar */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -230,33 +255,55 @@ export function DeliveryDetailPage() {
               </thead>
               <tbody>
                 {delivery.grns.map((grn) => (
-                  <tr key={grn.id} className="border-b border-gray-50">
-                    <td className="px-5 py-3.5 font-mono text-sm font-semibold text-gray-900">
-                      {grn.grnNumber ?? grn.id.slice(0, 8).toUpperCase()}
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-700">
-                      {new Date(grn.receivedAt).toLocaleString('en-IN', {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </td>
-                    <td className="px-5 py-3.5 text-gray-600">{vendorNamesFor(grn)}</td>
-                    <td className="px-5 py-3.5 text-gray-600">{grn.courierRef ?? '-'}</td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-gray-900">
-                      {grn.deviceCount}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => downloadGrnPdf(grn.id, grn.grnNumber ?? 'grn')}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-[#E86F2C] hover:text-[#D05E1E] border border-[#E86F2C]/30 hover:border-[#E86F2C] px-2.5 py-1.5 rounded-lg transition-colors"
-                      >
-                        <Download size={12} />
-                        PDF
-                      </button>
-                    </td>
-                  </tr>
+                  <Fragment key={grn.id}>
+                    <tr className="border-b border-gray-50">
+                      <td className="px-5 py-3.5 font-mono text-sm font-semibold text-gray-900">
+                        {grn.grnNumber ?? grn.id.slice(0, 8).toUpperCase()}
+                      </td>
+                      <td className="px-5 py-3.5 text-gray-700">
+                        {new Date(grn.receivedAt).toLocaleString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                      <td className="px-5 py-3.5 text-gray-600">{vendorNamesFor(grn)}</td>
+                      <td className="px-5 py-3.5 text-gray-600">{grn.courierRef ?? '-'}</td>
+                      <td className="px-5 py-3.5 text-right font-semibold text-gray-900">
+                        {grn.deviceCount}
+                      </td>
+                      <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                        {canEditGrn && (
+                          <button
+                            onClick={() => setEditingGrnId(editingGrnId === grn.id ? null : grn.id)}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 border border-gray-300 px-2.5 py-1.5 rounded-lg mr-2 transition-colors"
+                          >
+                            <Pencil size={12} />
+                            Edit
+                          </button>
+                        )}
+                        <button
+                          onClick={() => downloadGrnPdf(grn.id, grn.grnNumber ?? 'grn')}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-[#E86F2C] hover:text-[#D05E1E] border border-[#E86F2C]/30 hover:border-[#E86F2C] px-2.5 py-1.5 rounded-lg transition-colors"
+                        >
+                          <Download size={12} />
+                          PDF
+                        </button>
+                      </td>
+                    </tr>
+                    {editingGrnId === grn.id && (
+                      <tr>
+                        <td colSpan={6} className="p-0">
+                          <EditGrnPanel
+                            grn={grn}
+                            deliveryId={delivery.id}
+                            onClose={() => setEditingGrnId(null)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

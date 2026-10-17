@@ -12,6 +12,7 @@ interface Location {
 }
 
 interface DeliveryItem {
+  id: string;
   category: string;
   model: string;
   manufacturer: string;
@@ -22,6 +23,7 @@ interface Delivery {
   id: string;
   purchaseOrderRef: string | null;
   items: DeliveryItem[];
+  grns: { assets: { asset: { category: string; model: string; manufacturer: string } }[] }[];
 }
 
 interface DeviceRow {
@@ -35,19 +37,43 @@ interface DeviceRow {
   vendorName: string;
   requiresInspection: boolean;
   isNew: boolean;
+  // Expected line this device was matched to ('' when none).
+  itemId: string;
 }
 
 const CATEGORIES = ['laptop', 'monitor', 'peripheral'] as const;
 
-function guessFromItems(items: DeliveryItem[]): Partial<DeviceRow> {
-  if (items.length === 1) {
-    return {
-      category: items[0].category as DeviceRow['category'],
-      model: items[0].model,
-      manufacturer: items[0].manufacturer,
-    };
+const lineKey = (d: { category: string; model: string; manufacturer: string }): string =>
+  `${d.category}|${d.model.trim().toLowerCase()}|${d.manufacturer.trim().toLowerCase()}`;
+
+// Devices already received on earlier GRNs, allocated to expected lines in order
+// (the API doesn't track a per-line received count).
+function receivedPerLine(delivery: Delivery): Map<string, number> {
+  const pool = new Map<string, number>();
+  for (const grn of delivery.grns) {
+    for (const { asset } of grn.assets) {
+      pool.set(lineKey(asset), (pool.get(lineKey(asset)) ?? 0) + 1);
+    }
   }
-  return {};
+  const result = new Map<string, number>();
+  for (const item of delivery.items) {
+    const available = pool.get(lineKey(item)) ?? 0;
+    const taken = Math.min(available, item.quantity);
+    pool.set(lineKey(item), available - taken);
+    result.set(item.id, taken);
+  }
+  return result;
+}
+
+function fromItem(
+  item: DeliveryItem,
+): Pick<DeviceRow, 'category' | 'model' | 'manufacturer' | 'itemId'> {
+  return {
+    category: item.category as DeviceRow['category'],
+    model: item.model,
+    manufacturer: item.manufacturer,
+    itemId: item.id,
+  };
 }
 
 export function ReceiveDevicesPage() {
@@ -100,6 +126,11 @@ export function ReceiveDevicesPage() {
     setTimeout(() => scanRef.current?.focus(), 50);
   }
 
+  const alreadyReceived = delivery ? receivedPerLine(delivery) : new Map<string, number>();
+  const scannedFor = (itemId: string): number => devices.filter((d) => d.itemId === itemId).length;
+  const remainingFor = (item: DeliveryItem): number =>
+    item.quantity - (alreadyReceived.get(item.id) ?? 0) - scannedFor(item.id);
+
   function handleScan(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -113,16 +144,23 @@ export function ReceiveDevicesPage() {
       return;
     }
 
-    const prefill = delivery ? guessFromItems(delivery.items) : {};
+    // Fill from the first expected line that still has devices outstanding, so
+    // scanning 10 ThinkPads then 5 monitors needs no manual typing.
+    const target =
+      delivery &&
+      (delivery.items.find((i) => remainingFor(i) > 0) ??
+        (delivery.items.length === 1 ? delivery.items[0] : undefined));
+    const prefill = target ? fromItem(target) : undefined;
 
     setDevices((prev) => [
       ...prev,
       {
         key: `${serial}-${Date.now()}`,
         serialNumber: serial,
-        model: prefill.model ?? '',
-        manufacturer: prefill.manufacturer ?? '',
-        category: prefill.category ?? 'laptop',
+        model: prefill?.model ?? '',
+        manufacturer: prefill?.manufacturer ?? '',
+        category: prefill?.category ?? 'laptop',
+        itemId: prefill?.itemId ?? '',
         assetTag: '',
         referenceName: '',
         vendorName: '',
@@ -136,6 +174,13 @@ export function ReceiveDevicesPage() {
 
   function updateDevice(key: string, field: keyof DeviceRow, value: string | boolean) {
     setDevices((prev) => prev.map((d) => (d.key === key ? { ...d, [field]: value } : d)));
+  }
+
+  function assignItem(key: string, itemId: string) {
+    const item = delivery?.items.find((i) => i.id === itemId);
+    setDevices((prev) =>
+      prev.map((d) => (d.key === key ? { ...d, ...(item ? fromItem(item) : { itemId: '' }) } : d)),
+    );
   }
 
   function removeDevice(key: string) {
@@ -272,6 +317,43 @@ export function ReceiveDevicesPage() {
           </div>
         </div>
 
+        {/* Expected items progress */}
+        {delivery && delivery.items.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">Expected items</h2>
+            <div className="space-y-2">
+              {delivery.items.map((item) => {
+                const received = alreadyReceived.get(item.id) ?? 0;
+                const scanned = scannedFor(item.id);
+                const remaining = item.quantity - received - scanned;
+                return (
+                  <div key={item.id} className="flex flex-wrap items-center gap-x-3 text-sm">
+                    <span className="font-medium text-gray-900">
+                      {item.manufacturer} {item.model}
+                    </span>
+                    <span className="text-gray-500 capitalize">{item.category}</span>
+                    <span className="ml-auto text-gray-600">
+                      <span className="font-semibold text-gray-900">{received + scanned}</span> of{' '}
+                      {item.quantity}
+                      {scanned > 0 && (
+                        <span className="text-[#E86F2C]"> ({scanned} scanning now)</span>
+                      )}
+                      {' · '}
+                      <span className={remaining > 0 ? 'text-amber-600' : 'text-emerald-600'}>
+                        {remaining > 0
+                          ? `${remaining} remaining`
+                          : remaining === 0
+                            ? 'complete'
+                            : `${-remaining} extra`}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Scan input */}
         <div className="bg-[#1A2B3C] rounded-xl p-5 shadow-sm">
           <div className="flex items-center gap-2 text-white mb-3">
@@ -339,6 +421,25 @@ export function ReceiveDevicesPage() {
                           placeholder="IValue, or other vendor"
                           className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
                         />
+                      </div>
+                    )}
+                    {delivery && delivery.items.length > 1 && (
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Expected item
+                        </label>
+                        <select
+                          value={device.itemId}
+                          onChange={(e) => assignItem(device.key, e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
+                        >
+                          <option value="">Not on the expected list</option>
+                          {delivery.items.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.manufacturer} {item.model} ({item.category})
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     )}
                     <div>
