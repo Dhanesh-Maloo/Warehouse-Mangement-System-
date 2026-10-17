@@ -34,6 +34,7 @@ interface DeviceRow {
   referenceName: string;
   vendorName: string;
   requiresInspection: boolean;
+  isNew: boolean;
 }
 
 const CATEGORIES = ['laptop', 'monitor', 'peripheral'] as const;
@@ -126,6 +127,7 @@ export function ReceiveDevicesPage() {
         referenceName: '',
         vendorName: '',
         requiresInspection: false,
+        isNew: false,
       },
     ]);
     setScanValue('');
@@ -157,6 +159,7 @@ export function ReceiveDevicesPage() {
             referenceName,
             vendorName,
             requiresInspection,
+            isNew,
           }) => ({
             serialNumber,
             model,
@@ -166,6 +169,7 @@ export function ReceiveDevicesPage() {
             referenceName: referenceName.trim() || undefined,
             vendorName: requiresInspection ? undefined : vendorName.trim(),
             requiresInspection,
+            isNew,
           }),
         ),
       }),
@@ -400,6 +404,17 @@ export function ReceiveDevicesPage() {
                       />
                     </div>
                   </div>
+
+                  {/* New / used condition */}
+                  <label className="flex items-center gap-2 cursor-pointer w-fit text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={device.isNew}
+                      onChange={(e) => updateDevice(device.key, 'isNew', e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 accent-[#E86F2C]"
+                    />
+                    New device (leave unticked if used)
+                  </label>
 
                   {/* Inspection toggle */}
                   <label className="flex items-center gap-2.5 cursor-pointer w-fit">

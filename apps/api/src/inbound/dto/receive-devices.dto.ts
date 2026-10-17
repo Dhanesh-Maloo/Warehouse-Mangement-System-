@@ -37,6 +37,12 @@ export class ReceivedDeviceDto {
 
   @IsBoolean()
   requiresInspection!: boolean;
+
+  // Ticked at receiving: true marks the asset 'new', otherwise 'used'. Kept
+  // separate from requiresInspection because a new device can still be inspected.
+  @IsOptional()
+  @IsBoolean()
+  isNew?: boolean;
 }
 
 export class ReceiveDevicesDto {

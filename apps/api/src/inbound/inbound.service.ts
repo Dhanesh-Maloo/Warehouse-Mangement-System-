@@ -217,6 +217,7 @@ export class InboundService {
             model: device.model,
             manufacturer: device.manufacturer,
             category: device.category,
+            assetCondition: device.isNew ? 'new' : 'used',
             clientId: delivery.clientId,
             currentLocationId: dto.receivingLocationId,
             currentStatus: device.requiresInspection ? 'in_inspection' : 'in_storage',
