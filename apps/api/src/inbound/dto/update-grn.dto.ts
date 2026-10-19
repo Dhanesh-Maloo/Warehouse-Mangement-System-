@@ -38,6 +38,10 @@ export class UpdateReceivedDeviceDto {
   vendorName?: string;
 
   @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
   @IsIn(['new', 'used', 'dead', 'not_working'])
   assetCondition?: 'new' | 'used' | 'dead' | 'not_working';
 }

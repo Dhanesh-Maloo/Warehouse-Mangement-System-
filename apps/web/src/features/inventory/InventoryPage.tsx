@@ -33,6 +33,7 @@ interface Asset {
   serialNumber: string;
   assetTag: string | null;
   referenceName: string | null;
+  description: string | null;
   vendorName: string | null;
   assetCondition: 'new' | 'used' | 'dead' | 'not_working' | null;
   model: string;
@@ -87,6 +88,7 @@ const EMPTY_ADD_FORM = {
   serialNumber: '',
   assetTag: '',
   referenceName: '',
+  description: '',
   vendorName: '',
   manufacturer: '',
   model: '',
@@ -110,6 +112,7 @@ const EMPTY_EDIT_FORM = {
   serialNumber: '',
   assetTag: '',
   referenceName: '',
+  description: '',
   vendorName: '',
   manufacturer: '',
   model: '',
@@ -363,6 +366,7 @@ export function InventoryPage() {
       };
       if (payload.assetTag.trim()) body.assetTag = payload.assetTag.trim();
       if (payload.referenceName.trim()) body.referenceName = payload.referenceName.trim();
+      if (payload.description.trim()) body.description = payload.description.trim();
       if (payload.vendorName.trim()) body.vendorName = payload.vendorName.trim();
       if (payload.currentLocationId) body.currentLocationId = payload.currentLocationId;
       if (payload.conditionGrade) body.conditionGrade = payload.conditionGrade;
@@ -401,6 +405,8 @@ export function InventoryPage() {
         serialNumber: payload.serialNumber.trim() || undefined,
         assetTag: payload.assetTag.trim() || undefined,
         referenceName: payload.referenceName.trim() || undefined,
+        // '' (not undefined) so an emptied description is cleared on the server.
+        description: payload.description.trim(),
         vendorName: payload.vendorName.trim() || undefined,
         model: payload.model.trim() || undefined,
         manufacturer: payload.manufacturer.trim() || undefined,
@@ -495,6 +501,7 @@ export function InventoryPage() {
       serialNumber: asset.serialNumber,
       assetTag: asset.assetTag ?? '',
       referenceName: asset.referenceName ?? '',
+      description: asset.description ?? '',
       vendorName: asset.vendorName ?? '',
       manufacturer: asset.manufacturer,
       model: asset.model,
@@ -673,6 +680,18 @@ export function InventoryPage() {
                   value={addForm.referenceName}
                   onChange={(e) => setAddForm((f) => ({ ...f, referenceName: e.target.value }))}
                   placeholder="Client's own reference"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Description <span className="text-gray-400">(optional)</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={addForm.description}
+                  onChange={(e) => setAddForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="e.g. 16GB RAM, 512GB SSD, minor scratch on lid"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                 />
               </div>
@@ -1081,6 +1100,7 @@ export function InventoryPage() {
                   <th className="text-left px-4 py-3 whitespace-nowrap">New/Used</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Category</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Model</th>
+                  <th className="text-left px-4 py-3 whitespace-nowrap">Description</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Status</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">Dispatch Date</th>
                   <th className="text-left px-4 py-3 whitespace-nowrap">AWB (Tracking No.)</th>
@@ -1258,6 +1278,14 @@ export function InventoryPage() {
                         {a.manufacturer} {a.model}
                       </td>
 
+                      {/* 6b. Description */}
+                      <td
+                        className="px-4 py-3 text-gray-600 text-xs max-w-[220px] truncate"
+                        title={a.description ?? undefined}
+                      >
+                        {a.description ?? '-'}
+                      </td>
+
                       {/* 7. Status — inline editable */}
                       <td
                         className="px-4 py-3 whitespace-nowrap"
@@ -1423,7 +1451,7 @@ export function InventoryPage() {
                 {(data?.data ?? []).length === 0 && (
                   <tr>
                     <td
-                      colSpan={canEdit ? 17 : 15}
+                      colSpan={canEdit ? 18 : 16}
                       className="px-5 py-12 text-center text-gray-400 text-sm"
                     >
                       <Package size={24} className="mx-auto mb-2 text-gray-300" />
@@ -1484,6 +1512,18 @@ export function InventoryPage() {
               className="space-y-4"
             >
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Description <span className="text-gray-400">(optional)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editForm.description}
+                    onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                    placeholder="e.g. 16GB RAM, 512GB SSD, minor scratch on lid"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Date added</label>
                   <input

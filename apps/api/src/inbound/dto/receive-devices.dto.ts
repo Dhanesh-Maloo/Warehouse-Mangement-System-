@@ -36,6 +36,10 @@ export class ReceivedDeviceDto {
   @IsString()
   vendorName?: string;
 
+  @IsOptional()
+  @IsString()
+  description?: string;
+
   @IsBoolean()
   requiresInspection!: boolean;
 

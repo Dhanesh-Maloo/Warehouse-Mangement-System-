@@ -8,6 +8,7 @@ export interface EditableDevice {
   model: string;
   manufacturer: string;
   referenceName: string | null;
+  description: string | null;
   vendorName: string | null;
   assetCondition: string | null;
 }
@@ -42,6 +43,7 @@ function DeviceRow({
     model: device.model,
     manufacturer: device.manufacturer,
     referenceName: device.referenceName ?? '',
+    description: device.description ?? '',
     vendorName: device.vendorName ?? '',
     assetCondition: device.assetCondition ?? '',
   });
@@ -66,6 +68,9 @@ function DeviceRow({
           {device.manufacturer} {device.model}
         </td>
         <td className="px-3 py-2">{device.referenceName ?? '-'}</td>
+        <td className="px-3 py-2 max-w-[200px] truncate" title={device.description ?? undefined}>
+          {device.description ?? '-'}
+        </td>
         <td className="px-3 py-2">{device.vendorName ?? '-'}</td>
         <td className="px-3 py-2 capitalize">{device.assetCondition?.replace('_', ' ') ?? '-'}</td>
         <td className="px-3 py-2 text-right">
@@ -108,6 +113,13 @@ function DeviceRow({
           className={INPUT}
           value={form.referenceName}
           onChange={(e) => setForm({ ...form, referenceName: e.target.value })}
+        />
+      </td>
+      <td className="px-3 py-2">
+        <input
+          className={INPUT}
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
         />
       </td>
       <td className="px-3 py-2">
@@ -221,6 +233,7 @@ export function EditGrnPanel({
               <th className="text-left px-3 py-2">Serial</th>
               <th className="text-left px-3 py-2">Device</th>
               <th className="text-left px-3 py-2">Reference</th>
+              <th className="text-left px-3 py-2">Description</th>
               <th className="text-left px-3 py-2">Vendor</th>
               <th className="text-left px-3 py-2">Condition</th>
               <th className="px-3 py-2" />

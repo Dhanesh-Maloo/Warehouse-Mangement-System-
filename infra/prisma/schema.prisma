@@ -313,6 +313,8 @@ model Asset {
   referenceName     String?       @map("reference_name")
   // Who this device was purchased from (e.g. iValue or another vendor).
   vendorName        String?       @map("vendor_name")
+  // Free-text description of the device (specs, notes about the unit).
+  description       String?
   model             String
   manufacturer      String
   category          AssetCategory

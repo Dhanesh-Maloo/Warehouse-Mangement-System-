@@ -60,6 +60,28 @@ describe('AssetsService', () => {
       });
     });
 
+    it('stores a trimmed description and clears it when sent empty', async () => {
+      const update = jest.fn().mockResolvedValue({});
+      const prisma = {
+        asset: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'a1', currentStatus: 'in_storage' }),
+          update,
+        },
+        $transaction: jest.fn((fn: (t: unknown) => unknown) => fn({ asset: { update } })),
+      };
+      const svc = new AssetsService(prisma as never, {} as never, {} as never);
+      await svc.updateStatus('a1', { description: '  16GB / 512GB  ' });
+      expect(update).toHaveBeenLastCalledWith({
+        where: { id: 'a1' },
+        data: { description: '16GB / 512GB' },
+      });
+      await svc.updateStatus('a1', { description: '' });
+      expect(update).toHaveBeenLastCalledWith({
+        where: { id: 'a1' },
+        data: { description: null },
+      });
+    });
+
     it('rejects a Date added in the future', async () => {
       const prisma = {
         asset: {

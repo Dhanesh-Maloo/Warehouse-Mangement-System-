@@ -34,6 +34,7 @@ interface DeviceRow {
   category: 'laptop' | 'monitor' | 'peripheral';
   assetTag: string;
   referenceName: string;
+  description: string;
   vendorName: string;
   requiresInspection: boolean;
   isNew: boolean;
@@ -168,6 +169,7 @@ export function ReceiveDevicesPage() {
         itemId: prefill?.itemId ?? '',
         assetTag: '',
         referenceName: '',
+        description: '',
         vendorName: '',
         requiresInspection: false,
         isNew: false,
@@ -208,6 +210,7 @@ export function ReceiveDevicesPage() {
             category,
             assetTag,
             referenceName,
+            description,
             vendorName,
             requiresInspection,
             isNew,
@@ -218,6 +221,7 @@ export function ReceiveDevicesPage() {
             category,
             assetTag: assetTag.trim() || undefined,
             referenceName: referenceName.trim() || undefined,
+            description: description.trim() || undefined,
             vendorName: requiresInspection ? undefined : vendorName.trim(),
             requiresInspection,
             isNew,
@@ -524,6 +528,18 @@ export function ReceiveDevicesPage() {
                         value={device.referenceName}
                         onChange={(e) => updateDevice(device.key, 'referenceName', e.target.value)}
                         placeholder="Client's own reference"
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
+                      />
+                    </div>
+                    <div className="col-span-full">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Description <span className="text-gray-400">(opt.)</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={device.description}
+                        onChange={(e) => updateDevice(device.key, 'description', e.target.value)}
+                        placeholder="e.g. 16GB RAM, 512GB SSD, minor scratch on lid"
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-[#E86F2C]"
                       />
                     </div>

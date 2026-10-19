@@ -39,6 +39,7 @@ interface AssetDetail {
   serialNumber: string;
   assetTag: string | null;
   referenceName: string | null;
+  description: string | null;
   vendorName: string | null;
   model: string;
   manufacturer: string;
@@ -128,6 +129,7 @@ export function AssetDetailPage() {
     serialNumber: '',
     assetTag: '',
     referenceName: '',
+    description: '',
     vendorName: '',
     model: '',
     manufacturer: '',
@@ -153,6 +155,7 @@ export function AssetDetailPage() {
       serialNumber: asset.serialNumber,
       assetTag: asset.assetTag ?? '',
       referenceName: asset.referenceName ?? '',
+      description: asset.description ?? '',
       vendorName: asset.vendorName ?? '',
       model: asset.model,
       manufacturer: asset.manufacturer,
@@ -182,6 +185,8 @@ export function AssetDetailPage() {
         serialNumber: formData.serialNumber || undefined,
         assetTag: formData.assetTag || undefined,
         referenceName: formData.referenceName || undefined,
+        // '' (not undefined) so an emptied description is cleared on the server.
+        description: formData.description.trim(),
         vendorName: formData.vendorName || undefined,
         model: formData.model || undefined,
         manufacturer: formData.manufacturer || undefined,
@@ -328,6 +333,9 @@ export function AssetDetailPage() {
               </>
             )}
           </p>
+          {asset.description && (
+            <p className="text-sm text-gray-600 mt-1 whitespace-pre-line">{asset.description}</p>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
@@ -629,6 +637,18 @@ export function AssetDetailPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Description <span className="text-gray-400">(optional)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editForm.description}
+                    onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                    placeholder="e.g. 16GB RAM, 512GB SSD, minor scratch on lid"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Reference No. <span className="text-gray-400">(optional)</span>

@@ -53,6 +53,7 @@ export class AssetsService {
               { serialNumber: { contains: filter.search, mode: 'insensitive' as const } },
               { assetTag: { contains: filter.search, mode: 'insensitive' as const } },
               { referenceName: { contains: filter.search, mode: 'insensitive' as const } },
+              { description: { contains: filter.search, mode: 'insensitive' as const } },
               { vendorName: { contains: filter.search, mode: 'insensitive' as const } },
               { model: { contains: filter.search, mode: 'insensitive' as const } },
             ],
@@ -171,6 +172,7 @@ export class AssetsService {
       serialNumber?: string;
       assetTag?: string;
       referenceName?: string;
+      description?: string;
       vendorName?: string;
       model?: string;
       manufacturer?: string;
@@ -188,7 +190,7 @@ export class AssetsService {
     },
   ): Promise<Asset> {
     const existing = await this.findOne(id);
-    const { currentLocationId, category, deliveredAt, createdAt, ...rest } = data;
+    const { currentLocationId, category, deliveredAt, createdAt, description, ...rest } = data;
     let dateAdded: Date | undefined;
     if (createdAt) {
       // Date-only input keeps the original time of day so same-day ordering survives.
@@ -209,6 +211,7 @@ export class AssetsService {
       ...(category ? { category: category as AssetCategory } : {}),
       ...(deliveredAt ? { deliveredAt: new Date(deliveredAt) } : {}),
       ...(dateAdded ? { createdAt: dateAdded } : {}),
+      ...(description !== undefined ? { description: description.trim() || null } : {}),
       ...(currentLocationId !== undefined
         ? {
             currentLocation: currentLocationId
@@ -239,6 +242,7 @@ export class AssetsService {
     serialNumber: string;
     assetTag?: string;
     referenceName?: string;
+    description?: string;
     vendorName?: string;
     model: string;
     manufacturer: string;

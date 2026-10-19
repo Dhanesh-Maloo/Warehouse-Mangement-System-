@@ -23,6 +23,10 @@ export class CreateAssetDto {
 
   @IsOptional()
   @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
   vendorName?: string;
 
   @IsString()

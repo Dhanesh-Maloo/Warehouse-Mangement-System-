@@ -35,6 +35,11 @@ export class UpdateAssetStatusDto {
   @IsString()
   referenceName?: string;
 
+  // Empty string clears the description.
+  @IsOptional()
+  @IsString()
+  description?: string;
+
   @IsOptional()
   @IsString()
   vendorName?: string;
