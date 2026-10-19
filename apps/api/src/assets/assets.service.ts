@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import { LedgerService } from '../ledger/ledger.service';
@@ -179,14 +184,31 @@ export class AssetsService {
       deliveredAt?: string;
       disposalType?: string;
       hasCertification?: boolean;
+      createdAt?: string;
     },
   ): Promise<Asset> {
     const existing = await this.findOne(id);
-    const { currentLocationId, category, deliveredAt, ...rest } = data;
+    const { currentLocationId, category, deliveredAt, createdAt, ...rest } = data;
+    let dateAdded: Date | undefined;
+    if (createdAt) {
+      // Date-only input keeps the original time of day so same-day ordering survives.
+      dateAdded = /^\d{4}-\d{2}-\d{2}$/.test(createdAt)
+        ? new Date(
+            `${createdAt}T${existing.createdAt.toLocaleTimeString('en-GB', {
+              timeZone: 'Asia/Kolkata',
+              hour12: false,
+            })}+05:30`,
+          )
+        : new Date(createdAt);
+      if (dateAdded.getTime() > Date.now() + 60_000) {
+        throw new BadRequestException('Date added cannot be in the future');
+      }
+    }
     const updateData: Prisma.AssetUpdateInput = {
       ...rest,
       ...(category ? { category: category as AssetCategory } : {}),
       ...(deliveredAt ? { deliveredAt: new Date(deliveredAt) } : {}),
+      ...(dateAdded ? { createdAt: dateAdded } : {}),
       ...(currentLocationId !== undefined
         ? {
             currentLocation: currentLocationId

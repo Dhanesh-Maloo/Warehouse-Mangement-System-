@@ -76,6 +76,10 @@ function fromItem(
   };
 }
 
+// Warehouse days are IST days; en-CA formats as YYYY-MM-DD, which date inputs expect.
+const todayInIst = (): string =>
+  new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
 export function ReceiveDevicesPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -84,6 +88,7 @@ export function ReceiveDevicesPage() {
   const [scanValue, setScanValue] = useState('');
   const [locationId, setLocationId] = useState('');
   const [courierRef, setCourierRef] = useState('');
+  const [receivedDate, setReceivedDate] = useState(todayInIst);
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [submitError, setSubmitError] = useState('');
   const scanRef = useRef<HTMLInputElement>(null);
@@ -194,6 +199,7 @@ export function ReceiveDevicesPage() {
         expectedDeliveryId: id,
         receivingLocationId: locationId,
         courierRef: courierRef.trim() || undefined,
+        receivedAt: receivedDate,
         devices: devices.map(
           ({
             serialNumber,
@@ -243,6 +249,10 @@ export function ReceiveDevicesPage() {
       setSubmitError('Select a receiving location.');
       return;
     }
+    if (!receivedDate) {
+      setSubmitError('Enter the received date.');
+      return;
+    }
     const invalid = devices.find((d) => !d.model || !d.manufacturer);
     if (invalid) {
       setSubmitError(`Device ${invalid.serialNumber} is missing model or manufacturer.`);
@@ -283,7 +293,20 @@ export function ReceiveDevicesPage() {
         {/* Location + Courier ref */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Receipt details</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Received date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={receivedDate}
+                max={todayInIst()}
+                onChange={(e) => setReceivedDate(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Receiving location <span className="text-red-500">*</span>

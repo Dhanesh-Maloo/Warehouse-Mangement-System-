@@ -143,6 +143,7 @@ export function AssetDetailPage() {
     deliveredAt: '',
     disposalType: '',
     hasCertification: false,
+    createdAt: '',
   });
   const [editError, setEditError] = useState('');
 
@@ -167,6 +168,9 @@ export function AssetDetailPage() {
       deliveredAt: asset.deliveredAt ? new Date(asset.deliveredAt).toISOString().split('T')[0] : '',
       disposalType: asset.disposalType ?? '',
       hasCertification: asset.hasCertification ?? false,
+      createdAt: new Date(asset.createdAt).toLocaleDateString('en-CA', {
+        timeZone: 'Asia/Kolkata',
+      }),
     });
     setEditError('');
     setShowEditModal(true);
@@ -191,6 +195,7 @@ export function AssetDetailPage() {
         deliveredAt: formData.deliveredAt || undefined,
         disposalType: formData.disposalType || undefined,
         hasCertification: formData.hasCertification,
+        createdAt: formData.createdAt || undefined,
       };
       if (formData.repairHandling) {
         body.repairServiceName = formData.repairServiceName || undefined;
@@ -589,6 +594,16 @@ export function AssetDetailPage() {
               className="space-y-3"
             >
               <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Date added</label>
+                  <input
+                    type="date"
+                    value={editForm.createdAt}
+                    max={new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })}
+                    onChange={(e) => setEditForm((f) => ({ ...f, createdAt: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Serial number

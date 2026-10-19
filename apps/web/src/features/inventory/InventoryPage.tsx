@@ -126,6 +126,7 @@ const EMPTY_EDIT_FORM = {
   deliveredAt: '',
   disposalType: '',
   hasCertification: false,
+  createdAt: '',
 };
 
 // ─── Inline dropdown cell ─────────────────────────────────────────────────────
@@ -414,6 +415,7 @@ export function InventoryPage() {
         deliveredAt: payload.deliveredAt || undefined,
         disposalType: payload.disposalType || undefined,
         hasCertification: payload.hasCertification,
+        createdAt: payload.createdAt || undefined,
       };
       if (payload.repairHandling) {
         body.repairServiceName = payload.repairServiceName.trim() || undefined;
@@ -509,6 +511,9 @@ export function InventoryPage() {
       deliveredAt: asset.deliveredAt ? new Date(asset.deliveredAt).toISOString().split('T')[0] : '',
       disposalType: asset.disposalType ?? '',
       hasCertification: asset.hasCertification ?? false,
+      createdAt: new Date(asset.createdAt).toLocaleDateString('en-CA', {
+        timeZone: 'Asia/Kolkata',
+      }),
     });
     setEditFormError('');
     setEditingAsset(asset);
@@ -1479,6 +1484,16 @@ export function InventoryPage() {
               className="space-y-4"
             >
               <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Date added</label>
+                  <input
+                    type="date"
+                    value={editForm.createdAt}
+                    max={new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })}
+                    onChange={(e) => setEditForm((f) => ({ ...f, createdAt: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Asset tag</label>
                   <input

@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsBoolean,
   IsOptional,
+  IsDateString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AssetCategory } from '@prisma/client';
@@ -64,4 +65,10 @@ export class ReceiveDevicesDto {
   @IsOptional()
   @IsBoolean()
   forceOverride?: boolean;
+
+  // Date the devices were physically received. A date-only value (YYYY-MM-DD)
+  // means that day in IST. Defaults to now; becomes the assets' "Date added".
+  @IsOptional()
+  @IsDateString()
+  receivedAt?: string;
 }

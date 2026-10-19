@@ -87,4 +87,9 @@ export class UpdateAssetStatusDto {
   @IsOptional()
   @IsBoolean()
   hasCertification?: boolean;
+
+  // "Date added" in inventory. A date-only value (YYYY-MM-DD) means that day in IST.
+  @IsOptional()
+  @IsDateString()
+  createdAt?: string;
 }

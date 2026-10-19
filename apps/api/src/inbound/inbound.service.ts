@@ -171,7 +171,12 @@ export class InboundService {
       throw new BadRequestException(`Device ${missingVendor.serialNumber} is missing vendor name`);
     }
 
-    const occurredAt = new Date();
+    const now = new Date();
+    // Billing and "Date added" follow the date the devices were physically received.
+    const occurredAt = dto.receivedAt ? this.resolveReceivedAt(dto.receivedAt, now) : now;
+    if (occurredAt.getTime() > now.getTime() + 60_000) {
+      throw new BadRequestException('Received date cannot be in the future');
+    }
     const [ingestLaptopRate, ingestPeripheralRate, inspectRate] = await Promise.all([
       this.rateCard.findEffectiveAt('INGEST_LAPTOP', occurredAt),
       this.rateCard.findEffectiveAt('INGEST_PERIPHERAL', occurredAt),
@@ -221,6 +226,7 @@ export class InboundService {
             clientId: delivery.clientId,
             currentLocationId: dto.receivingLocationId,
             currentStatus: device.requiresInspection ? 'in_inspection' : 'in_storage',
+            createdAt: occurredAt,
           },
         });
         assetEntries.push({ assetId: asset.id, category: device.category });
@@ -236,13 +242,14 @@ export class InboundService {
         );
 
         if (device.requiresInspection) {
-          const slaTargetAt = addBusinessMinutes(occurredAt, 1440, this.getHolidaySet());
+          // The SLA clock starts when the inspection really begins, not on a backdated receipt date.
+          const slaTargetAt = addBusinessMinutes(now, 1440, this.getHolidaySet());
           await tx.inspection.create({
             data: {
               assetId: asset.id,
               type: 'inbound',
               status: 'in_progress',
-              startedAt: occurredAt,
+              startedAt: now,
               startedByUserId: receivedByUserId,
               slaTargetAt,
             },
@@ -252,15 +259,14 @@ export class InboundService {
       }
 
       // Generate sequential GRN number within the current month atomically
-      const monthPrefix = `GRN-${occurredAt.getFullYear()}${String(occurredAt.getMonth() + 1).padStart(2, '0')}`;
+      const monthPrefix = `GRN-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
       // pg_advisory_xact_lock takes an integer lock for the duration of the transaction,
       // serializing concurrent GRN inserts for the same month.
-      const lockKey = occurredAt.getFullYear() * 100 + (occurredAt.getMonth() + 1);
+      const lockKey = now.getFullYear() * 100 + (now.getMonth() + 1);
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockKey})`;
+      // Count by number prefix, not receivedAt: a backdated receipt must still take the next sequence number.
       const countResult = await tx.goodsReceivedNote.count({
-        where: {
-          receivedAt: { gte: new Date(occurredAt.getFullYear(), occurredAt.getMonth(), 1) },
-        },
+        where: { grnNumber: { startsWith: `${monthPrefix}-` } },
       });
       const grnNumber = `${monthPrefix}-${String(countResult + 1).padStart(4, '0')}`;
 

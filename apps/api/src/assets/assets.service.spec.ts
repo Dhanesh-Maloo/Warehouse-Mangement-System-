@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { AssetsService } from './assets.service';
 
 describe('AssetsService', () => {
@@ -32,6 +33,44 @@ describe('AssetsService', () => {
         expect.objectContaining({
           where: expect.not.objectContaining({ assetCondition: expect.anything() }),
         }),
+      );
+    });
+  });
+
+  describe('updateStatus', () => {
+    it('sets Date added from a date-only value, keeping the existing time of day in IST', async () => {
+      const update = jest.fn().mockResolvedValue({});
+      const prisma = {
+        asset: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'a1',
+            clientId: 'c1',
+            currentStatus: 'in_storage',
+            createdAt: new Date('2026-10-19T05:30:00Z'),
+          }),
+          update,
+        },
+        $transaction: jest.fn((fn: (t: unknown) => unknown) => fn({ asset: { update } })),
+      };
+      const svc = new AssetsService(prisma as never, {} as never, {} as never);
+      await svc.updateStatus('a1', { createdAt: '2026-10-01' });
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: { createdAt: new Date('2026-10-01T11:00:00+05:30') },
+      });
+    });
+
+    it('rejects a Date added in the future', async () => {
+      const prisma = {
+        asset: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ id: 'a1', createdAt: new Date('2026-10-19T05:30:00Z') }),
+        },
+      };
+      const svc = new AssetsService(prisma as never, {} as never, {} as never);
+      await expect(svc.updateStatus('a1', { createdAt: '2099-01-01' })).rejects.toThrow(
+        BadRequestException,
       );
     });
   });

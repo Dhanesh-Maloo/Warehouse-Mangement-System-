@@ -51,6 +51,32 @@ describe('InboundService edits', () => {
     );
   });
 
+  describe('receiveDevices', () => {
+    it('rejects a received date in the future', async () => {
+      prisma.expectedDelivery.findUnique.mockResolvedValue({
+        id: 'd1',
+        status: 'pending',
+        clientId: 'c1',
+        items: [],
+        grns: [],
+      });
+      Object.assign(prisma, {
+        location: { findUnique: jest.fn().mockResolvedValue({ id: 'l1' }) },
+      });
+      await expect(
+        service.receiveDevices(
+          {
+            expectedDeliveryId: 'd1',
+            receivingLocationId: 'l1',
+            receivedAt: '2099-01-01',
+            devices: [],
+          },
+          'u1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe('updateGrn', () => {
     const grn = {
       id: 'grn-1',
