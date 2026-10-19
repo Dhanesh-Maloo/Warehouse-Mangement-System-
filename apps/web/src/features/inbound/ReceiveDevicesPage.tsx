@@ -92,6 +92,7 @@ export function ReceiveDevicesPage() {
   const [receivedDate, setReceivedDate] = useState(todayInIst);
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [submitError, setSubmitError] = useState('');
+  const [scanNotice, setScanNotice] = useState('');
   const scanRef = useRef<HTMLInputElement>(null);
 
   const { data: delivery } = useQuery({
@@ -137,31 +138,37 @@ export function ReceiveDevicesPage() {
   const remainingFor = (item: DeliveryItem): number =>
     item.quantity - (alreadyReceived.get(item.id) ?? 0) - scannedFor(item.id);
 
-  function handleScan(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    const serial = scanValue.trim().toUpperCase();
-    if (!serial) return;
+  // Adds one device per serial, each filled from the first expected line that
+  // still has devices outstanding, so scanning 10 ThinkPads then 5 monitors (or
+  // pasting 10 serials at once) needs no manual typing. Returns how many were
+  // skipped as duplicates.
+  function addSerials(rawSerials: string[]): number {
+    const seen = new Set(devices.map((d) => d.serialNumber));
+    const remaining = new Map<string, number>(
+      (delivery?.items ?? []).map((i) => [i.id, remainingFor(i)]),
+    );
+    const stamp = Date.now();
+    const added: DeviceRow[] = [];
+    let duplicates = 0;
 
-    if (devices.some((d) => d.serialNumber === serial)) {
-      // Flash warning — don't add duplicate
-      setScanValue('');
-      refocusScan();
-      return;
-    }
+    for (const raw of rawSerials) {
+      const serial = raw.trim().toUpperCase();
+      if (!serial) continue;
+      if (seen.has(serial)) {
+        duplicates += 1;
+        continue;
+      }
+      seen.add(serial);
 
-    // Fill from the first expected line that still has devices outstanding, so
-    // scanning 10 ThinkPads then 5 monitors needs no manual typing.
-    const target =
-      delivery &&
-      (delivery.items.find((i) => remainingFor(i) > 0) ??
-        (delivery.items.length === 1 ? delivery.items[0] : undefined));
-    const prefill = target ? fromItem(target) : undefined;
+      const target =
+        delivery &&
+        (delivery.items.find((i) => (remaining.get(i.id) ?? 0) > 0) ??
+          (delivery.items.length === 1 ? delivery.items[0] : undefined));
+      if (target) remaining.set(target.id, (remaining.get(target.id) ?? 0) - 1);
+      const prefill = target ? fromItem(target) : undefined;
 
-    setDevices((prev) => [
-      ...prev,
-      {
-        key: `${serial}-${Date.now()}`,
+      added.push({
+        key: `${serial}-${stamp}-${added.length}`,
         serialNumber: serial,
         model: prefill?.model ?? '',
         manufacturer: prefill?.manufacturer ?? '',
@@ -173,8 +180,39 @@ export function ReceiveDevicesPage() {
         vendorName: '',
         requiresInspection: false,
         isNew: false,
-      },
-    ]);
+      });
+    }
+
+    if (added.length > 0) setDevices((prev) => [...prev, ...added]);
+    return duplicates;
+  }
+
+  function handleScan(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (!scanValue.trim()) return;
+    setScanNotice('');
+    addSerials([scanValue]);
+    setScanValue('');
+    refocusScan();
+  }
+
+  // Pasting a list (e.g. a column copied from Excel) adds every serial at once.
+  // A single-line paste falls through to the normal input behaviour.
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const serials = e.clipboardData
+      .getData('text')
+      .split(/[\s,;]+/)
+      .filter(Boolean);
+    if (serials.length < 2) return;
+    e.preventDefault();
+    const duplicates = addSerials(serials);
+    const added = new Set(serials.map((x) => x.toUpperCase())).size - duplicates;
+    setScanNotice(
+      `Added ${added} device${added !== 1 ? 's' : ''}` +
+        (duplicates > 0 ? `, skipped ${duplicates} duplicate${duplicates !== 1 ? 's' : ''}` : '') +
+        '.',
+    );
     setScanValue('');
     refocusScan();
   }
@@ -397,12 +435,15 @@ export function ReceiveDevicesPage() {
             value={scanValue}
             onChange={(e) => setScanValue(e.target.value)}
             onKeyDown={handleScan}
+            onPaste={handlePaste}
             placeholder="Scan barcode or type serial and press Enter…"
             className="w-full px-4 py-3 bg-white/10 text-white placeholder-white/40 border border-white/20 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#E86F2C] focus:border-transparent"
           />
           <p className="mt-2 text-xs text-[#8AA6BF]">
-            Point a barcode scanner here - it types the serial and sends Enter automatically.
+            Point a barcode scanner here - it types the serial and sends Enter automatically. Or
+            paste a list of serials (one per line) to add them all at once.
           </p>
+          {scanNotice && <p className="mt-1 text-xs font-medium text-emerald-300">{scanNotice}</p>}
         </div>
 
         {/* Device list */}
