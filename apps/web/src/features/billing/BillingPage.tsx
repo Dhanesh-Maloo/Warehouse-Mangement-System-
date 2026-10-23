@@ -192,6 +192,14 @@ function formatINR(p: string | bigint | null | undefined): string {
   );
 }
 
+// Storage accrual rows (commitment, over-limit devices and the reversals each daily run
+// posts) are account-level charges attached to an arbitrary device to satisfy the ledger
+// FK. They are summarised in "Current Storage Summary", so listing them per-device here
+// would be misleading and noisy.
+function isAccrualEntry(e: LedgerEntry): boolean {
+  return e.referenceType === 'storage_accrual' || e.referenceType === 'storage_accrual_reversal';
+}
+
 function periodLabel(start: string): string {
   // @db.Date fields arrive as UTC midnight (e.g. "2026-06-01T00:00:00.000Z").
   // Parsing via new Date() shifts it to May 31 IST. Extract the date string directly instead.
@@ -320,7 +328,7 @@ export function BillingPage() {
   });
 
   const {
-    data: ledgerEntries = [],
+    data: allLedgerEntries = [],
     isLoading: ledgerLoading,
     refetch: refetchLedger,
   } = useQuery({
@@ -337,6 +345,8 @@ export function BillingPage() {
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
+
+  const ledgerEntries = allLedgerEntries.filter((e) => !isAccrualEntry(e));
 
   // Aggregate by category for the summary chips
   const categoryTotals = ledgerEntries.reduce<Record<string, bigint>>((acc, e) => {
