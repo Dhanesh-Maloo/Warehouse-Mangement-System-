@@ -15,6 +15,7 @@ import {
   Search,
   X,
   Warehouse,
+  AlertTriangle,
 } from 'lucide-react';
 
 // ─── Types (matching actual API response) ────────────────────────────────────
@@ -207,22 +208,43 @@ function StatCard({
   count,
   projected,
   rateLabel,
+  limit,
 }: {
   icon: React.ReactNode;
   label: string;
   count: number;
   projected: string;
   rateLabel: string;
+  /** Committed quantity covered by the flat fee; anything above is billed per device. */
+  limit?: number;
 }) {
+  const exceededBy = limit !== undefined && count > limit ? count - limit : 0;
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3">
+    <div
+      className={`rounded-xl border shadow-sm p-5 flex flex-col gap-3 ${
+        exceededBy > 0 ? 'bg-red-50 border-red-300 ring-1 ring-red-200' : 'bg-white border-gray-100'
+      }`}
+    >
       <div className="flex items-center gap-2 text-gray-500">
         {icon}
         <span className="text-sm font-medium">{label}</span>
       </div>
+      {exceededBy > 0 && (
+        <div className="flex items-center gap-1.5 self-start rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-semibold text-white">
+          <AlertTriangle size={12} />
+          Exceeded {limit} limit by {exceededBy}
+        </div>
+      )}
       <div className="flex items-end justify-between gap-2">
         <div>
-          <p className="text-3xl font-bold text-gray-900 tabular-nums">{count}</p>
+          <p
+            className={`text-3xl font-bold tabular-nums ${exceededBy > 0 ? 'text-red-700' : 'text-gray-900'}`}
+          >
+            {count}
+            {limit !== undefined && (
+              <span className="text-base font-medium text-gray-400"> / {limit}</span>
+            )}
+          </p>
           <p className="text-xs text-gray-400 mt-0.5">{rateLabel}</p>
         </div>
         <div className="text-right">
@@ -500,7 +522,14 @@ export function BillingPage() {
         ) : (
           <>
             {summary.commitment && (
-              <div className="bg-[#E86F2C]/5 border border-[#E86F2C]/20 rounded-xl px-5 py-3 text-sm text-gray-700">
+              <div
+                className={`rounded-xl border px-5 py-3 text-sm text-gray-700 ${
+                  summary.laptopCount > summary.commitment.laptopCount ||
+                  summary.peripheralCount > summary.commitment.peripheralCount
+                    ? 'bg-red-50 border-red-300'
+                    : 'bg-[#E86F2C]/5 border-[#E86F2C]/20'
+                }`}
+              >
                 <span className="font-semibold text-[#E86F2C]">
                   {formatINR(summary.commitment.amountPaise)}/month minimum commitment
                 </span>{' '}
@@ -545,6 +574,7 @@ export function BillingPage() {
                     : 'Laptops in storage'
                 }
                 count={summary.laptopCount}
+                limit={summary.commitment?.laptopCount}
                 projected={summary.laptopProjectedPaise}
                 rateLabel={`₹${(Number(paise(summary.rates?.laptopPerDevicePaise)) / 100).toFixed(0)}/unit/month`}
               />
@@ -556,6 +586,7 @@ export function BillingPage() {
                     : 'Peripherals in storage'
                 }
                 count={summary.peripheralCount}
+                limit={summary.commitment?.peripheralCount}
                 projected={summary.peripheralProjectedPaise}
                 rateLabel={`₹${(Number(paise(summary.rates?.peripheralPerDevicePaise)) / 100).toFixed(0)}/unit/month`}
               />
