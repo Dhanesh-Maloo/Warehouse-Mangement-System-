@@ -406,7 +406,7 @@ export function BillingPage() {
     queryKey: ['inbound-billing-pending', effectiveClientId],
     queryFn: () =>
       api.get<PendingInboundBilling>(`/inbound-billing/pending?clientId=${effectiveClientId}`),
-    enabled: isAdminOrManager && !!effectiveClientId,
+    enabled: (isAdminOrManager || isClientAdmin) && !!effectiveClientId,
     staleTime: 0,
   });
 
@@ -711,7 +711,7 @@ export function BillingPage() {
       </section>
 
       {/* Section 1b — One-time inbound charges not yet billed */}
-      {isAdminOrManager && effectiveClientId && (
+      {(isAdminOrManager || isClientAdmin) && effectiveClientId && (
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Receipt size={16} className="text-gray-500" />
@@ -795,7 +795,7 @@ export function BillingPage() {
                     Billed for {inboundMonth ? monthLabel(inboundMonth) : 'selected month'}
                   </label>
                 </div>
-              ) : (
+              ) : isClientAdmin ? null : (
                 <p className="text-sm text-gray-500">Only an admin can mark this as billed.</p>
               )}
 

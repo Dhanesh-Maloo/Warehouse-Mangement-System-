@@ -23,13 +23,18 @@ import type { JwtPayload } from '../common/types/jwt-payload.type';
 export class InboundBillingController {
   constructor(private readonly service: InboundBillingService) {}
 
-  /** GET /inbound-billing/pending?clientId= — devices with no inbound charge yet, plus history. */
+  /**
+   * GET /inbound-billing/pending?clientId= — devices with no inbound charge yet, plus history.
+   * client_admin is read-only and forced to their own clientId.
+   */
   @Get('pending')
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'client_admin')
   getPending(
     @Query('clientId', ParseUUIDPipe) clientId: string,
+    @CurrentUser() user: JwtPayload,
   ): ReturnType<InboundBillingService['getPending']> {
-    return this.service.getPending(clientId);
+    const effectiveClientId = user.role === 'client_admin' ? (user.clientId ?? '') : clientId;
+    return this.service.getPending(effectiveClientId);
   }
 
   /** POST /inbound-billing/mark-billed — admin only; ticks the pending devices as billed. */
