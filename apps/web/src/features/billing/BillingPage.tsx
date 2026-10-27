@@ -16,6 +16,7 @@ import {
   X,
   Warehouse,
   AlertTriangle,
+  Undo2,
 } from 'lucide-react';
 
 // ─── Types (matching actual API response) ────────────────────────────────────
@@ -76,6 +77,26 @@ interface AccrualRunResult {
     skipped: boolean;
     skipReason?: string;
   }[];
+}
+
+interface InboundBillingRecord {
+  id: string;
+  billingMonth: string;
+  laptopCount: number;
+  peripheralCount: number;
+  totalAmountPaise: string;
+  billedAt: string;
+}
+
+interface PendingInboundBilling {
+  clientId: string;
+  laptopCount: number;
+  peripheralCount: number;
+  laptopAmountPaise: string;
+  peripheralAmountPaise: string;
+  totalAmountPaise: string;
+  rates: { laptopPaise: string; peripheralPaise: string };
+  history: InboundBillingRecord[];
 }
 
 interface LedgerEntry {
@@ -198,6 +219,11 @@ function formatINR(p: string | bigint | null | undefined): string {
 // would be misleading and noisy.
 function isAccrualEntry(e: LedgerEntry): boolean {
   return e.referenceType === 'storage_accrual' || e.referenceType === 'storage_accrual_reversal';
+}
+
+function monthLabel(ym: string): string {
+  const [year, month] = ym.split('-').map(Number);
+  return new Date(year, month - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 }
 
 function periodLabel(start: string): string {
@@ -366,6 +392,44 @@ export function BillingPage() {
       void qc.invalidateQueries({ queryKey: ['billing-ledger'] });
     },
     onError: (e: Error) => setAccrualError(e.message),
+  });
+
+  // ── One-time inbound fee (₹48 laptop / ₹14 peripheral) for devices added outside
+  // the inbound flow. Ticking "billed" stamps those devices so later months only
+  // charge devices added after.
+  const [inboundMonth, setInboundMonth] = useState(
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+  );
+  const [inboundError, setInboundError] = useState('');
+
+  const { data: inboundPending, isLoading: inboundLoading } = useQuery({
+    queryKey: ['inbound-billing-pending', effectiveClientId],
+    queryFn: () =>
+      api.get<PendingInboundBilling>(`/inbound-billing/pending?clientId=${effectiveClientId}`),
+    enabled: isAdminOrManager && !!effectiveClientId,
+    staleTime: 0,
+  });
+
+  const markInboundBilledMutation = useMutation({
+    mutationFn: () =>
+      api.post<InboundBillingRecord>('/inbound-billing/mark-billed', {
+        clientId: effectiveClientId,
+        billingMonth: inboundMonth,
+      }),
+    onSuccess: () => {
+      setInboundError('');
+      void qc.invalidateQueries({ queryKey: ['inbound-billing-pending'] });
+    },
+    onError: (e: Error) => setInboundError(e.message),
+  });
+
+  const undoInboundBilledMutation = useMutation({
+    mutationFn: (id: string) => api.del<undefined>(`/inbound-billing/${id}`),
+    onSuccess: () => {
+      setInboundError('');
+      void qc.invalidateQueries({ queryKey: ['inbound-billing-pending'] });
+    },
+    onError: (e: Error) => setInboundError(e.message),
   });
 
   // ── Asset billing lookup: find one asset and see everything billed
@@ -645,6 +709,156 @@ export function BillingPage() {
           </>
         )}
       </section>
+
+      {/* Section 1b — One-time inbound charges not yet billed */}
+      {isAdminOrManager && effectiveClientId && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Receipt size={16} className="text-gray-500" />
+            <h2 className="text-base font-semibold text-gray-700">
+              Inbound Charges to Bill (one-time)
+            </h2>
+          </div>
+          <p className="text-sm text-gray-500 -mt-2">
+            Devices added outside the inbound flow have no inbound charge in the ledger. This is
+            what still needs to be billed. Once marked billed, those devices are never charged again
+            — only devices added later appear here.
+          </p>
+
+          {inboundLoading || !inboundPending ? (
+            <div className="text-sm text-gray-400 py-2">Loading inbound charges…</div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-gray-500 text-xs">
+                    <HardDrive size={14} /> Laptops / monitors
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
+                    {inboundPending.laptopCount}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    × {formatINR(inboundPending.rates.laptopPaise)} ={' '}
+                    {formatINR(inboundPending.laptopAmountPaise)}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-gray-500 text-xs">
+                    <Package size={14} /> Peripherals
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
+                    {inboundPending.peripheralCount}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    × {formatINR(inboundPending.rates.peripheralPaise)} ={' '}
+                    {formatINR(inboundPending.peripheralAmountPaise)}
+                  </p>
+                </div>
+                <div className="bg-[#E86F2C]/5 border border-[#E86F2C]/20 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-gray-500 text-xs">
+                    <TrendingUp size={14} /> Amount to bill
+                  </div>
+                  <p className="text-2xl font-bold text-[#E86F2C] mt-1 tabular-nums">
+                    {formatINR(inboundPending.totalAmountPaise)}
+                  </p>
+                </div>
+              </div>
+
+              {inboundPending.laptopCount + inboundPending.peripheralCount === 0 ? (
+                <div className="flex items-center gap-2 text-sm text-emerald-700">
+                  <CheckCircle size={16} /> Nothing pending — all devices have been billed.
+                </div>
+              ) : isAdmin ? (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <input
+                    type="month"
+                    value={inboundMonth}
+                    onChange={(e) => setInboundMonth(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={false}
+                      disabled={markInboundBilledMutation.isPending || !inboundMonth}
+                      onChange={() => {
+                        if (
+                          window.confirm(
+                            `Mark ${formatINR(inboundPending.totalAmountPaise)} as billed for ${monthLabel(inboundMonth)}? These devices will not be charged again.`,
+                          )
+                        ) {
+                          markInboundBilledMutation.mutate();
+                        }
+                      }}
+                      className="h-4 w-4 accent-[#E86F2C]"
+                    />
+                    Billed for {inboundMonth ? monthLabel(inboundMonth) : 'selected month'}
+                  </label>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Only an admin can mark this as billed.</p>
+              )}
+
+              {inboundError && <p className="text-sm text-red-600">{inboundError}</p>}
+
+              {inboundPending.history.length > 0 && (
+                <div className="border border-gray-100 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
+                        <th className="text-left px-4 py-2.5">Billed</th>
+                        <th className="text-left px-4 py-2.5">Month</th>
+                        <th className="text-right px-4 py-2.5">Laptops</th>
+                        <th className="text-right px-4 py-2.5">Peripherals</th>
+                        <th className="text-right px-4 py-2.5">Amount</th>
+                        {isAdmin && <th className="px-4 py-2.5" />}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {inboundPending.history.map((h) => (
+                        <tr key={h.id} className="border-b border-gray-50">
+                          <td className="px-4 py-2.5 text-emerald-600">
+                            <CheckCircle size={15} />
+                          </td>
+                          <td className="px-4 py-2.5 font-medium text-gray-900">
+                            {monthLabel(h.billingMonth)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">{h.laptopCount}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">
+                            {h.peripheralCount}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
+                            {formatINR(h.totalAmountPaise)}
+                          </td>
+                          {isAdmin && (
+                            <td className="px-4 py-2.5 text-right">
+                              <button
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      `Undo billing for ${monthLabel(h.billingMonth)}? Those devices will show as pending again.`,
+                                    )
+                                  ) {
+                                    undoInboundBilledMutation.mutate(h.id);
+                                  }
+                                }}
+                                disabled={undoInboundBilledMutation.isPending}
+                                className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-red-600"
+                              >
+                                <Undo2 size={13} /> Undo
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Section 2 — Accrual Run History */}
       {isAdminOrManager && (

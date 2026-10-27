@@ -222,6 +222,7 @@ model Client {
   assets             Asset[]
   expectedDeliveries ExpectedDelivery[]
   ledgerEntries      EventLedger[]
+  inboundBillings    InboundBilling[]
   endUsers           EndUser[]
   deploymentOrders   DeploymentOrder[]
   retrievalRequests  RetrievalRequest[]
@@ -335,8 +336,12 @@ model Asset {
   deliveredAt       DateTime?     @map("delivered_at") @db.Timestamptz
   disposalType      String?       @map("disposal_type")
   hasCertification  Boolean?      @map("has_certification")
+  // Set when the one-time inbound (INGEST) fee for a device that never went
+  // through the inbound flow was marked billed. Null = not yet billed this way.
+  inboundBillingId  String?       @map("inbound_billing_id")
 
   client          Client        @relation(fields: [clientId], references: [id])
+  inboundBilling  InboundBilling? @relation(fields: [inboundBillingId], references: [id])
   currentLocation Location?     @relation(fields: [currentLocationId], references: [id])
   grnAssets       GrnAsset[]
   inspections     Inspection[]
@@ -779,6 +784,30 @@ model StorageAccrualRun {
   client Client @relation(fields: [clientId], references: [id])
 
   @@map("storage_accrual_runs")
+}
+
+// Tracks the one-time inbound fee for devices added outside the inbound flow
+// (no INGEST ledger event). Deliberately not a ledger write: it records what was
+// invoiced so those devices are not charged again in later months.
+model InboundBilling {
+  id                    String   @id @default(uuid()) @map("inbound_billing_id")
+  clientId              String   @map("client_id")
+  // Month the charge was invoiced in, "YYYY-MM".
+  billingMonth          String   @map("billing_month")
+  laptopCount           Int      @map("laptop_count")
+  peripheralCount       Int      @map("peripheral_count")
+  laptopAmountPaise     BigInt   @map("laptop_amount_paise")
+  peripheralAmountPaise BigInt   @map("peripheral_amount_paise")
+  totalAmountPaise      BigInt   @map("total_amount_paise")
+  // String snapshot of user_id, same convention as events_ledger.created_by.
+  billedBy              String   @map("billed_by")
+  billedAt              DateTime @default(now()) @map("billed_at") @db.Timestamptz
+
+  client Client  @relation(fields: [clientId], references: [id])
+  assets Asset[]
+
+  @@index([clientId, billingMonth])
+  @@map("inbound_billings")
 }
 
 model EventSuppression {
