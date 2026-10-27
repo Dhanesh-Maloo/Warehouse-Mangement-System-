@@ -382,16 +382,6 @@ export function BillingPage() {
     refetchOnWindowFocus: true,
   });
 
-  const ledgerEntries = allLedgerEntries.filter((e) => !isAccrualEntry(e));
-
-  // Aggregate by category for the summary chips
-  const categoryTotals = ledgerEntries.reduce<Record<string, bigint>>((acc, e) => {
-    const cat = EVENT_CATEGORY[e.eventType] ?? 'Other';
-    acc[cat] = (acc[cat] ?? 0n) + paise(e.amountPaise);
-    return acc;
-  }, {});
-  const periodTotal = ledgerEntries.reduce((sum, e) => sum + paise(e.amountPaise), 0n);
-
   const runAccrualMutation = useMutation({
     mutationFn: () => api.post<AccrualRunResult>('/storage/run-accrual', {}),
     onSuccess: (result) => {
@@ -441,6 +431,33 @@ export function BillingPage() {
     },
     onError: (e: Error) => setInboundError(e.message),
   });
+
+  // Devices added outside the inbound flow have no ledger row, so their pending inbound
+  // charge is shown here as a virtual "Inbound (Ingest)" row. Always shown, regardless of
+  // the date filter, because an unbilled charge is owed whatever month the device arrived.
+  const pendingInboundRows: LedgerEntry[] = (inboundPending?.devices ?? []).map((d) => ({
+    id: `pending-${d.id}`,
+    eventType: 'INGEST',
+    quantity: 1,
+    unitRatePaise: d.amountPaise,
+    amountPaise: d.amountPaise,
+    occurredAt: d.addedAt,
+    referenceType: 'pending_inbound',
+    notes: null,
+    asset: { id: d.id, serialNumber: d.serialNumber, assetTag: null, model: d.model },
+  }));
+  const ledgerEntries = [
+    ...pendingInboundRows,
+    ...allLedgerEntries.filter((e) => !isAccrualEntry(e)),
+  ].sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1));
+
+  // Aggregate by category for the summary chips
+  const categoryTotals = ledgerEntries.reduce<Record<string, bigint>>((acc, e) => {
+    const cat = EVENT_CATEGORY[e.eventType] ?? 'Other';
+    acc[cat] = (acc[cat] ?? 0n) + paise(e.amountPaise);
+    return acc;
+  }, {});
+  const periodTotal = ledgerEntries.reduce((sum, e) => sum + paise(e.amountPaise), 0n);
 
   // ── Asset billing lookup: find one asset and see everything billed
   // against it — actions taken, charges, and days in storage — for a
@@ -811,52 +828,6 @@ export function BillingPage() {
 
               {inboundError && <p className="text-sm text-red-600">{inboundError}</p>}
 
-              {inboundPending.devices.length > 0 && (
-                <details className="border border-gray-100 rounded-lg overflow-hidden" open>
-                  <summary className="px-4 py-2.5 text-sm font-medium text-gray-700 cursor-pointer bg-gray-50">
-                    Devices not yet billed ({inboundPending.devices.length})
-                  </summary>
-                  <div className="max-h-96 overflow-auto">
-                    <table className="w-full text-sm">
-                      <thead className="sticky top-0 bg-white">
-                        <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
-                          <th className="text-left px-4 py-2.5">Asset</th>
-                          <th className="text-left px-4 py-2.5">Type</th>
-                          <th className="text-left px-4 py-2.5">Date added (IST)</th>
-                          <th className="text-right px-4 py-2.5">Inbound charge</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {inboundPending.devices.map((d) => (
-                          <tr key={d.id} className="border-b border-gray-50">
-                            <td className="px-4 py-2">
-                              <p className="font-mono text-xs font-semibold text-[#E86F2C]">
-                                {d.serialNumber}
-                              </p>
-                              <p className="text-xs text-gray-400">{d.model}</p>
-                            </td>
-                            <td className="px-4 py-2 text-xs text-gray-600 capitalize">
-                              {d.category}
-                            </td>
-                            <td className="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">
-                              {new Date(d.addedAt).toLocaleDateString('en-IN', {
-                                timeZone: 'Asia/Kolkata',
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
-                            </td>
-                            <td className="px-4 py-2 text-right tabular-nums font-semibold text-xs">
-                              {formatINR(d.amountPaise)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </details>
-              )}
-
               {inboundPending.history.length > 0 && (
                 <div className="border border-gray-100 rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
@@ -1086,6 +1057,11 @@ export function BillingPage() {
                               >
                                 {EVENT_LABELS[e.eventType] ?? e.eventType}
                               </span>
+                              {e.referenceType === 'pending_inbound' && (
+                                <span className="ml-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                  Not yet billed
+                                </span>
+                              )}
                             </td>
                             <td className="px-5 py-3">
                               <p className="font-mono text-xs font-semibold text-[#E86F2C]">
