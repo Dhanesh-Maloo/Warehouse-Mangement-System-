@@ -13,13 +13,35 @@ describe('InboundBillingService', () => {
       ? [{ unitRatePaise: 4800n, effectiveFrom: new Date('2026-01-01'), effectiveTo: null }]
       : [{ unitRatePaise: 1400n, effectiveFrom: new Date('2026-01-01'), effectiveTo: null }];
 
-  function setup(assets: { id: string; category: string }[]): void {
+  function setup(
+    assets: { id: string; category: string }[],
+    ledgered: {
+      id: string;
+      category: string;
+      ledgerEntries: { id: string; amountPaise: bigint }[];
+    }[] = [],
+    suppressedIds: string[] = [],
+  ): void {
     mockPrisma = {
       asset: {
+        findMany: jest.fn().mockImplementation(({ where }: any) =>
+          Promise.resolve(
+            where.ledgerEntries.some
+              ? ledgered.map((a) => ({
+                  ...a,
+                  serialNumber: a.id,
+                  model: 'm',
+                  createdAt: new Date('2026-10-19'),
+                }))
+              : assets.map((a) => ({ ...a, createdAt: new Date('2026-09-18') })),
+          ),
+        ),
+        updateMany: jest.fn().mockResolvedValue({ count: assets.length + ledgered.length }),
+      },
+      eventSuppression: {
         findMany: jest
           .fn()
-          .mockResolvedValue(assets.map((a) => ({ ...a, createdAt: new Date('2026-09-18') }))),
-        updateMany: jest.fn().mockResolvedValue({ count: assets.length }),
+          .mockResolvedValue(suppressedIds.map((id) => ({ suppressedEventId: id }))),
       },
       rateCardItem: {
         findMany: jest
@@ -58,6 +80,24 @@ describe('InboundBillingService', () => {
     expect(res.laptopCount).toBe(3);
     expect(res.peripheralCount).toBe(1);
     expect(res.totalAmountPaise).toBe(String(3 * 4800 + 1400));
+  });
+
+  it('also bills devices already in the ledger from their ledger amount, skipping suppressed events', async () => {
+    setup(
+      [{ id: 'a1', category: 'laptop' }],
+      [
+        { id: 'l1', category: 'laptop', ledgerEntries: [{ id: 'e1', amountPaise: 4800n }] },
+        { id: 'l2', category: 'peripheral', ledgerEntries: [{ id: 'e2', amountPaise: 1400n }] },
+        // Covered by a Full Prep bundle: nothing owed, must not be counted
+        { id: 'l3', category: 'laptop', ledgerEntries: [{ id: 'e3', amountPaise: 4800n }] },
+      ],
+      ['e3'],
+    );
+    const res = await service.getPending('c1');
+    expect(res.laptopCount).toBe(2);
+    expect(res.peripheralCount).toBe(1);
+    expect(res.totalAmountPaise).toBe(String(4800 + 4800 + 1400));
+    expect(res.devices.filter((d) => d.inLedger).map((d) => d.id)).toEqual(['l1', 'l2']);
   });
 
   it('only considers assets with no INGEST event and not already billed', async () => {

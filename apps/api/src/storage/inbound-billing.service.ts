@@ -31,6 +31,8 @@ export interface PendingInboundDevice {
   category: string;
   addedAt: Date;
   amountPaise: string;
+  /** True when the charge is already a ledger INGEST row; false when priced from the rate card. */
+  inLedger: boolean;
 }
 
 export interface PendingInboundBilling {
@@ -54,7 +56,7 @@ interface Totals {
   peripheralAmountPaise: bigint;
 }
 
-type Db = Pick<PrismaService, 'asset' | 'rateCardItem'>;
+type Db = Pick<PrismaService, 'asset' | 'rateCardItem' | 'eventSuppression'>;
 
 /**
  * One-time inbound fee for devices that were added outside the inbound flow
@@ -204,19 +206,54 @@ export class InboundBillingService {
   }
 
   private async computePending(db: Db, clientId: string): Promise<Totals> {
-    const [assets, laptopRates, peripheralRates] = await Promise.all([
+    const select = {
+      id: true,
+      serialNumber: true,
+      model: true,
+      category: true,
+      createdAt: true,
+    } as const;
+    const [unledgered, ledgered, laptopRates, peripheralRates] = await Promise.all([
+      // Devices added outside the inbound flow: no INGEST row, so priced from the rate card.
       db.asset.findMany({
         where: {
           clientId,
           inboundBillingId: null,
           ledgerEntries: { none: { eventType: 'INGEST' } },
         },
-        select: { id: true, serialNumber: true, model: true, category: true, createdAt: true },
+        select,
+        orderBy: { createdAt: 'asc' },
+      }),
+      // Devices received through inbound: already in the ledger, but still unbilled until stamped.
+      db.asset.findMany({
+        where: {
+          clientId,
+          inboundBillingId: null,
+          ledgerEntries: { some: { eventType: 'INGEST' } },
+        },
+        select: {
+          ...select,
+          ledgerEntries: {
+            where: { eventType: { in: ['INGEST', 'CORRECTION_INGEST'] } },
+            select: { id: true, amountPaise: true },
+          },
+        },
         orderBy: { createdAt: 'asc' },
       }),
       this.ratesFor(db, LAPTOP_CODE),
       this.ratesFor(db, PERIPHERAL_CODE),
     ]);
+
+    const eventIds = ledgered.flatMap((a) => a.ledgerEntries.map((e) => e.id));
+    // Events covered by a bundle charge (e.g. Full Prep) aren't billed separately.
+    const suppressed = new Set(
+      (
+        await db.eventSuppression.findMany({
+          where: { suppressedEventId: { in: eventIds } },
+          select: { suppressedEventId: true },
+        })
+      ).map((s) => s.suppressedEventId),
+    );
 
     const totals: Totals = {
       assetIds: [],
@@ -226,16 +263,16 @@ export class InboundBillingService {
       laptopAmountPaise: 0n,
       peripheralAmountPaise: 0n,
     };
-    for (const a of assets) {
+    const add = (
+      a: { id: string; serialNumber: string; model: string; category: string; createdAt: Date },
+      amount: bigint,
+      inLedger: boolean,
+    ): void => {
       totals.assetIds.push(a.id);
-      let amount: bigint;
       if (a.category === 'peripheral') {
-        amount = this.pickRate(peripheralRates, a.createdAt, DEFAULT_PERIPHERAL_PAISE);
         totals.peripheralCount += 1;
         totals.peripheralAmountPaise += amount;
       } else {
-        // Laptops and monitors share the laptop inbound rate, as in the inbound flow.
-        amount = this.pickRate(laptopRates, a.createdAt, DEFAULT_LAPTOP_PAISE);
         totals.laptopCount += 1;
         totals.laptopAmountPaise += amount;
       }
@@ -246,7 +283,24 @@ export class InboundBillingService {
         category: a.category,
         addedAt: a.createdAt,
         amountPaise: amount.toString(),
+        inLedger,
       });
+    };
+
+    for (const a of unledgered) {
+      // Laptops and monitors share the laptop inbound rate, as in the inbound flow.
+      const amount =
+        a.category === 'peripheral'
+          ? this.pickRate(peripheralRates, a.createdAt, DEFAULT_PERIPHERAL_PAISE)
+          : this.pickRate(laptopRates, a.createdAt, DEFAULT_LAPTOP_PAISE);
+      add(a, amount, false);
+    }
+    for (const a of ledgered) {
+      const amount = a.ledgerEntries
+        .filter((e) => !suppressed.has(e.id))
+        .reduce((sum, e) => sum + e.amountPaise, 0n);
+      // Nothing owed (suppressed by a bundle, or fully reversed): leave unstamped.
+      if (amount > 0n) add(a, amount, true);
     }
     return totals;
   }

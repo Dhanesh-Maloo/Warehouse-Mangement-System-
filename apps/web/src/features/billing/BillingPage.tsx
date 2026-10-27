@@ -95,6 +95,7 @@ interface PendingInboundDevice {
   category: string;
   addedAt: string;
   amountPaise: string;
+  inLedger: boolean;
 }
 
 interface PendingInboundBilling {
@@ -435,17 +436,22 @@ export function BillingPage() {
   // Devices added outside the inbound flow have no ledger row, so their pending inbound
   // charge is shown here as a virtual "Inbound (Ingest)" row. Always shown, regardless of
   // the date filter, because an unbilled charge is owed whatever month the device arrived.
-  const pendingInboundRows: LedgerEntry[] = (inboundPending?.devices ?? []).map((d) => ({
-    id: `pending-${d.id}`,
-    eventType: 'INGEST',
-    quantity: 1,
-    unitRatePaise: d.amountPaise,
-    amountPaise: d.amountPaise,
-    occurredAt: d.addedAt,
-    referenceType: 'pending_inbound',
-    notes: null,
-    asset: { id: d.id, serialNumber: d.serialNumber, assetTag: null, model: d.model },
-  }));
+  const pendingDevices = inboundPending?.devices ?? [];
+  // Devices received through inbound already have a ledger INGEST row; it just needs the tag.
+  const unbilledLedgerAssetIds = new Set(pendingDevices.filter((d) => d.inLedger).map((d) => d.id));
+  const pendingInboundRows: LedgerEntry[] = pendingDevices
+    .filter((d) => !d.inLedger)
+    .map((d) => ({
+      id: `pending-${d.id}`,
+      eventType: 'INGEST',
+      quantity: 1,
+      unitRatePaise: d.amountPaise,
+      amountPaise: d.amountPaise,
+      occurredAt: d.addedAt,
+      referenceType: 'pending_inbound',
+      notes: null,
+      asset: { id: d.id, serialNumber: d.serialNumber, assetTag: null, model: d.model },
+    }));
   const ledgerEntries = [
     ...pendingInboundRows,
     ...allLedgerEntries.filter((e) => !isAccrualEntry(e)),
@@ -458,6 +464,35 @@ export function BillingPage() {
     return acc;
   }, {});
   const periodTotal = ledgerEntries.reduce((sum, e) => sum + paise(e.amountPaise), 0n);
+
+  const isUnbilledInbound = (e: LedgerEntry): boolean =>
+    e.referenceType === 'pending_inbound' ||
+    (e.eventType === 'INGEST' && unbilledLedgerAssetIds.has(e.asset.id));
+
+  const pendingDeviceCount = inboundPending
+    ? inboundPending.laptopCount + inboundPending.peripheralCount
+    : 0;
+  const billAllButton =
+    isAdmin && inboundPending && pendingDeviceCount > 0 ? (
+      <button
+        onClick={() => {
+          if (
+            window.confirm(
+              `Mark all ${pendingDeviceCount} devices (${formatINR(inboundPending.totalAmountPaise)}) as billed for ${monthLabel(inboundMonth)}? They will not be charged again; devices added later will show as pending.`,
+            )
+          ) {
+            markInboundBilledMutation.mutate();
+          }
+        }}
+        disabled={markInboundBilledMutation.isPending || !inboundMonth}
+        className="flex items-center gap-2 bg-[#E86F2C] hover:bg-[#D05E1E] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+      >
+        <CheckCircle size={15} />
+        {markInboundBilledMutation.isPending
+          ? 'Billing…'
+          : `Billing done — bill all inbound till now (${formatINR(inboundPending.totalAmountPaise)})`}
+      </button>
+    ) : null;
 
   // ── Asset billing lookup: find one asset and see everything billed
   // against it — actions taken, charges, and days in storage — for a
@@ -803,24 +838,7 @@ export function BillingPage() {
                     onChange={(e) => setInboundMonth(e.target.value)}
                     className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                   />
-                  <button
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          `Mark all ${inboundPending.laptopCount + inboundPending.peripheralCount} devices (${formatINR(inboundPending.totalAmountPaise)}) as billed for ${monthLabel(inboundMonth)}? They will not be charged again; devices added later will show as pending.`,
-                        )
-                      ) {
-                        markInboundBilledMutation.mutate();
-                      }
-                    }}
-                    disabled={markInboundBilledMutation.isPending || !inboundMonth}
-                    className="flex items-center gap-2 bg-[#E86F2C] hover:bg-[#D05E1E] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <CheckCircle size={15} />
-                    {markInboundBilledMutation.isPending
-                      ? 'Billing…'
-                      : `Bill all inbound till now (${formatINR(inboundPending.totalAmountPaise)})`}
-                  </button>
+                  {billAllButton}
                 </div>
               ) : isClientAdmin ? null : (
                 <p className="text-sm text-gray-500">Only an admin can mark this as billed.</p>
@@ -1007,6 +1025,18 @@ export function BillingPage() {
                   {formatINR(periodTotal.toString())}
                 </span>
               </div>
+              {billAllButton && (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <input
+                    type="month"
+                    value={inboundMonth}
+                    onChange={(e) => setInboundMonth(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                  {billAllButton}
+                  {inboundError && <span className="text-sm text-red-600">{inboundError}</span>}
+                </div>
+              )}
               {Object.keys(categoryTotals).length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(categoryTotals)
@@ -1057,7 +1087,7 @@ export function BillingPage() {
                               >
                                 {EVENT_LABELS[e.eventType] ?? e.eventType}
                               </span>
-                              {e.referenceType === 'pending_inbound' && (
+                              {isUnbilledInbound(e) && (
                                 <span className="ml-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
                                   Not yet billed
                                 </span>
