@@ -37,21 +37,26 @@ export class InboundBillingController {
     return this.service.getPending(effectiveClientId);
   }
 
-  /** POST /inbound-billing/mark-billed — admin/manager; ticks the pending devices as billed. */
+  /**
+   * POST /inbound-billing/mark-billed — ticks the pending devices as billed.
+   * client_admin is forced to their own clientId.
+   */
   @Post('mark-billed')
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'client_admin')
   markBilled(
     @Body() dto: MarkInboundBilledDto,
     @CurrentUser() user: JwtPayload,
   ): ReturnType<InboundBillingService['markBilled']> {
-    return this.service.markBilled(dto.clientId, dto.billingMonth, user.sub);
+    const clientId = user.role === 'client_admin' ? (user.clientId ?? '') : dto.clientId;
+    return this.service.markBilled(clientId, dto.billingMonth, user.sub);
   }
 
-  /** DELETE /inbound-billing/:id — admin/manager; un-ticks a billed batch. */
+  /** DELETE /inbound-billing/:id — un-ticks a billed batch; client_admin only for their own client. */
   @Delete(':id')
   @HttpCode(204)
-  @Roles('admin', 'manager')
+  @Roles('admin', 'manager', 'client_admin')
   undo(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload): Promise<void> {
-    return this.service.undo(id, user.sub);
+    const scopeClientId = user.role === 'client_admin' ? (user.clientId ?? '') : undefined;
+    return this.service.undo(id, user.sub, scopeClientId);
   }
 }

@@ -166,6 +166,18 @@ describe('InboundBillingService', () => {
     expect(mockPrisma.inboundBilling.delete).toHaveBeenCalledWith({ where: { id: 'ib-1' } });
   });
 
+  it("undo 404s when a client-scoped caller targets another client's record", async () => {
+    setup([]);
+    mockPrisma.inboundBilling.findUnique.mockResolvedValue({
+      id: 'ib-1',
+      clientId: 'other-client',
+      billingMonth: '2026-10',
+      totalAmountPaise: 6200n,
+    });
+    await expect(service.undo('ib-1', 'user-1', 'c1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(mockPrisma.inboundBilling.delete).not.toHaveBeenCalled();
+  });
+
   it('undo 404s for an unknown record', async () => {
     setup([]);
     mockPrisma.inboundBilling.findUnique.mockResolvedValue(null);

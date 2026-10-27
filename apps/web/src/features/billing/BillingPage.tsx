@@ -313,6 +313,8 @@ export function BillingPage() {
   const isClientUser = user?.role === 'client_user';
   const isEditor = user?.role === 'editor';
   const isClientAdmin = user?.role === 'client_admin';
+  // iValue staff and the client admin can mark inbound charges as billed.
+  const canMarkBilled = isAdminOrManager || isClientAdmin;
   // editors are scoped to their own client like client_users
   const isClientScoped = isClientUser || isEditor || isClientAdmin;
 
@@ -473,7 +475,7 @@ export function BillingPage() {
     ? inboundPending.laptopCount + inboundPending.peripheralCount
     : 0;
   const billAllButton =
-    isAdminOrManager && inboundPending && pendingDeviceCount > 0 ? (
+    canMarkBilled && inboundPending && pendingDeviceCount > 0 ? (
       <button
         onClick={() => {
           if (
@@ -830,7 +832,7 @@ export function BillingPage() {
                 <div className="flex items-center gap-2 text-sm text-emerald-700">
                   <CheckCircle size={16} /> Nothing pending — all devices have been billed.
                 </div>
-              ) : isAdminOrManager ? (
+              ) : canMarkBilled ? (
                 <div className="flex items-center gap-3 flex-wrap">
                   <input
                     type="month"
@@ -859,7 +861,7 @@ export function BillingPage() {
                         <th className="text-right px-4 py-2.5">Laptops</th>
                         <th className="text-right px-4 py-2.5">Peripherals</th>
                         <th className="text-right px-4 py-2.5">Amount</th>
-                        {isAdminOrManager && <th className="px-4 py-2.5" />}
+                        {canMarkBilled && <th className="px-4 py-2.5" />}
                       </tr>
                     </thead>
                     <tbody>
@@ -878,7 +880,7 @@ export function BillingPage() {
                           <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
                             {formatINR(h.totalAmountPaise)}
                           </td>
-                          {isAdminOrManager && (
+                          {canMarkBilled && (
                             <td className="px-4 py-2.5 text-right">
                               <button
                                 onClick={() => {

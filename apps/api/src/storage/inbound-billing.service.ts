@@ -160,9 +160,12 @@ export class InboundBillingService {
   }
 
   /** Reverts a mark-billed so its devices show as pending again (mis-click recovery). */
-  async undo(id: string, userId: string): Promise<void> {
+  async undo(id: string, userId: string, scopeClientId?: string): Promise<void> {
     const record = await this.prisma.inboundBilling.findUnique({ where: { id } });
-    if (!record) throw new NotFoundException('Billing record not found');
+    // A scoped caller (client admin) gets the same 404 for another client's record.
+    if (!record || (scopeClientId !== undefined && record.clientId !== scopeClientId)) {
+      throw new NotFoundException('Billing record not found');
+    }
 
     await this.prisma.$transaction([
       this.prisma.asset.updateMany({
