@@ -24,8 +24,18 @@ export interface InboundBillingRecord {
   billedAt: Date;
 }
 
+export interface PendingInboundDevice {
+  id: string;
+  serialNumber: string;
+  model: string;
+  category: string;
+  addedAt: Date;
+  amountPaise: string;
+}
+
 export interface PendingInboundBilling {
   clientId: string;
+  devices: PendingInboundDevice[];
   laptopCount: number;
   peripheralCount: number;
   laptopAmountPaise: string;
@@ -37,6 +47,7 @@ export interface PendingInboundBilling {
 
 interface Totals {
   assetIds: string[];
+  devices: PendingInboundDevice[];
   laptopCount: number;
   peripheralCount: number;
   laptopAmountPaise: bigint;
@@ -72,6 +83,7 @@ export class InboundBillingService {
 
     return {
       clientId,
+      devices: totals.devices,
       laptopCount: totals.laptopCount,
       peripheralCount: totals.peripheralCount,
       laptopAmountPaise: totals.laptopAmountPaise.toString(),
@@ -199,7 +211,8 @@ export class InboundBillingService {
           inboundBillingId: null,
           ledgerEntries: { none: { eventType: 'INGEST' } },
         },
-        select: { id: true, category: true, createdAt: true },
+        select: { id: true, serialNumber: true, model: true, category: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
       }),
       this.ratesFor(db, LAPTOP_CODE),
       this.ratesFor(db, PERIPHERAL_CODE),
@@ -207,6 +220,7 @@ export class InboundBillingService {
 
     const totals: Totals = {
       assetIds: [],
+      devices: [],
       laptopCount: 0,
       peripheralCount: 0,
       laptopAmountPaise: 0n,
@@ -214,18 +228,25 @@ export class InboundBillingService {
     };
     for (const a of assets) {
       totals.assetIds.push(a.id);
+      let amount: bigint;
       if (a.category === 'peripheral') {
+        amount = this.pickRate(peripheralRates, a.createdAt, DEFAULT_PERIPHERAL_PAISE);
         totals.peripheralCount += 1;
-        totals.peripheralAmountPaise += this.pickRate(
-          peripheralRates,
-          a.createdAt,
-          DEFAULT_PERIPHERAL_PAISE,
-        );
+        totals.peripheralAmountPaise += amount;
       } else {
         // Laptops and monitors share the laptop inbound rate, as in the inbound flow.
+        amount = this.pickRate(laptopRates, a.createdAt, DEFAULT_LAPTOP_PAISE);
         totals.laptopCount += 1;
-        totals.laptopAmountPaise += this.pickRate(laptopRates, a.createdAt, DEFAULT_LAPTOP_PAISE);
+        totals.laptopAmountPaise += amount;
       }
+      totals.devices.push({
+        id: a.id,
+        serialNumber: a.serialNumber,
+        model: a.model,
+        category: a.category,
+        addedAt: a.createdAt,
+        amountPaise: amount.toString(),
+      });
     }
     return totals;
   }
