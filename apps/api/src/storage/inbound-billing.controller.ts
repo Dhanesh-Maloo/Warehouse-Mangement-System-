@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Delete,
@@ -37,9 +37,9 @@ export class InboundBillingController {
     return this.service.getPending(effectiveClientId);
   }
 
-  /** POST /inbound-billing/mark-billed — admin only; ticks the pending devices as billed. */
+  /** POST /inbound-billing/mark-billed — admin/manager; ticks the pending devices as billed. */
   @Post('mark-billed')
-  @Roles('admin')
+  @Roles('admin', 'manager')
   markBilled(
     @Body() dto: MarkInboundBilledDto,
     @CurrentUser() user: JwtPayload,
@@ -47,10 +47,10 @@ export class InboundBillingController {
     return this.service.markBilled(dto.clientId, dto.billingMonth, user.sub);
   }
 
-  /** DELETE /inbound-billing/:id — admin only; un-ticks a billed batch. */
+  /** DELETE /inbound-billing/:id — admin/manager; un-ticks a billed batch. */
   @Delete(':id')
   @HttpCode(204)
-  @Roles('admin')
+  @Roles('admin', 'manager')
   undo(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtPayload): Promise<void> {
     return this.service.undo(id, user.sub);
   }

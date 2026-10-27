@@ -473,7 +473,7 @@ export function BillingPage() {
     ? inboundPending.laptopCount + inboundPending.peripheralCount
     : 0;
   const billAllButton =
-    isAdmin && inboundPending && pendingDeviceCount > 0 ? (
+    isAdminOrManager && inboundPending && pendingDeviceCount > 0 ? (
       <button
         onClick={() => {
           if (
@@ -830,7 +830,7 @@ export function BillingPage() {
                 <div className="flex items-center gap-2 text-sm text-emerald-700">
                   <CheckCircle size={16} /> Nothing pending — all devices have been billed.
                 </div>
-              ) : isAdmin ? (
+              ) : isAdminOrManager ? (
                 <div className="flex items-center gap-3 flex-wrap">
                   <input
                     type="month"
@@ -840,8 +840,11 @@ export function BillingPage() {
                   />
                   {billAllButton}
                 </div>
-              ) : isClientAdmin ? null : (
-                <p className="text-sm text-gray-500">Only an admin can mark this as billed.</p>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  Billing is marked by iValue. Sign in with an iValue admin or manager account to
+                  mark it as billed.
+                </p>
               )}
 
               {inboundError && <p className="text-sm text-red-600">{inboundError}</p>}
@@ -856,7 +859,7 @@ export function BillingPage() {
                         <th className="text-right px-4 py-2.5">Laptops</th>
                         <th className="text-right px-4 py-2.5">Peripherals</th>
                         <th className="text-right px-4 py-2.5">Amount</th>
-                        {isAdmin && <th className="px-4 py-2.5" />}
+                        {isAdminOrManager && <th className="px-4 py-2.5" />}
                       </tr>
                     </thead>
                     <tbody>
@@ -875,7 +878,7 @@ export function BillingPage() {
                           <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
                             {formatINR(h.totalAmountPaise)}
                           </td>
-                          {isAdmin && (
+                          {isAdminOrManager && (
                             <td className="px-4 py-2.5 text-right">
                               <button
                                 onClick={() => {
