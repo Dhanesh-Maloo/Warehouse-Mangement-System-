@@ -803,24 +803,24 @@ export function BillingPage() {
                     onChange={(e) => setInboundMonth(e.target.value)}
                     className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                   />
-                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={false}
-                      disabled={markInboundBilledMutation.isPending || !inboundMonth}
-                      onChange={() => {
-                        if (
-                          window.confirm(
-                            `Mark ${formatINR(inboundPending.totalAmountPaise)} as billed for ${monthLabel(inboundMonth)}? These devices will not be charged again.`,
-                          )
-                        ) {
-                          markInboundBilledMutation.mutate();
-                        }
-                      }}
-                      className="h-4 w-4 accent-[#E86F2C]"
-                    />
-                    Billed for {inboundMonth ? monthLabel(inboundMonth) : 'selected month'}
-                  </label>
+                  <button
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Mark all ${inboundPending.laptopCount + inboundPending.peripheralCount} devices (${formatINR(inboundPending.totalAmountPaise)}) as billed for ${monthLabel(inboundMonth)}? They will not be charged again; devices added later will show as pending.`,
+                        )
+                      ) {
+                        markInboundBilledMutation.mutate();
+                      }
+                    }}
+                    disabled={markInboundBilledMutation.isPending || !inboundMonth}
+                    className="flex items-center gap-2 bg-[#E86F2C] hover:bg-[#D05E1E] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <CheckCircle size={15} />
+                    {markInboundBilledMutation.isPending
+                      ? 'Billing…'
+                      : `Bill all inbound till now (${formatINR(inboundPending.totalAmountPaise)})`}
+                  </button>
                 </div>
               ) : isClientAdmin ? null : (
                 <p className="text-sm text-gray-500">Only an admin can mark this as billed.</p>
