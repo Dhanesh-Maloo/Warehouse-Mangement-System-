@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
 import { rupeesToPaise } from '../../lib/money';
+import { usePincodeState } from '../logistics/usePincodeState';
 import { Plus, Truck, Search, Download } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -302,6 +303,9 @@ export function RetrievalPage() {
     retryDelay: 1000,
   });
   const redeployZonePreview = redeployZoneData?.zone;
+
+  usePincodeState(form.pincode, (state) => setField('state', state));
+  usePincodeState(form.redeployPincode, (state) => setField('redeployState', state));
 
   const createEndUserMutation = useMutation({
     mutationFn: ({ name, clientId: cid }: { name: string; clientId: string }) =>

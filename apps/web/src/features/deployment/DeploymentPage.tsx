@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
 import { rupeesToPaise } from '../../lib/money';
+import { usePincodeState } from '../logistics/usePincodeState';
 import { Plus, X, Truck, Search, Download } from 'lucide-react';
 import {
   type DeploymentOrder,
@@ -217,6 +218,8 @@ export function DeploymentPage() {
     retryDelay: 1000,
   });
   const zonePreview = zoneData?.zone;
+
+  usePincodeState(pincode, (state) => f('addrState', state));
 
   // ---------------------------------------------------------------------------
   // Mutations

@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { CourierZoneService, type CourierZone } from './courier-zone.service';
+import { stateForPincode } from './pincode-state-map';
 import { AddRuralPincodeDto } from './dto/add-rural-pincode.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -20,6 +21,14 @@ export class LogisticsController {
     // wrap it in an object so the response is always valid JSON.
     const zone = await this.courierZone.resolveZone(pincode);
     return { zone };
+  }
+
+  /** State for a pincode, used to pre-fill the State field on address forms. Null if the prefix is unknown. */
+  @Get('resolve-state')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
+  resolveState(@Query('pincode') pincode: string): { state: string | null } {
+    const trimmed = pincode?.trim() ?? '';
+    return { state: /^\d{6}$/.test(trimmed) ? (stateForPincode(trimmed) ?? null) : null };
   }
 
   @Get('rural-pincodes')
