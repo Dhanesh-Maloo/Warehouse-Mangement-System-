@@ -188,7 +188,7 @@ export function EditDeliveryForm({
               type="button"
               disabled={items.length === 1}
               onClick={() => setItems((p) => p.filter((_, i) => i !== idx))}
-              className="col-span-1 text-gray-400 hover:text-red-500 disabled:opacity-30"
+              className="col-span-1 text-gray-400 hover:text-amber-600 disabled:opacity-30"
               aria-label="Remove item"
             >
               <Trash2 size={16} />

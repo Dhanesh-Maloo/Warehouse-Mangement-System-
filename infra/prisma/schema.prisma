@@ -223,6 +223,7 @@ model Client {
   expectedDeliveries ExpectedDelivery[]
   ledgerEntries      EventLedger[]
   inboundBillings    InboundBilling[]
+  chargeBillingBatches ChargeBillingBatch[]
   endUsers           EndUser[]
   deploymentOrders   DeploymentOrder[]
   retrievalRequests  RetrievalRequest[]
@@ -568,6 +569,7 @@ model EventLedger {
 
   asset  Asset  @relation(fields: [assetId], references: [id])
   client Client @relation(fields: [clientId], references: [id])
+  billedEvent ChargeBilledEvent?
 
   @@map("events_ledger")
 }
@@ -829,6 +831,38 @@ model InboundBilling {
 
   @@index([clientId, billingMonth])
   @@map("inbound_billings")
+}
+
+// Marks groups of ledger charges as invoiced. The ledger itself is append-only, so "billed"
+// lives here instead of as a column on events_ledger; undoing a batch just deletes it.
+model ChargeBillingBatch {
+  id               String   @id @default(uuid()) @map("batch_id")
+  clientId         String   @map("client_id")
+  // Label of the charge group billed together (Deployment, Retrieval, ...).
+  category         String
+  eventCount       Int      @map("event_count")
+  totalAmountPaise BigInt   @map("total_amount_paise")
+  // String snapshot of user_id, same convention as events_ledger.created_by.
+  billedBy         String   @map("billed_by")
+  billedAt         DateTime @default(now()) @map("billed_at") @db.Timestamptz
+
+  client Client              @relation(fields: [clientId], references: [id])
+  events ChargeBilledEvent[]
+
+  @@index([clientId, billedAt])
+  @@map("charge_billing_batches")
+}
+
+model ChargeBilledEvent {
+  // The primary key makes it impossible to bill the same charge twice.
+  eventId String @id @map("event_id")
+  batchId String @map("batch_id")
+
+  batch ChargeBillingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  event EventLedger        @relation(fields: [eventId], references: [id])
+
+  @@index([batchId])
+  @@map("charge_billed_events")
 }
 
 model EventSuppression {

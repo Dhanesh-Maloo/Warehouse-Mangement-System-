@@ -722,7 +722,7 @@ export function DeploymentPage() {
                           f('assetIds', []);
                           setPasteReview(null);
                         }}
-                        className="text-xs text-red-600 font-medium hover:underline"
+                        className="text-xs text-blue-600 font-medium hover:underline"
                       >
                         Clear all
                       </button>
@@ -737,7 +737,7 @@ export function DeploymentPage() {
                           <button
                             type="button"
                             onClick={() => toggleAsset(a.id)}
-                            className="text-gray-400 hover:text-red-600 flex-shrink-0"
+                            className="text-gray-400 hover:text-amber-600 flex-shrink-0"
                             aria-label={`Remove ${a.serialNumber}`}
                           >
                             <X size={12} />

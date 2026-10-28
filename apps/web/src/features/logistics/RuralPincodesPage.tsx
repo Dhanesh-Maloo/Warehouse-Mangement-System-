@@ -125,7 +125,7 @@ export function RuralPincodesPage() {
                   <td className="px-5 py-3 text-right">
                     <button
                       onClick={() => removeMutation.mutate(p.pincode)}
-                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      className="text-gray-400 hover:text-amber-600 transition-colors"
                       title="Remove"
                     >
                       <Trash2 size={15} />

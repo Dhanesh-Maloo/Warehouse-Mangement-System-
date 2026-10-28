@@ -299,7 +299,7 @@ export function UsersPage() {
                               status: u.status === 'active' ? 'suspended' : 'active',
                             })
                           }
-                          className={`text-xs font-medium px-3 py-1 rounded-lg border transition-colors ${u.status === 'active' ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
+                          className={`text-xs font-medium px-3 py-1 rounded-lg border transition-colors ${u.status === 'active' ? 'border-amber-300 text-amber-700 hover:bg-amber-50' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'}`}
                         >
                           {u.status === 'active' ? 'Suspend' : 'Reactivate'}
                         </button>

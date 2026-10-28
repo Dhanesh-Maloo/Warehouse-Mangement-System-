@@ -88,6 +88,19 @@ interface InboundBillingRecord {
   billedAt: string;
 }
 
+interface ChargeBillingBatch {
+  id: string;
+  category: string;
+  eventCount: number;
+  totalAmountPaise: string;
+  billedAt: string;
+}
+
+interface ChargeBillingState {
+  billedEventIds: string[];
+  batches: ChargeBillingBatch[];
+}
+
 interface PendingInboundDevice {
   id: string;
   serialNumber: string;
@@ -437,6 +450,43 @@ export function BillingPage() {
     onError: (e: Error) => setInboundError(e.message),
   });
 
+  // ── "Mark billed" for every other charge group (Deployment, Retrieval, ...). The ledger is
+  // append-only, so billed state is a separate record; billed charges drop out of the pending total.
+  const [showBilled, setShowBilled] = useState(false);
+  const [chargeBillError, setChargeBillError] = useState('');
+
+  const { data: chargeBilling } = useQuery({
+    queryKey: ['charge-billing', effectiveClientId],
+    queryFn: () => api.get<ChargeBillingState>(`/charge-billing?clientId=${effectiveClientId}`),
+    enabled: !!effectiveClientId,
+    staleTime: 0,
+  });
+
+  const markChargesBilledMutation = useMutation({
+    mutationFn: (vars: { category: string; eventIds: string[] }) =>
+      api.post<ChargeBillingBatch>('/charge-billing/mark-billed', {
+        clientId: effectiveClientId,
+        ...vars,
+      }),
+    onSuccess: () => {
+      setChargeBillError('');
+      void qc.invalidateQueries({ queryKey: ['charge-billing'] });
+    },
+    onError: (e: Error) => {
+      setChargeBillError(e.message);
+      void qc.invalidateQueries({ queryKey: ['charge-billing'] });
+    },
+  });
+
+  const undoChargeBatchMutation = useMutation({
+    mutationFn: (id: string) => api.del<undefined>(`/charge-billing/${id}`),
+    onSuccess: () => {
+      setChargeBillError('');
+      void qc.invalidateQueries({ queryKey: ['charge-billing'] });
+    },
+    onError: (e: Error) => setChargeBillError(e.message),
+  });
+
   // Devices added outside the inbound flow have no ledger row, so their pending inbound
   // charge is shown here as a virtual "Inbound (Ingest)" row. Always shown, regardless of
   // the date filter, because an unbilled charge is owed whatever month the device arrived.
@@ -456,18 +506,35 @@ export function BillingPage() {
       notes: null,
       asset: { id: d.id, serialNumber: d.serialNumber, assetTag: null, model: d.model },
     }));
-  const ledgerEntries = [
+  const everyEntry = [
     ...pendingInboundRows,
     ...allLedgerEntries.filter((e) => !isAccrualEntry(e)),
   ].sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1));
 
-  // Aggregate by category for the summary chips
-  const categoryTotals = ledgerEntries.reduce<Record<string, bigint>>((acc, e) => {
+  // Inbound is billed through the per-device flow (an asset is stamped once billed); every other
+  // category is billed in batches that record the exact ledger rows.
+  const billedChargeIds = new Set(chargeBilling?.billedEventIds ?? []);
+  const isBilledEntry = (e: LedgerEntry): boolean => {
+    if (EVENT_CATEGORY[e.eventType] === 'Inbound') {
+      return (
+        inboundPending !== undefined &&
+        e.referenceType !== 'pending_inbound' &&
+        !unbilledLedgerAssetIds.has(e.asset.id)
+      );
+    }
+    return billedChargeIds.has(e.id);
+  };
+  const pendingEntries = everyEntry.filter((e) => !isBilledEntry(e));
+  const billedEntries = everyEntry.filter(isBilledEntry);
+  const ledgerEntries = showBilled ? everyEntry : pendingEntries;
+
+  // Totals only count what is still waiting to be billed
+  const categoryTotals = pendingEntries.reduce<Record<string, bigint>>((acc, e) => {
     const cat = EVENT_CATEGORY[e.eventType] ?? 'Other';
     acc[cat] = (acc[cat] ?? 0n) + paise(e.amountPaise);
     return acc;
   }, {});
-  const periodTotal = ledgerEntries.reduce((sum, e) => sum + paise(e.amountPaise), 0n);
+  const periodTotal = pendingEntries.reduce((sum, e) => sum + paise(e.amountPaise), 0n);
 
   const isUnbilledInbound = (e: LedgerEntry): boolean =>
     e.referenceType === 'pending_inbound' ||
@@ -476,6 +543,38 @@ export function BillingPage() {
   const pendingDeviceCount = inboundPending
     ? inboundPending.laptopCount + inboundPending.peripheralCount
     : 0;
+  const billingBusy = markInboundBilledMutation.isPending || markChargesBilledMutation.isPending;
+
+  function canBillCategory(cat: string): boolean {
+    if (!canMarkBilled) return false;
+    return cat === 'Inbound' ? pendingDeviceCount > 0 : true;
+  }
+
+  function markCategoryBilled(cat: string, total: bigint) {
+    if (cat === 'Inbound') {
+      if (!inboundPending || !inboundMonth) return;
+      if (
+        window.confirm(
+          `Mark all ${pendingDeviceCount} inbound devices (${formatINR(inboundPending.totalAmountPaise)}) as billed for ${monthLabel(inboundMonth)}? They will not be charged again; devices added later will show as pending.`,
+        )
+      ) {
+        markInboundBilledMutation.mutate();
+      }
+      return;
+    }
+    const eventIds = pendingEntries
+      .filter((e) => (EVENT_CATEGORY[e.eventType] ?? 'Other') === cat)
+      .map((e) => e.id);
+    if (eventIds.length === 0) return;
+    if (
+      window.confirm(
+        `Mark ${eventIds.length} ${cat} charge${eventIds.length !== 1 ? 's' : ''} (${formatINR(total.toString())}) as billed? They will no longer appear in the next bill.`,
+      )
+    ) {
+      markChargesBilledMutation.mutate({ category: cat, eventIds });
+    }
+  }
+
   const billAllButton =
     canMarkBilled && inboundPending && pendingDeviceCount > 0 ? (
       <button
@@ -895,7 +994,7 @@ export function BillingPage() {
                                   }
                                 }}
                                 disabled={undoInboundBilledMutation.isPending}
-                                className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-red-600"
+                                className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-amber-600"
                               >
                                 <Undo2 size={13} /> Undo
                               </button>
@@ -1026,38 +1125,132 @@ export function BillingPage() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="text-sm text-gray-500">
-                  Period total ({ledgerEntries.length} events)
+                  Pending to bill ({pendingEntries.length} events)
                 </span>
                 <span className="text-2xl font-bold text-gray-900 tabular-nums">
                   {formatINR(periodTotal.toString())}
                 </span>
               </div>
-              {billAllButton && (
-                <div className="flex items-center gap-3 flex-wrap">
+              {canMarkBilled && inboundPending && pendingDeviceCount > 0 && (
+                <div className="flex items-center gap-2 text-sm text-gray-600 flex-wrap">
+                  <span>Inbound billing month</span>
                   <input
                     type="month"
                     value={inboundMonth}
                     onChange={(e) => setInboundMonth(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                    className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  {billAllButton}
-                  {inboundError && <span className="text-sm text-red-600">{inboundError}</span>}
                 </div>
               )}
-              {Object.keys(categoryTotals).length > 0 && (
+              {Object.keys(categoryTotals).length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(categoryTotals)
                     .sort((a, b) => (a[0] < b[0] ? -1 : 1))
                     .map(([cat, total]) => (
                       <div
                         key={cat}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${CATEGORY_COLORS[cat] ?? 'bg-gray-100 text-gray-600'}`}
+                        className="inline-flex items-stretch rounded-full overflow-hidden"
                       >
-                        <span>{cat}</span>
-                        <span className="font-bold">{formatINR(total.toString())}</span>
+                        <div
+                          className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium ${CATEGORY_COLORS[cat] ?? 'bg-gray-100 text-gray-600'}`}
+                        >
+                          <span>{cat}</span>
+                          <span className="font-bold">{formatINR(total.toString())}</span>
+                        </div>
+                        {canBillCategory(cat) && (
+                          <button
+                            type="button"
+                            onClick={() => markCategoryBilled(cat, total)}
+                            disabled={billingBusy}
+                            title={`Mark all pending ${cat} charges as billed`}
+                            className="flex items-center gap-1 px-3 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 transition-colors"
+                          >
+                            <CheckCircle size={12} />
+                            Mark billed
+                          </button>
+                        )}
                       </div>
                     ))}
                 </div>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  Nothing pending. Everything here has been billed.
+                </p>
+              )}
+              {(inboundError || chargeBillError) && (
+                <p className="text-sm text-red-600">{inboundError || chargeBillError}</p>
+              )}
+
+              {billedEntries.length > 0 && (
+                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer w-fit">
+                  <input
+                    type="checkbox"
+                    checked={showBilled}
+                    onChange={(e) => setShowBilled(e.target.checked)}
+                    className="w-4 h-4 rounded accent-blue-600"
+                  />
+                  Also show billed charges ({billedEntries.length})
+                </label>
+              )}
+
+              {(chargeBilling?.batches.length ?? 0) > 0 && (
+                <details className="border border-gray-100 rounded-lg">
+                  <summary className="px-4 py-2.5 text-sm font-medium text-gray-700 cursor-pointer">
+                    Billed history ({chargeBilling?.batches.length})
+                  </summary>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-y border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
+                        <th className="text-left px-4 py-2">Charges</th>
+                        <th className="text-right px-4 py-2">Events</th>
+                        <th className="text-right px-4 py-2">Amount</th>
+                        <th className="text-left px-4 py-2">Billed on</th>
+                        {canMarkBilled && <th className="px-4 py-2" />}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chargeBilling?.batches.map((b) => (
+                        <tr key={b.id} className="border-b border-gray-50">
+                          <td className="px-4 py-2 font-medium text-gray-900">{b.category}</td>
+                          <td className="px-4 py-2 text-right tabular-nums">{b.eventCount}</td>
+                          <td className="px-4 py-2 text-right font-semibold tabular-nums">
+                            {formatINR(b.totalAmountPaise)}
+                          </td>
+                          <td className="px-4 py-2 text-gray-500 text-xs whitespace-nowrap">
+                            {new Date(b.billedAt).toLocaleString('en-IN', {
+                              timeZone: 'Asia/Kolkata',
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </td>
+                          {canMarkBilled && (
+                            <td className="px-4 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      `Undo billing of ${b.eventCount} ${b.category} charge${b.eventCount !== 1 ? 's' : ''}? They will show as pending again.`,
+                                    )
+                                  ) {
+                                    undoChargeBatchMutation.mutate(b.id);
+                                  }
+                                }}
+                                disabled={undoChargeBatchMutation.isPending}
+                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                              >
+                                <Undo2 size={13} /> Undo
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </details>
               )}
             </div>
 
@@ -1065,7 +1258,9 @@ export function BillingPage() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
               {ledgerEntries.length === 0 ? (
                 <div className="px-5 py-12 text-center text-gray-400 text-sm">
-                  No transactions in this period.
+                  {billedEntries.length > 0
+                    ? 'Everything in this period has been billed.'
+                    : 'No transactions in this period.'}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -1087,13 +1282,21 @@ export function BillingPage() {
                         const amt = paise(e.amountPaise);
                         const isNegative = amt < 0n;
                         return (
-                          <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50/40">
+                          <tr
+                            key={e.id}
+                            className={`border-b border-gray-50 hover:bg-gray-50/40 ${isBilledEntry(e) ? 'opacity-60' : ''}`}
+                          >
                             <td className="px-5 py-3 whitespace-nowrap">
                               <span
                                 className={`px-2 py-0.5 rounded-full text-xs font-medium ${chipCls}`}
                               >
                                 {EVENT_LABELS[e.eventType] ?? e.eventType}
                               </span>
+                              {isBilledEntry(e) && (
+                                <span className="ml-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                  Billed
+                                </span>
+                              )}
                               {isUnbilledInbound(e) && (
                                 <span className="ml-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
                                   Not yet billed

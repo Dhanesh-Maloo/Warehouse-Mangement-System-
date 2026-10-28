@@ -21,6 +21,7 @@ import { DeploymentModule } from './deployment/deployment.module';
 import { RepairModule } from './repair/repair.module';
 import { ResaleModule } from './resale/resale.module';
 import { StorageModule } from './storage/storage.module';
+import { ChargeBillingModule } from './charge-billing/charge-billing.module';
 import { DocumentsModule } from './documents/documents.module';
 import { R2Module } from './r2/r2.module';
 import { MailModule } from './mail/mail.module';
@@ -52,6 +53,7 @@ import { TicketLookupModule } from './ticket-lookup/ticket-lookup.module';
     RepairModule,
     ResaleModule,
     StorageModule,
+    ChargeBillingModule,
     DocumentsModule,
     LogisticsModule,
     TicketLookupModule,

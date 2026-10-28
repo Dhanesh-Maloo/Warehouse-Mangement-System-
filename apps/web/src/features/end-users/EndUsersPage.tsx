@@ -293,7 +293,7 @@ export function EndUsersPage() {
             <button
               onClick={() => deactivateMutation.mutate(confirmDeactivate.id)}
               disabled={deactivateMutation.isPending}
-              className="bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 hover:bg-red-700"
+              className="bg-amber-400 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 hover:bg-amber-500"
             >
               {deactivateMutation.isPending ? 'Deactivating…' : 'Yes, deactivate'}
             </button>
@@ -380,7 +380,7 @@ export function EndUsersPage() {
                           {canDeactivate && (
                             <button
                               onClick={() => setConfirmDeactivate(eu)}
-                              className="text-xs font-medium px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors whitespace-nowrap"
+                              className="text-xs font-medium px-2.5 py-1 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors whitespace-nowrap"
                             >
                               Deactivate
                             </button>

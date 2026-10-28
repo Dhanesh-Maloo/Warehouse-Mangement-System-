@@ -330,7 +330,7 @@ export function LocationsPage() {
                               </button>
                               <button
                                 onClick={() => setDeleteTarget(loc)}
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                                 title="Delete location"
                               >
                                 <Trash2 size={14} />
@@ -387,7 +387,7 @@ export function LocationsPage() {
               <button
                 onClick={() => deleteMutation.mutate(deleteTarget.id)}
                 disabled={deleteMutation.isPending || deleteTarget._count.assets > 0}
-                className="px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-semibold bg-amber-400 hover:bg-amber-500 text-gray-900 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
               </button>

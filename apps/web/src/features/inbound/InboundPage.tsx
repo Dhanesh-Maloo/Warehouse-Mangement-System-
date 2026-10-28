@@ -302,7 +302,7 @@ export function InboundPage() {
                         <button
                           type="button"
                           onClick={() => removeItem(idx)}
-                          className="p-1 text-gray-400 hover:text-red-500"
+                          className="p-1 text-gray-400 hover:text-amber-600"
                         >
                           <Trash2 size={14} />
                         </button>

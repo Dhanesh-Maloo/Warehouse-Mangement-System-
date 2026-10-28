@@ -468,7 +468,7 @@ export function ReceiveDevicesPage() {
                     <button
                       type="button"
                       onClick={() => removeDevice(device.key)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                     >
                       <Trash2 size={15} />
                     </button>

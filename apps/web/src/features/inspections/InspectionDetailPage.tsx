@@ -541,7 +541,7 @@ export function InspectionDetailPage() {
         {!isComplete && (
           <button
             onClick={() => setShowCancelConfirm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 text-sm font-medium hover:bg-amber-50 transition-colors"
           >
             <XOctagon size={15} />
             Cancel inspection
@@ -584,7 +584,7 @@ export function InspectionDetailPage() {
                   });
                 }}
                 disabled={cancelMutation.isPending}
-                className="px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-40"
+                className="px-4 py-2 text-sm font-semibold bg-amber-400 hover:bg-amber-500 text-gray-900 rounded-lg transition-colors disabled:opacity-40"
               >
                 {cancelMutation.isPending ? 'Cancelling…' : 'Yes, cancel'}
               </button>
@@ -1132,7 +1132,7 @@ export function InspectionDetailPage() {
                     <button
                       type="button"
                       onClick={() => removePhoto(idx)}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full hidden group-hover:flex items-center justify-center"
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-amber-500 text-white rounded-full hidden group-hover:flex items-center justify-center"
                     >
                       <Trash2 size={10} />
                     </button>

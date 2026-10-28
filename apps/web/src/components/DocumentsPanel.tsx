@@ -207,7 +207,7 @@ export function DocumentsPanel({ entityType, entityId, readOnly = false }: Docum
                       type="button"
                       onClick={() => deleteMutation.mutate(doc.id)}
                       disabled={deleteMutation.isPending}
-                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
                       title="Delete"
                     >
                       <Trash2 size={14} />

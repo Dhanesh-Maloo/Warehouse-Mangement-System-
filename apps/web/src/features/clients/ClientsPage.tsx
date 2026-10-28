@@ -290,7 +290,7 @@ export function ClientsPage() {
             <button
               onClick={() => deactivateMutation.mutate(confirmDeactivate.id)}
               disabled={deactivateMutation.isPending}
-              className="bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 hover:bg-red-700"
+              className="bg-amber-400 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 hover:bg-amber-500"
             >
               {deactivateMutation.isPending ? 'Deactivating…' : 'Yes, deactivate'}
             </button>
@@ -335,7 +335,7 @@ export function ClientsPage() {
                   {isAdmin && c.isActive && (
                     <button
                       onClick={() => setConfirmDeactivate(c)}
-                      className="p-1 text-gray-400 hover:text-red-600"
+                      className="p-1 text-gray-400 hover:text-amber-600"
                       title="Deactivate client"
                     >
                       <Trash2 size={14} />
