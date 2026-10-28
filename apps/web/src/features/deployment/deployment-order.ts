@@ -19,6 +19,8 @@ export interface DeploymentOrder {
   contactName: string;
   contactPhone: string;
   trackingNumber?: string;
+  /** Transport charge currently billed for the order, in paise (bigint serialised as a string). */
+  transportChargePaise: string;
   ivalueTicketNumber?: string;
   clientTicketNumber?: string;
   notes?: string;

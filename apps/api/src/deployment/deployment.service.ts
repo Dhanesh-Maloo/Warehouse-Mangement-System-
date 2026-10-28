@@ -32,6 +32,13 @@ type DeploymentOrderWithRelations = Prisma.DeploymentOrderGetPayload<{
   include: typeof ORDER_INCLUDE;
 }>;
 
+/** Order plus the transport charge currently billed for it (sum of its transport ledger rows). */
+type DeploymentOrderView = DeploymentOrderWithRelations & { transportChargePaise: bigint };
+
+// The old zone-rate courier events count too, so editing an old order adjusts its existing charge
+// instead of stacking a second one on top.
+const TRANSPORT_EVENT_TYPES = ['TRANSPORT', 'COURIER_CITY', 'COURIER_INTERSTATE', 'COURIER_RURAL'];
+
 @Injectable()
 export class DeploymentService {
   constructor(
@@ -47,11 +54,11 @@ export class DeploymentService {
    * List all deployment orders, optionally filtered by clientId.
    * Results include the related asset and endUser records.
    */
-  findAll(
+  async findAll(
     clientId?: string,
     search?: string,
     status?: string,
-  ): Prisma.PrismaPromise<DeploymentOrderWithRelations[]> {
+  ): Promise<DeploymentOrderView[]> {
     const searchFilter = search
       ? {
           OR: [
@@ -74,7 +81,7 @@ export class DeploymentService {
           ],
         }
       : {};
-    return this.prisma.deploymentOrder.findMany({
+    const orders = await this.prisma.deploymentOrder.findMany({
       where: {
         ...(clientId ? { clientId } : {}),
         ...(status ? { status: status as DeploymentOrderStatus } : {}),
@@ -83,6 +90,8 @@ export class DeploymentService {
       include: ORDER_INCLUDE,
       orderBy: { requestedAt: 'desc' },
     });
+    const totals = await this.transportTotals(orders.map((o) => o.id));
+    return orders.map((o) => ({ ...o, transportChargePaise: totals.get(o.id) ?? BigInt(0) }));
   }
 
   /**
@@ -90,7 +99,7 @@ export class DeploymentService {
    * Throws NotFoundException when not found.
    */
   async findOne(id: string): Promise<
-    DeploymentOrderWithRelations & {
+    DeploymentOrderView & {
       createdByUser: { id: string; fullName: string };
     }
   > {
@@ -102,7 +111,76 @@ export class DeploymentService {
       },
     });
     if (!order) throw new NotFoundException(`Deployment order ${id} not found`);
-    return order;
+    const totals = await this.transportTotals([id]);
+    return { ...order, transportChargePaise: totals.get(id) ?? BigInt(0) };
+  }
+
+  /** Transport charge currently on the ledger for each order, in paise. */
+  private async transportTotals(orderIds: string[]): Promise<Map<string, bigint>> {
+    if (orderIds.length === 0) return new Map();
+    const sums = await this.prisma.eventLedger.groupBy({
+      by: ['referenceId'],
+      where: {
+        referenceType: 'deployment_order',
+        eventType: { in: TRANSPORT_EVENT_TYPES },
+        referenceId: { in: orderIds },
+      },
+      _sum: { amountPaise: true },
+    });
+    return new Map(
+      sums.flatMap((s) =>
+        s.referenceId ? [[s.referenceId, s._sum.amountPaise ?? BigInt(0)]] : [],
+      ),
+    );
+  }
+
+  /**
+   * Set the order's transport charge after creation (the real courier bill often arrives days or
+   * weeks later). The ledger is append-only, so this posts an adjustment row dated now for the
+   * difference; billing then shows it as a new pending charge in the current period.
+   */
+  async updateTransportCharge(
+    id: string,
+    transportChargePaise: number,
+    updatedByUserId: string,
+  ): Promise<DeploymentOrderView> {
+    const order = await this.findOne(id);
+    if (order.status === 'cancelled') {
+      throw new BadRequestException('Cannot change the transport charge of a cancelled order');
+    }
+
+    const current = order.transportChargePaise;
+    const target = BigInt(transportChargePaise);
+    const delta = target - current;
+    if (delta === BigInt(0)) return order;
+
+    const rupees = (paise: bigint): string => `₹${(Number(paise) / 100).toFixed(2)}`;
+    await this.ledger.create({
+      eventType: 'TRANSPORT',
+      asset: { connect: { id: order.assetId } },
+      client: { connect: { id: order.clientId } },
+      quantity: 1,
+      unitRatePaise: delta,
+      amountPaise: delta,
+      occurredAt: new Date(),
+      createdBy: updatedByUserId,
+      referenceId: order.id,
+      referenceType: 'deployment_order',
+      notes:
+        current === BigInt(0)
+          ? 'Transport charge added after order creation'
+          : `Transport charge adjusted from ${rupees(current)} to ${rupees(target)}`,
+    });
+    await this.audit.log({
+      userId: updatedByUserId,
+      action: 'deployment.updateTransportCharge',
+      entity: 'DeploymentOrder',
+      entityId: id,
+      oldValue: { transportChargePaise: current.toString() },
+      newValue: { transportChargePaise: target.toString() },
+    });
+
+    return this.findOne(id);
   }
 
   /**

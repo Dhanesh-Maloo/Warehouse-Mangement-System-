@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
-import { rupeesToPaise } from '../../lib/money';
+import { formatPaise, rupeesToPaise } from '../../lib/money';
 import { usePincodeState } from '../logistics/usePincodeState';
-import { Plus, X, Truck, Search, Download } from 'lucide-react';
+import { Plus, X, Truck, Search, Download, Pencil } from 'lucide-react';
 import {
   type DeploymentOrder,
   STATUS_LABELS,
@@ -119,6 +119,12 @@ export function DeploymentPage() {
   const [editingTracking, setEditingTracking] = useState<{ orderId: string; value: string } | null>(
     null,
   );
+
+  // Inline transport-charge editing: one order at a time
+  const [editingTransport, setEditingTransport] = useState<{
+    orderId: string;
+    value: string;
+  } | null>(null);
 
   // Order shown in the detail drawer (looked up by id so it stays fresh after edits)
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
@@ -299,6 +305,30 @@ export function DeploymentPage() {
     },
     onError: (e: Error) => alert(e.message),
   });
+
+  // The real courier bill often arrives days or weeks after the order, so the amount is
+  // added/changed here. The API posts an adjustment to the ledger, which shows up in billing.
+  const transportMutation = useMutation({
+    mutationFn: ({ id, transportChargePaise }: { id: string; transportChargePaise: number }) =>
+      api.patch(`/deployment/${id}/transport`, { transportChargePaise }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['deployment-orders'] });
+      void qc.invalidateQueries({ queryKey: ['billing-ledger'] });
+      void qc.invalidateQueries({ queryKey: ['charge-billing'] });
+      setEditingTransport(null);
+    },
+    onError: (e: Error) => alert(e.message),
+  });
+
+  function saveTransport() {
+    if (!editingTransport) return;
+    const paise = rupeesToPaise(editingTransport.value);
+    if (paise === undefined || paise === null) {
+      alert('Enter a valid transport charge in rupees (0 or more).');
+      return;
+    }
+    transportMutation.mutate({ id: editingTransport.orderId, transportChargePaise: paise });
+  }
 
   async function downloadDeliveryChallanPdf(id: string) {
     const token = localStorage.getItem('wh_token');
@@ -1136,6 +1166,7 @@ export function DeploymentPage() {
                   <th className="text-left px-5 py-3">IValue Ticket #</th>
                   <th className="text-left px-5 py-3">Client Ticket #</th>
                   <th className="text-left px-5 py-3">Tracking No.</th>
+                  <th className="text-left px-5 py-3">Transport</th>
                   <th className="text-left px-5 py-3">Requested</th>
                   <th className="px-5 py-3" />
                   <th className="px-5 py-3" />
@@ -1292,6 +1323,74 @@ export function DeploymentPage() {
                         />
                       </td>
 
+                      {/* Transport charge — added/edited here once the courier bill is known */}
+                      <td className="px-5 py-3.5 text-xs whitespace-nowrap">
+                        {editingTransport?.orderId === order.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              autoFocus
+                              value={editingTransport.value}
+                              placeholder="₹ amount"
+                              onChange={(e) =>
+                                setEditingTransport({ orderId: order.id, value: e.target.value })
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveTransport();
+                                if (e.key === 'Escape') setEditingTransport(null);
+                              }}
+                              className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={saveTransport}
+                              disabled={transportMutation.isPending}
+                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-2.5 py-1 rounded-lg disabled:opacity-50"
+                            >
+                              {transportMutation.isPending ? 'Saving…' : 'Save'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingTransport(null)}
+                              className="text-xs text-gray-500 hover:text-gray-700"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="tabular-nums text-gray-700">
+                              {Number(order.transportChargePaise) > 0 ? (
+                                formatPaise(order.transportChargePaise)
+                              ) : (
+                                <span className="text-gray-300">-</span>
+                              )}
+                            </span>
+                            {canCreate && order.status !== 'cancelled' && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingTransport({
+                                    orderId: order.id,
+                                    value:
+                                      Number(order.transportChargePaise) > 0
+                                        ? String(Number(order.transportChargePaise) / 100)
+                                        : '',
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
+                              >
+                                <Pencil size={12} />
+                                {Number(order.transportChargePaise) > 0 ? 'Edit' : 'Add'}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
                       {/* Requested date */}
                       <td className="px-5 py-3.5 text-gray-500 text-xs">
                         {new Date(order.requestedAt).toLocaleDateString('en-IN')}
@@ -1355,7 +1454,7 @@ export function DeploymentPage() {
                 })}
                 {orders.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="px-5 py-12 text-center text-gray-400 text-sm">
+                    <td colSpan={12} className="px-5 py-12 text-center text-gray-400 text-sm">
                       {orderSearch || orderStatusFilter
                         ? 'No deployment orders match the selected filters.'
                         : 'No deployment orders yet. Create one above.'}

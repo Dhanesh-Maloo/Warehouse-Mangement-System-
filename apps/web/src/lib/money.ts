@@ -10,3 +10,12 @@ export function rupeesToPaise(input: string): number | undefined | null {
   if (!Number.isFinite(rupees) || rupees < 0) return null;
   return Math.round(rupees * 100);
 }
+
+/** Format an integer paise amount (number or numeric string from the API) as ₹ with Indian grouping. */
+export function formatPaise(paise: number | string): string {
+  return (Number(paise) / 100).toLocaleString('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+  });
+}

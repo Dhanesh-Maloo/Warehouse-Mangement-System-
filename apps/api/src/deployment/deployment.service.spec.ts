@@ -53,6 +53,7 @@ describe('DeploymentService', () => {
       },
       eventLedger: {
         findMany: jest.fn().mockResolvedValue([]),
+        groupBy: jest.fn().mockResolvedValue([]),
       },
       eventSuppression: {
         create: jest.fn().mockReturnValue({ catch: jest.fn() }),
@@ -188,6 +189,82 @@ describe('DeploymentService', () => {
       expect(mockPrisma.deploymentOrder.create).not.toHaveBeenCalled();
       expect(mockPrisma.asset.update).not.toHaveBeenCalled();
       expect(mockLedger.create).not.toHaveBeenCalled();
+    });
+  });
+  describe('updateTransportCharge', () => {
+    const order = { id: 'order-1', clientId: 'client-1', assetId: 'asset-1', status: 'delivered' };
+
+    function existingTransport(paise: number): void {
+      mockPrisma.eventLedger.groupBy.mockResolvedValue([
+        { referenceId: 'order-1', _sum: { amountPaise: BigInt(paise) } },
+      ]);
+    }
+
+    beforeEach(() => {
+      mockPrisma.deploymentOrder.findUnique.mockResolvedValue(order);
+    });
+
+    it('posts the whole amount as a new transport charge when none was entered at creation', async () => {
+      await service.updateTransportCharge('order-1', 275050, 'user-1');
+
+      expect(mockLedger.create).toHaveBeenCalledTimes(1);
+      expect(mockLedger.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'TRANSPORT',
+          amountPaise: BigInt(275050),
+          referenceId: 'order-1',
+          referenceType: 'deployment_order',
+        }),
+      );
+      expect(mockAudit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'deployment.updateTransportCharge' }),
+      );
+    });
+
+    it('posts only the difference when raising an existing charge', async () => {
+      existingTransport(150000);
+
+      await service.updateTransportCharge('order-1', 200000, 'user-1');
+
+      expect(mockLedger.create).toHaveBeenCalledWith(
+        expect.objectContaining({ amountPaise: BigInt(50000) }),
+      );
+    });
+
+    it('posts a negative adjustment when lowering a charge', async () => {
+      existingTransport(150000);
+
+      await service.updateTransportCharge('order-1', 100000, 'user-1');
+
+      expect(mockLedger.create).toHaveBeenCalledWith(
+        expect.objectContaining({ amountPaise: BigInt(-50000) }),
+      );
+    });
+
+    it('does nothing when the amount is unchanged', async () => {
+      existingTransport(150000);
+
+      await service.updateTransportCharge('order-1', 150000, 'user-1');
+
+      expect(mockLedger.create).not.toHaveBeenCalled();
+      expect(mockAudit.log).not.toHaveBeenCalled();
+    });
+
+    it('rejects a cancelled order', async () => {
+      mockPrisma.deploymentOrder.findUnique.mockResolvedValue({ ...order, status: 'cancelled' });
+
+      await expect(service.updateTransportCharge('order-1', 1000, 'user-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockLedger.create).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException for an unknown order', async () => {
+      mockPrisma.deploymentOrder.findUnique.mockResolvedValue(null);
+
+      await expect(service.updateTransportCharge('nope', 1000, 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

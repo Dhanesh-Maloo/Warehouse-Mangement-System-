@@ -14,6 +14,7 @@ import type { Response } from 'express';
 import { DeploymentService } from './deployment.service';
 import { CreateDeploymentOrderDto } from './dto/create-deployment-order.dto';
 import { UpdateDeploymentStatusDto } from './dto/update-deployment-status.dto';
+import { UpdateTransportChargeDto } from './dto/update-transport-charge.dto';
 import { UpdateTicketsDto } from '../common/dto/update-tickets.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -107,6 +108,17 @@ export class DeploymentController {
   ): ReturnType<DeploymentService['updateTracking']> {
     await this.assertOwnsOrder(id, user);
     return this.deploymentService.updateTracking(id, trackingNumber, user.sub);
+  }
+
+  @Patch(':id/transport')
+  @Roles('admin', 'manager', 'operator', 'editor', 'client_admin')
+  async updateTransportCharge(
+    @Param('id') id: string,
+    @Body() dto: UpdateTransportChargeDto,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<DeploymentService['updateTransportCharge']> {
+    await this.assertOwnsOrder(id, user);
+    return this.deploymentService.updateTransportCharge(id, dto.transportChargePaise, user.sub);
   }
 
   @Patch(':id/tickets')

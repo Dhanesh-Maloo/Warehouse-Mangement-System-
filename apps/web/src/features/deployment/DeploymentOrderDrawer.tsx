@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Download, X } from 'lucide-react';
+import { formatPaise } from '../../lib/money';
 import {
   type DeploymentOrder,
   STATUS_COLORS,
@@ -79,6 +80,13 @@ export function DeploymentOrderDrawer({ order, onClose, onDownloadChallan }: Dra
           <Field label="Contact name">{order.contactName || EMPTY}</Field>
           <Field label="Contact phone">{order.contactPhone || EMPTY}</Field>
           <Field label="Courier zone">{ZONE_LABELS[order.courierZone]}</Field>
+          <Field label="Transport charge">
+            {Number(order.transportChargePaise) > 0 ? (
+              formatPaise(order.transportChargePaise)
+            ) : (
+              <span className="text-gray-400">Not entered yet</span>
+            )}
+          </Field>
           <Field label="Bundle">
             {order.bundleType === 'full_prep' ? 'Full prep' : 'Standard'}
             {order.requiresLabeling && <span className="block text-gray-500">Labeling</span>}
