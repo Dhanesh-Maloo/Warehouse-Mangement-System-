@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
+import { rupeesToPaise } from '../../lib/money';
 import { Plus, X, Truck, Search, Download } from 'lucide-react';
 import {
   type DeploymentOrder,
@@ -49,6 +50,7 @@ const VALID_NEXT_STATUSES: Record<DeploymentOrder['status'], DeploymentOrder['st
 
 const EMPTY_FORM = {
   assetIds: [] as string[],
+  transportCharge: '',
   endUserId: '',
   bundleType: 'standard' as 'standard' | 'full_prep',
   addrLine1: '',
@@ -347,9 +349,16 @@ export function DeploymentPage() {
       }
     }
 
+    const transportChargePaise = rupeesToPaise(form.transportCharge);
+    if (transportChargePaise === null) {
+      setFormError('Enter a valid transport charge (0 or more).');
+      return;
+    }
+
     createMutation.mutate({
       clientId: cid,
       assetIds: form.assetIds,
+      transportChargePaise,
       endUserId: resolvedEndUserId,
       bundleType: form.bundleType,
       deliveryAddress: {
@@ -452,20 +461,18 @@ export function DeploymentPage() {
   // ---------------------------------------------------------------------------
 
   function estimatedCost(): string {
-    // Courier is charged once per shipment; bundle, labeling and repacking per asset.
+    // Transport is the manual amount, once per shipment; bundle, labeling and repacking per asset.
     const assetCount = Math.max(form.assetIds.length, 1);
     let perAsset = form.bundleType === 'standard' ? 12800 : 38000;
     if (form.requiresLabeling) perAsset += 4800;
     if (form.requiresRepacking) perAsset += 14000;
     let paise = perAsset * assetCount;
-    if (zonePreview === 'intra_state') paise += 150000;
-    else if (zonePreview === 'inter_state') paise += 250000;
-    else if (zonePreview === 'rural') paise += 320000;
+    paise += rupeesToPaise(form.transportCharge) ?? 0;
     const rupees = paise / 100;
     return rupees.toLocaleString('en-IN', {
       style: 'currency',
       currency: 'INR',
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
     });
   }
 
@@ -946,11 +953,11 @@ export function DeploymentPage() {
                 {!/^\d{6}$/.test(pincode)
                   ? 'Enter a 6-digit PIN code above to determine the zone'
                   : zonePreview === 'intra_state'
-                    ? 'Intra-state City - ₹1,500'
+                    ? 'Intra-state City'
                     : zonePreview === 'inter_state'
-                      ? 'Inter-state - ₹2,500'
+                      ? 'Inter-state'
                       : zonePreview === 'rural'
-                        ? 'Rural - ₹3,200'
+                        ? 'Rural'
                         : zoneIsError
                           ? ((zoneError as Error)?.message ?? 'Could not resolve zone')
                           : 'Resolving…'}
@@ -965,8 +972,28 @@ export function DeploymentPage() {
                 </button>
               )}
               <p className="text-xs text-gray-400 mt-1">
-                Automatically determined from the PIN code. Can be corrected after the order is
-                created if misclassified.
+                Automatically determined from the PIN code. For information only; it does not set
+                any price.
+              </p>
+            </div>
+
+            {/* Transport charge — entered manually; the real courier cost varies per shipment */}
+            <div className="max-w-sm">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Transport charge (₹) <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                value={form.transportCharge}
+                onChange={(e) => f('transportCharge', e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                One charge for the whole shipment. Leave empty if there is no transport charge.
               </p>
             </div>
 

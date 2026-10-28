@@ -3,6 +3,9 @@ import {
   ArrayMinSize,
   ArrayUnique,
   IsArray,
+  IsInt,
+  Max,
+  Min,
   IsUUID,
   IsEnum,
   IsBoolean,
@@ -62,6 +65,14 @@ export class CreateDeploymentOrderDto {
 
   @IsString()
   contactPhone!: string;
+
+  // Manual transport (courier) charge in paise. Entered by the operator because the
+  // real cost varies per shipment; 0 / omitted means no transport charge is billed.
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  transportChargePaise?: number;
 
   @IsOptional()
   @IsBoolean()

@@ -229,6 +229,9 @@ export class InspectionsService {
             retrieval.redeployDeliveryAddress as unknown as CreateDeploymentOrderDto['deliveryAddress'],
           contactName: retrieval.redeployContactName ?? '',
           contactPhone: retrieval.redeployContactPhone ?? '',
+          transportChargePaise: retrieval.redeployTransportChargePaise
+            ? Number(retrieval.redeployTransportChargePaise)
+            : undefined,
         } as CreateDeploymentOrderDto,
         completedByUserId,
       );

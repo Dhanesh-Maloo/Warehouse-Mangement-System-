@@ -1,6 +1,9 @@
 import {
   IsUUID,
   IsEnum,
+  IsInt,
+  Max,
+  Min,
   IsObject,
   IsString,
   IsBoolean,
@@ -108,6 +111,21 @@ export class CreateRetrievalRequestDto {
   @ValidateIf((o: CreateRetrievalRequestDto) => o.bundleType === 'full_cycle')
   @IsString()
   redeployContactPhone?: string;
+
+  // Manual transport (courier) charge in paise for the pickup/return leg; billed now.
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  transportChargePaise?: number;
+
+  // Manual transport charge in paise for the later redeploy shipment; carried onto the
+  // auto-created deployment order when the inspection comes back clean.
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  redeployTransportChargePaise?: number;
 
   @IsOptional()
   @IsString()

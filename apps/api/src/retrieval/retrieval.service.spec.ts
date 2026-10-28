@@ -100,21 +100,31 @@ describe('RetrievalService', () => {
       await expect(service.create(baseDto, 'user-1')).rejects.toThrow(BadRequestException);
     });
 
-    it.each([
-      ['intra_state', 'COURIER_CITY'],
-      ['inter_state', 'COURIER_INTERSTATE'],
-      ['rural', 'COURIER_RURAL'],
-    ])('bills courier code %s -> %s based on resolved zone', async (zone, expectedCode) => {
-      mockCourierZone.resolveZone.mockResolvedValue(zone);
-      mockRateCard.findEffectiveAt.mockResolvedValue({ unitRatePaise: BigInt(500) });
+    it.each(['intra_state', 'inter_state', 'rural'])(
+      'bills the manual transport amount, not a zone rate (zone %s)',
+      async (zone) => {
+        mockCourierZone.resolveZone.mockResolvedValue(zone);
+        mockRateCard.findEffectiveAt.mockResolvedValue({ unitRatePaise: BigInt(500) });
 
+        await service.create({ ...baseDto, transportChargePaise: 123456 }, 'user-1');
+
+        const transport = mockLedger.create.mock.calls.find((c) => c[0].eventType === 'TRANSPORT');
+        expect(transport).toBeDefined();
+        expect(transport![0].amountPaise).toBe(BigInt(123456));
+        expect(
+          mockLedger.create.mock.calls.some((c) => c[0].eventType.startsWith('COURIER_')),
+        ).toBe(false);
+        expect(mockRateCard.findEffectiveAt).not.toHaveBeenCalledWith(
+          expect.stringMatching(/^COURIER_/),
+          expect.any(Date),
+        );
+      },
+    );
+
+    it('posts no transport charge when no amount is entered', async () => {
       await service.create(baseDto, 'user-1');
 
-      const courierLedgerCall = mockLedger.create.mock.calls.find(
-        (call) => call[0].eventType === expectedCode,
-      );
-      expect(courierLedgerCall).toBeDefined();
-      expect(mockRateCard.findEffectiveAt).toHaveBeenCalledWith(expectedCode, expect.any(Date));
+      expect(mockLedger.create.mock.calls.some((c) => c[0].eventType === 'TRANSPORT')).toBe(false);
     });
 
     it('bills RETRIEVAL for standard bundle type', async () => {

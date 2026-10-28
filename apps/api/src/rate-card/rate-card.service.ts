@@ -11,15 +11,18 @@ export class RateCardService {
     private readonly audit: AuditService,
   ) {}
 
+  // Zone-based courier rates were retired in favour of a manual transport amount. The rows
+  // stay in the table (rate history is never edited) but are hidden from the price list.
   async findAll(): Promise<RateCardItem[]> {
     return this.prisma.rateCardItem.findMany({
+      where: { code: { not: { startsWith: 'COURIER_' } } },
       orderBy: [{ code: 'asc' }, { effectiveFrom: 'desc' }],
     });
   }
 
   async findCurrent(): Promise<RateCardItem[]> {
     return this.prisma.rateCardItem.findMany({
-      where: { effectiveTo: null },
+      where: { effectiveTo: null, code: { not: { startsWith: 'COURIER_' } } },
       orderBy: { code: 'asc' },
     });
   }

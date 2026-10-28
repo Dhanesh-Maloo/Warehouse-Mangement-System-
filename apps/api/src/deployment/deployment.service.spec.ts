@@ -114,7 +114,7 @@ describe('DeploymentService', () => {
       expect(result.id).toBe('order-1');
     });
 
-    it('posts one courier charge for the shipment and bundle/labeling/repacking per asset', async () => {
+    it('posts one manual transport charge for the shipment and bundle/labeling/repacking per asset', async () => {
       const assets = ['asset-1', 'asset-2', 'asset-3'].map((id) => ({ ...baseAsset, id }));
       mockPrisma.asset.findMany.mockResolvedValue(assets);
 
@@ -124,12 +124,18 @@ describe('DeploymentService', () => {
           assetIds: assets.map((a) => a.id),
           requiresLabeling: true,
           requiresRepacking: true,
+          transportChargePaise: 275050,
         },
         'user-1',
       );
 
       const types = mockLedger.create.mock.calls.map((c) => c[0].eventType as string);
-      expect(types.filter((t) => t === 'COURIER_CITY')).toHaveLength(1);
+      expect(types.filter((t) => t === 'TRANSPORT')).toHaveLength(1);
+      expect(types.some((t) => t.startsWith('COURIER_'))).toBe(false);
+      const transport = mockLedger.create.mock.calls.find(
+        (c) => c[0].eventType === 'TRANSPORT',
+      )![0];
+      expect(transport.amountPaise).toBe(BigInt(275050));
       expect(types.filter((t) => t === 'PICK_PACK')).toHaveLength(3);
       expect(types.filter((t) => t === 'LABELING')).toHaveLength(3);
       expect(types.filter((t) => t === 'REPACKING')).toHaveLength(3);
@@ -144,6 +150,14 @@ describe('DeploymentService', () => {
           }),
         }),
       );
+    });
+
+    it('posts no transport charge when no amount is entered', async () => {
+      await service.create(baseDto, 'user-1');
+
+      const types = mockLedger.create.mock.calls.map((c) => c[0].eventType as string);
+      expect(types).not.toContain('TRANSPORT');
+      expect(types.some((t) => t.startsWith('COURIER_'))).toBe(false);
     });
 
     it('rejects the whole order if any one asset belongs to another client', async () => {

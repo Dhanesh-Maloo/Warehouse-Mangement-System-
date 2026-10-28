@@ -141,28 +141,21 @@ export class RetrievalService {
     // Resolve retrieval rate code based on bundle type
     const retrievalCode = dto.bundleType === 'full_cycle' ? 'RETRIEVAL_FULL_CYCLE' : 'RETRIEVAL';
 
-    // Courier zone is derived server-side from the pickup pincode — never
-    // trust a client-supplied zone for billing.
+    // The zone is only an informational label now; transport is billed from the
+    // manual amount the operator enters, not from a zone rate.
     const courierZone = await this.courierZone.resolveZone(dto.pickupAddress.pincode);
-    const courierCodeMap: Record<string, string> = {
-      intra_state: 'COURIER_CITY',
-      inter_state: 'COURIER_INTERSTATE',
-      rural: 'COURIER_RURAL',
-    };
-    const courierCode = courierCodeMap[courierZone];
+    const transportPaise = BigInt(dto.transportChargePaise ?? 0);
 
     // Two billed wipe tiers, mirroring Disposal's non_certified/certified_blanco.
     const wipeCode =
       dto.wipeType === 'certified_blanco' ? 'RETRIEVAL_WIPE_CERTIFIED' : 'RETRIEVAL_WIPE_NON_CERT';
 
-    const [retrievalRate, courierRate, wipeRate] = await Promise.all([
+    const [retrievalRate, wipeRate] = await Promise.all([
       this.rateCard.findEffectiveAt(retrievalCode, occurredAt),
-      this.rateCard.findEffectiveAt(courierCode, occurredAt),
       dto.requiresWipe ? this.rateCard.findEffectiveAt(wipeCode, occurredAt) : null,
     ]);
 
     const retrievalUnitRate = retrievalRate ? retrievalRate.unitRatePaise : BigInt(0);
-    const courierUnitRate = courierRate ? courierRate.unitRatePaise : BigInt(0);
     const wipeUnitRate = wipeRate ? wipeRate.unitRatePaise : BigInt(0);
 
     return this.prisma.$transaction(async (tx) => {
@@ -186,6 +179,7 @@ export class RetrievalService {
             : undefined,
           redeployContactName: dto.redeployContactName,
           redeployContactPhone: dto.redeployContactPhone,
+          redeployTransportChargePaise: dto.redeployTransportChargePaise ?? null,
           ivalueTicketNumber: dto.ivalueTicketNumber,
           clientTicketNumber: dto.clientTicketNumber,
           notes: dto.notes,
@@ -208,19 +202,21 @@ export class RetrievalService {
         referenceType: 'retrieval',
       });
 
-      // Post return courier ledger event
-      await this.ledger.create({
-        eventType: courierCode,
-        asset: { connect: { id: dto.assetId } },
-        client: { connect: { id: dto.clientId } },
-        quantity: 1,
-        unitRatePaise: courierUnitRate,
-        amountPaise: courierUnitRate,
-        occurredAt,
-        createdBy: createdByUserId,
-        referenceId: retrieval.id,
-        referenceType: 'retrieval',
-      });
+      // Post return transport ledger event (manual amount)
+      if (transportPaise > BigInt(0)) {
+        await this.ledger.create({
+          eventType: 'TRANSPORT',
+          asset: { connect: { id: dto.assetId } },
+          client: { connect: { id: dto.clientId } },
+          quantity: 1,
+          unitRatePaise: transportPaise,
+          amountPaise: transportPaise,
+          occurredAt,
+          createdBy: createdByUserId,
+          referenceId: retrieval.id,
+          referenceType: 'retrieval',
+        });
+      }
 
       // Post data wipe ledger event, if requested
       if (dto.requiresWipe) {

@@ -667,6 +667,8 @@ model RetrievalRequest {
   redeployDeliveryAddress Json?              @map("redeploy_delivery_address")
   redeployContactName    String?             @map("redeploy_contact_name")
   redeployContactPhone   String?             @map("redeploy_contact_phone")
+  // Manual transport charge (paise) for the redeploy shipment, billed when it is auto-created.
+  redeployTransportChargePaise BigInt?       @map("redeploy_transport_charge_paise")
   // Set once the post-retrieval inspection completes.
   damageFound            Boolean?            @map("damage_found")
   status                 RetrievalStatus     @default(pending)

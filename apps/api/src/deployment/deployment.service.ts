@@ -107,7 +107,7 @@ export class DeploymentService {
 
   /**
    * Create a deployment order (one shipment, one or more assets) and post the
-   * ledger events: courier once for the shipment; bundle, labeling and
+   * ledger events: transport (manual amount) once for the shipment; bundle, labeling and
    * repacking once per asset. Also marks every asset as deployed.
    * Everything runs inside a single Prisma transaction.
    */
@@ -138,17 +138,10 @@ export class DeploymentService {
     const bundleRate = await this.rateCard.findEffectiveAt(bundleRateCode, occurredAt);
     const bundleUnitRate = bundleRate ? bundleRate.unitRatePaise : BigInt(0);
 
-    // Courier zone is derived server-side from the delivery pincode — never
-    // trust a client-supplied zone for billing.
+    // The zone is only an informational label now; transport is billed from the
+    // manual amount the operator enters, not from a zone rate.
     const courierZone = await this.courierZone.resolveZone(dto.deliveryAddress.pincode);
-    const courierCodeMap = {
-      intra_state: 'COURIER_CITY',
-      inter_state: 'COURIER_INTERSTATE',
-      rural: 'COURIER_RURAL',
-    } as const;
-    const courierCode = courierCodeMap[courierZone];
-    const courierRate = await this.rateCard.findEffectiveAt(courierCode, occurredAt);
-    const courierUnitRate = courierRate ? courierRate.unitRatePaise : BigInt(0);
+    const transportPaise = BigInt(dto.transportChargePaise ?? 0);
 
     let labelingUnitRate = BigInt(0);
     if (dto.requiresLabeling) {
@@ -186,20 +179,22 @@ export class DeploymentService {
         include: ORDER_INCLUDE,
       });
 
-      // One shipment, one courier charge. It hangs off the primary asset because
-      // every ledger row needs an asset.
-      await this.ledger.create({
-        eventType: courierCode,
-        asset: { connect: { id: assetIds[0] } },
-        client: { connect: { id: dto.clientId } },
-        quantity: 1,
-        unitRatePaise: courierUnitRate,
-        amountPaise: courierUnitRate,
-        occurredAt,
-        createdBy: createdByUserId,
-        referenceId: order.id,
-        referenceType: 'deployment_order',
-      });
+      // One shipment, one transport charge (manual amount). It hangs off the primary
+      // asset because every ledger row needs an asset.
+      if (transportPaise > BigInt(0)) {
+        await this.ledger.create({
+          eventType: 'TRANSPORT',
+          asset: { connect: { id: assetIds[0] } },
+          client: { connect: { id: dto.clientId } },
+          quantity: 1,
+          unitRatePaise: transportPaise,
+          amountPaise: transportPaise,
+          occurredAt,
+          createdBy: createdByUserId,
+          referenceId: order.id,
+          referenceType: 'deployment_order',
+        });
+      }
 
       for (const assetId of assetIds) {
         const previousStatus = assetById.get(assetId)?.currentStatus ?? null;

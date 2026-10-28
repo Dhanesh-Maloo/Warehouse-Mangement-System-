@@ -234,8 +234,8 @@ const MODULES: ModuleInfo[] = [
     summary: 'Pick, pack and dispatch an in-storage device to an end user at a delivery address.',
     steps: [
       'Click "New Deployment Order", choose the client, the in-storage asset, and the end user (or create one inline).',
-      'Fill in the delivery address, bundle type (standard vs. full prep/labeling/repacking), and courier zone.',
-      'As the order progresses, update its status, courier zone, and tracking number from the list.',
+      'Select one or more assets (you can paste many serial numbers and confirm), then fill in the delivery address, bundle type (standard vs. full prep/labeling/repacking) and the transport charge. The transport charge is typed in manually, once per shipment.',
+      'As the order progresses, update its status and tracking number from the list.',
       'Once an order is "delivered", download a Delivery Challan (DC) PDF from the list - proof of delivery with the asset, client, contact, tracking and ticket details.',
     ],
     roles:

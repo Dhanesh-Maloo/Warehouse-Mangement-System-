@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
+import { rupeesToPaise } from '../../lib/money';
 import { Plus, Truck, Search, Download } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -164,6 +165,8 @@ const EMPTY_FORM = {
   redeployPincode: '',
   redeployContactName: '',
   redeployContactPhone: '',
+  transportCharge: '',
+  redeployTransportCharge: '',
   ivalueTicketNumber: '',
   clientTicketNumber: '',
   notes: '',
@@ -396,9 +399,20 @@ export function RetrievalPage() {
       }
     }
 
+    const transportChargePaise = rupeesToPaise(form.transportCharge);
+    const redeployTransportChargePaise = isFullCycle
+      ? rupeesToPaise(form.redeployTransportCharge)
+      : undefined;
+    if (transportChargePaise === null || redeployTransportChargePaise === null) {
+      setFormError('Enter a valid transport charge (0 or more).');
+      return;
+    }
+
     createMutation.mutate({
       clientId: cid,
       assetId: form.assetId,
+      transportChargePaise,
+      redeployTransportChargePaise,
       ownerId: form.ownerId || undefined,
       bundleType: form.bundleType,
       pickupAddress: {
@@ -667,11 +681,11 @@ export function RetrievalPage() {
                   {!/^\d{6}$/.test(form.pincode)
                     ? 'Enter a 6-digit pincode above'
                     : zonePreview === 'intra_state'
-                      ? 'City - ₹1,500'
+                      ? 'City'
                       : zonePreview === 'inter_state'
-                        ? 'Interstate - ₹2,500'
+                        ? 'Interstate'
                         : zonePreview === 'rural'
-                          ? 'Rural - ₹3,200'
+                          ? 'Rural'
                           : zoneIsError
                             ? ((zoneError as Error)?.message ?? 'Could not resolve zone')
                             : 'Resolving…'}
@@ -686,6 +700,26 @@ export function RetrievalPage() {
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Transport charge for the pickup — entered manually */}
+            <div className="max-w-sm">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Transport charge (₹) <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                value={form.transportCharge}
+                onChange={(e) => setField('transportCharge', e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Cost of bringing the device back. Leave empty if there is none.
+              </p>
             </div>
 
             {/* Diagnostic step — now mandatory for every retrieval, both bundle types */}
@@ -913,13 +947,13 @@ export function RetrievalPage() {
                       }`}
                     >
                       {!/^\d{6}$/.test(form.redeployPincode)
-                        ? 'Enter the pincode above to preview courier zone/rate'
+                        ? 'Enter the pincode above to preview the courier zone'
                         : redeployZonePreview === 'intra_state'
-                          ? 'City - ₹1,500 (billed when redeployed)'
+                          ? 'City'
                           : redeployZonePreview === 'inter_state'
-                            ? 'Interstate - ₹2,500 (billed when redeployed)'
+                            ? 'Interstate'
                             : redeployZonePreview === 'rural'
-                              ? 'Rural - ₹3,200 (billed when redeployed)'
+                              ? 'Rural'
                               : redeployZoneIsError
                                 ? ((redeployZoneError as Error)?.message ??
                                   'Could not resolve zone')
@@ -954,6 +988,26 @@ export function RetrievalPage() {
                     placeholder="+91 98765 43210"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                   />
+                </div>
+
+                <div className="max-w-sm">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Redeploy transport charge (₹){' '}
+                    <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={form.redeployTransportCharge}
+                    onChange={(e) => setField('redeployTransportCharge', e.target.value)}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Billed when the redeploy order is created after a clean inspection.
+                  </p>
                 </div>
               </div>
             )}
