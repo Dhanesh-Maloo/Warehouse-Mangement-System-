@@ -49,7 +49,7 @@ function slaStatus(startedAt: string): 'on_track' | 'at_risk' | 'breached' {
 const SLA_COLORS = {
   on_track: 'bg-emerald-100 text-emerald-700',
   at_risk: 'bg-amber-100 text-amber-700',
-  breached: 'bg-red-100 text-red-700',
+  breached: 'bg-blue-100 text-blue-700',
 };
 const SLA_ICONS = {
   on_track: Clock,
@@ -161,15 +161,15 @@ export function DashboardPage() {
         <>
           {/* SLA alert banner */}
           {breachedCount > 0 && (
-            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3">
-              <AlertTriangle size={18} className="text-red-500 flex-shrink-0" />
-              <span className="text-sm font-medium text-red-700">
+            <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-5 py-3">
+              <AlertTriangle size={18} className="text-blue-600 flex-shrink-0" />
+              <span className="text-sm font-medium text-blue-800">
                 {breachedCount} inspection{breachedCount !== 1 ? 's' : ''} have breached their
                 24-hour SLA
               </span>
               <Link
                 to="/inspections"
-                className="ml-auto text-sm text-red-600 hover:text-red-800 font-semibold flex items-center gap-1"
+                className="ml-auto text-sm text-blue-700 hover:text-blue-900 font-semibold flex items-center gap-1"
               >
                 View <ArrowRight size={14} />
               </Link>
@@ -197,7 +197,7 @@ export function DashboardPage() {
               value={summary?.in_inspection ?? 0}
               icon={ClipboardCheck}
               color={
-                breachedCount > 0 ? 'bg-red-500' : atRiskCount > 0 ? 'bg-amber-500' : 'bg-amber-400'
+                breachedCount > 0 ? 'bg-blue-600' : atRiskCount > 0 ? 'bg-amber-500' : 'bg-amber-400'
               }
               sub={
                 breachedCount > 0
