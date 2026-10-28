@@ -24,6 +24,7 @@ interface Client {
 interface InventoryAsset {
   id: string;
   serialNumber: string;
+  assetTag: string | null;
   model: string;
   manufacturer: string;
   category: string;
@@ -93,6 +94,8 @@ export function DeploymentPage() {
 
   // Filter box for the multi-select asset list
   const [assetSearch, setAssetSearch] = useState('');
+  // Result of the last paste / Enter: how many were added and which serials weren't found
+  const [serialNote, setSerialNote] = useState<{ added: number; notFound: string[] } | null>(null);
 
   // End user combobox
   const [endUserInput, setEndUserInput] = useState('');
@@ -140,12 +143,24 @@ export function DeploymentPage() {
   const { data: availableAssets = [] } = useQuery({
     queryKey: ['inventory-in-storage', activeClientId],
     queryFn: async () => {
-      const params = new URLSearchParams({ status: 'in_storage' });
-      if (activeClientId) params.set('clientId', activeClientId);
-      const res = await api.get<{ data: InventoryAsset[]; total: number }>(
-        `/inventory?${params.toString()}`,
-      );
-      return res.data;
+      // The API pages results (max 200). Load every page so pasted serial numbers
+      // can be matched against all assets in storage, not just the first page.
+      const pageSize = 200;
+      const all: InventoryAsset[] = [];
+      for (;;) {
+        const params = new URLSearchParams({
+          status: 'in_storage',
+          take: String(pageSize),
+          skip: String(all.length),
+        });
+        if (activeClientId) params.set('clientId', activeClientId);
+        const res = await api.get<{ data: InventoryAsset[]; total: number }>(
+          `/inventory?${params.toString()}`,
+        );
+        all.push(...res.data);
+        if (res.data.length < pageSize || all.length >= res.total) break;
+      }
+      return all;
     },
     enabled: showForm,
   });
@@ -224,6 +239,7 @@ export function DeploymentPage() {
       setShowForm(false);
       setForm(EMPTY_FORM);
       setAssetSearch('');
+      setSerialNote(null);
       setEndUserInput('');
       setFormError('');
     },
@@ -370,11 +386,35 @@ export function DeploymentPage() {
       .includes(assetSearch.trim().toLowerCase()),
   );
 
+  // Kept in selection order so the list reads the way the user picked / pasted them
+  const selectedAssets = form.assetIds
+    .map((id) => availableAssets.find((a) => a.id === id))
+    .filter((a): a is InventoryAsset => a !== undefined);
+
   function toggleAsset(id: string) {
     setForm((p) => ({
       ...p,
       assetIds: p.assetIds.includes(id) ? p.assetIds.filter((x) => x !== id) : [...p.assetIds, id],
     }));
+  }
+
+  /** Select every in-storage asset whose serial (or asset tag) appears in pasted/typed text. */
+  function addSerials(text: string) {
+    const tokens = [...new Set(text.split(/[\s,;]+/).filter(Boolean))];
+    const byKey = new Map<string, string>();
+    for (const a of availableAssets) {
+      byKey.set(a.serialNumber.toLowerCase(), a.id);
+      if (a.assetTag) byKey.set(a.assetTag.toLowerCase(), a.id);
+    }
+    const matched = new Set<string>();
+    const notFound: string[] = [];
+    for (const t of tokens) {
+      const id = byKey.get(t.toLowerCase());
+      if (id) matched.add(id);
+      else notFound.push(t);
+    }
+    setForm((p) => ({ ...p, assetIds: [...new Set([...p.assetIds, ...matched])] }));
+    setSerialNote({ added: matched.size, notFound });
   }
 
   function toggleAllVisible() {
@@ -470,6 +510,7 @@ export function DeploymentPage() {
                 setShowForm(false);
                 setForm(EMPTY_FORM);
                 setAssetSearch('');
+                setSerialNote(null);
                 setEndUserInput('');
                 setFormError('');
               }}
@@ -556,7 +597,25 @@ export function DeploymentPage() {
                   type="text"
                   value={assetSearch}
                   onChange={(e) => setAssetSearch(e.target.value)}
-                  placeholder="Filter by serial or model…"
+                  onPaste={(e) => {
+                    // Several serials pasted at once (e.g. a copied spreadsheet column): select them all.
+                    const text = e.clipboardData.getData('text');
+                    if (/[\s,;]/.test(text.trim())) {
+                      e.preventDefault();
+                      addSerials(text);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    // Enter would otherwise submit the whole order form.
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (assetSearch.trim()) {
+                        addSerials(assetSearch);
+                        setAssetSearch('');
+                      }
+                    }
+                  }}
+                  placeholder="Filter, or paste multiple serial numbers…"
                   className="w-full px-3 py-2 border border-gray-300 rounded-t-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                 />
                 <div className="border border-t-0 border-gray-300 rounded-b-lg max-h-48 overflow-y-auto">
@@ -585,6 +644,68 @@ export function DeploymentPage() {
                     </p>
                   )}
                 </div>
+
+                {serialNote && (
+                  <div
+                    className={`mt-2 text-xs rounded-lg px-3 py-2 flex items-start justify-between gap-2 ${
+                      serialNote.notFound.length > 0
+                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    }`}
+                  >
+                    <span className="break-words min-w-0">
+                      Selected {serialNote.added} asset{serialNote.added !== 1 ? 's' : ''}.
+                      {serialNote.notFound.length > 0 &&
+                        ` Not found in storage (${serialNote.notFound.length}): ${serialNote.notFound.join(', ')}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSerialNote(null)}
+                      className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                      aria-label="Dismiss"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+
+                {selectedAssets.length > 0 && (
+                  <div className="mt-3 border border-gray-200 rounded-lg">
+                    <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+                      <span className="text-xs font-medium text-gray-700">
+                        Selected assets ({selectedAssets.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          f('assetIds', []);
+                          setSerialNote(null);
+                        }}
+                        className="text-xs text-red-600 font-medium hover:underline"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                    <ul className="max-h-48 overflow-y-auto divide-y divide-gray-100">
+                      {selectedAssets.map((a) => (
+                        <li key={a.id} className="flex items-center gap-2 px-3 py-1.5 text-xs">
+                          <span className="font-mono text-gray-800">{a.serialNumber}</span>
+                          <span className="text-gray-500 truncate flex-1">
+                            {a.manufacturer} {a.model}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleAsset(a.id)}
+                            className="text-gray-400 hover:text-red-600 flex-shrink-0"
+                            aria-label={`Remove ${a.serialNumber}`}
+                          >
+                            <X size={12} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -879,6 +1000,7 @@ export function DeploymentPage() {
                   setShowForm(false);
                   setForm(EMPTY_FORM);
                   setAssetSearch('');
+                  setSerialNote(null);
                   setEndUserInput('');
                   setFormError('');
                 }}
