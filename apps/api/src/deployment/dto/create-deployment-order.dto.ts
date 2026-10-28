@@ -9,7 +9,6 @@ import {
   IsObject,
   IsString,
   IsOptional,
-  IsNotEmpty,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -76,9 +75,9 @@ export class CreateDeploymentOrderDto {
   @IsString()
   ivalueTicketNumber?: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  clientTicketNumber!: string;
+  clientTicketNumber?: string;
 
   @IsOptional()
   @IsString()

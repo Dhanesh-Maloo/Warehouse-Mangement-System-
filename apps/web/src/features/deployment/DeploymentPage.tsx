@@ -94,8 +94,11 @@ export function DeploymentPage() {
 
   // Filter box for the multi-select asset list
   const [assetSearch, setAssetSearch] = useState('');
-  // Result of the last paste / Enter: how many were added and which serials weren't found
-  const [serialNote, setSerialNote] = useState<{ added: number; notFound: string[] } | null>(null);
+  // Serials pasted/typed but not yet confirmed: what matched and what didn't
+  const [pasteReview, setPasteReview] = useState<{
+    found: InventoryAsset[];
+    notFound: string[];
+  } | null>(null);
 
   // End user combobox
   const [endUserInput, setEndUserInput] = useState('');
@@ -239,7 +242,7 @@ export function DeploymentPage() {
       setShowForm(false);
       setForm(EMPTY_FORM);
       setAssetSearch('');
-      setSerialNote(null);
+      setPasteReview(null);
       setEndUserInput('');
       setFormError('');
     },
@@ -398,23 +401,33 @@ export function DeploymentPage() {
     }));
   }
 
-  /** Select every in-storage asset whose serial (or asset tag) appears in pasted/typed text. */
-  function addSerials(text: string) {
+  /**
+   * Match pasted/typed serials (or asset tags) against in-storage assets and stage the
+   * result for review. Nothing is selected until the user confirms.
+   */
+  function stageSerials(text: string) {
     const tokens = [...new Set(text.split(/[\s,;]+/).filter(Boolean))];
-    const byKey = new Map<string, string>();
+    const byKey = new Map<string, InventoryAsset>();
     for (const a of availableAssets) {
-      byKey.set(a.serialNumber.toLowerCase(), a.id);
-      if (a.assetTag) byKey.set(a.assetTag.toLowerCase(), a.id);
+      byKey.set(a.serialNumber.toLowerCase(), a);
+      if (a.assetTag) byKey.set(a.assetTag.toLowerCase(), a);
     }
-    const matched = new Set<string>();
+    const found = new Map<string, InventoryAsset>();
     const notFound: string[] = [];
     for (const t of tokens) {
-      const id = byKey.get(t.toLowerCase());
-      if (id) matched.add(id);
+      const asset = byKey.get(t.toLowerCase());
+      if (asset) found.set(asset.id, asset);
       else notFound.push(t);
     }
-    setForm((p) => ({ ...p, assetIds: [...new Set([...p.assetIds, ...matched])] }));
-    setSerialNote({ added: matched.size, notFound });
+    setPasteReview({ found: [...found.values()], notFound });
+  }
+
+  function confirmPasteReview() {
+    if (!pasteReview) return;
+    const ids = pasteReview.found.map((a) => a.id);
+    setForm((p) => ({ ...p, assetIds: [...new Set([...p.assetIds, ...ids])] }));
+    setPasteReview(null);
+    setAssetSearch('');
   }
 
   function toggleAllVisible() {
@@ -510,7 +523,7 @@ export function DeploymentPage() {
                 setShowForm(false);
                 setForm(EMPTY_FORM);
                 setAssetSearch('');
-                setSerialNote(null);
+                setPasteReview(null);
                 setEndUserInput('');
                 setFormError('');
               }}
@@ -536,11 +549,10 @@ export function DeploymentPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Client Ticket Number <span className="text-red-500">*</span>
+                  Client Ticket Number <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
-                  required
                   value={form.clientTicketNumber}
                   onChange={(e) => f('clientTicketNumber', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
@@ -598,21 +610,18 @@ export function DeploymentPage() {
                   value={assetSearch}
                   onChange={(e) => setAssetSearch(e.target.value)}
                   onPaste={(e) => {
-                    // Several serials pasted at once (e.g. a copied spreadsheet column): select them all.
+                    // Several serials pasted at once (e.g. a copied spreadsheet column): stage for review.
                     const text = e.clipboardData.getData('text');
                     if (/[\s,;]/.test(text.trim())) {
                       e.preventDefault();
-                      addSerials(text);
+                      stageSerials(text);
                     }
                   }}
                   onKeyDown={(e) => {
                     // Enter would otherwise submit the whole order form.
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      if (assetSearch.trim()) {
-                        addSerials(assetSearch);
-                        setAssetSearch('');
-                      }
+                      if (assetSearch.trim()) stageSerials(assetSearch);
                     }
                   }}
                   placeholder="Filter, or paste multiple serial numbers…"
@@ -645,27 +654,49 @@ export function DeploymentPage() {
                   )}
                 </div>
 
-                {serialNote && (
-                  <div
-                    className={`mt-2 text-xs rounded-lg px-3 py-2 flex items-start justify-between gap-2 ${
-                      serialNote.notFound.length > 0
-                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    }`}
-                  >
-                    <span className="break-words min-w-0">
-                      Selected {serialNote.added} asset{serialNote.added !== 1 ? 's' : ''}.
-                      {serialNote.notFound.length > 0 &&
-                        ` Not found in storage (${serialNote.notFound.length}): ${serialNote.notFound.join(', ')}`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setSerialNote(null)}
-                      className="text-gray-400 hover:text-gray-600 flex-shrink-0"
-                      aria-label="Dismiss"
-                    >
-                      <X size={12} />
-                    </button>
+                {pasteReview && (
+                  <div className="mt-2 border border-[#E86F2C]/40 bg-[#E86F2C]/5 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-medium text-gray-800">
+                      Found {pasteReview.found.length} of{' '}
+                      {pasteReview.found.length + pasteReview.notFound.length} serial number
+                      {pasteReview.found.length + pasteReview.notFound.length !== 1 ? 's' : ''}
+                    </p>
+                    {pasteReview.found.length > 0 && (
+                      <ul className="max-h-32 overflow-y-auto text-xs font-mono text-gray-700 space-y-0.5">
+                        {pasteReview.found.map((a) => (
+                          <li key={a.id}>
+                            {a.serialNumber}
+                            {form.assetIds.includes(a.id) && (
+                              <span className="font-sans text-gray-400"> (already selected)</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {pasteReview.notFound.length > 0 && (
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 break-words">
+                        Not in storage ({pasteReview.notFound.length}):{' '}
+                        {pasteReview.notFound.join(', ')}
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={confirmPasteReview}
+                        disabled={pasteReview.found.length === 0}
+                        className="bg-[#E86F2C] text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50 hover:bg-[#D05E1E] transition-colors"
+                      >
+                        Confirm
+                        {pasteReview.found.length > 0 ? ` (${pasteReview.found.length})` : ''}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPasteReview(null)}
+                        className="text-xs text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-100"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -679,7 +710,7 @@ export function DeploymentPage() {
                         type="button"
                         onClick={() => {
                           f('assetIds', []);
-                          setSerialNote(null);
+                          setPasteReview(null);
                         }}
                         className="text-xs text-red-600 font-medium hover:underline"
                       >
@@ -1000,7 +1031,7 @@ export function DeploymentPage() {
                   setShowForm(false);
                   setForm(EMPTY_FORM);
                   setAssetSearch('');
-                  setSerialNote(null);
+                  setPasteReview(null);
                   setEndUserInput('');
                   setFormError('');
                 }}
