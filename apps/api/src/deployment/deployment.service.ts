@@ -21,6 +21,17 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
 const PDFDocument = require('pdfkit') as typeof import('pdfkit');
 
+// `asset` is the order's primary asset; `items` holds every asset in the shipment.
+const ORDER_INCLUDE = {
+  asset: true,
+  endUser: true,
+  items: { include: { asset: true }, orderBy: { createdAt: 'asc' } },
+} as const satisfies Prisma.DeploymentOrderInclude;
+
+type DeploymentOrderWithRelations = Prisma.DeploymentOrderGetPayload<{
+  include: typeof ORDER_INCLUDE;
+}>;
+
 @Injectable()
 export class DeploymentService {
   constructor(
@@ -40,17 +51,25 @@ export class DeploymentService {
     clientId?: string,
     search?: string,
     status?: string,
-  ): Prisma.PrismaPromise<
-    Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>[]
-  > {
+  ): Prisma.PrismaPromise<DeploymentOrderWithRelations[]> {
     const searchFilter = search
       ? {
           OR: [
             { ivalueTicketNumber: { contains: search, mode: 'insensitive' as const } },
             { clientTicketNumber: { contains: search, mode: 'insensitive' as const } },
             { trackingNumber: { contains: search, mode: 'insensitive' as const } },
-            { asset: { serialNumber: { contains: search, mode: 'insensitive' as const } } },
-            { asset: { assetTag: { contains: search, mode: 'insensitive' as const } } },
+            {
+              items: {
+                some: {
+                  asset: {
+                    OR: [
+                      { serialNumber: { contains: search, mode: 'insensitive' as const } },
+                      { assetTag: { contains: search, mode: 'insensitive' as const } },
+                    ],
+                  },
+                },
+              },
+            },
             { endUser: { name: { contains: search, mode: 'insensitive' as const } } },
           ],
         }
@@ -61,7 +80,7 @@ export class DeploymentService {
         ...(status ? { status: status as DeploymentOrderStatus } : {}),
         ...searchFilter,
       },
-      include: { asset: true, endUser: true },
+      include: ORDER_INCLUDE,
       orderBy: { requestedAt: 'desc' },
     });
   }
@@ -71,19 +90,14 @@ export class DeploymentService {
    * Throws NotFoundException when not found.
    */
   async findOne(id: string): Promise<
-    Prisma.DeploymentOrderGetPayload<{
-      include: {
-        asset: true;
-        endUser: true;
-        createdByUser: { select: { id: true; fullName: true } };
-      };
-    }>
+    DeploymentOrderWithRelations & {
+      createdByUser: { id: string; fullName: string };
+    }
   > {
     const order = await this.prisma.deploymentOrder.findUnique({
       where: { id },
       include: {
-        asset: true,
-        endUser: true,
+        ...ORDER_INCLUDE,
         createdByUser: { select: { id: true, fullName: true } },
       },
     });
@@ -92,21 +106,26 @@ export class DeploymentService {
   }
 
   /**
-   * Create a deployment order and post the corresponding ledger events
-   * for the bundle type, courier zone, and any optional add-ons.
-   * Also marks the asset as deployed.
+   * Create a deployment order (one shipment, one or more assets) and post the
+   * ledger events: courier once for the shipment; bundle, labeling and
+   * repacking once per asset. Also marks every asset as deployed.
    * Everything runs inside a single Prisma transaction.
    */
   async create(
     dto: CreateDeploymentOrderDto,
     createdByUserId: string,
-  ): Promise<Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>> {
-    const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } });
-    if (!asset) throw new NotFoundException(`Asset ${dto.assetId} not found`);
-
-    if (asset.clientId !== dto.clientId) {
+  ): Promise<DeploymentOrderWithRelations> {
+    const assetIds = [...new Set(dto.assetIds)];
+    const assets = await this.prisma.asset.findMany({ where: { id: { in: assetIds } } });
+    const assetById = new Map(assets.map((a) => [a.id, a]));
+    const missing = assetIds.filter((id) => !assetById.has(id));
+    if (missing.length > 0) {
+      throw new NotFoundException(`Asset ${missing.join(', ')} not found`);
+    }
+    const foreign = assetIds.filter((id) => assetById.get(id)?.clientId !== dto.clientId);
+    if (foreign.length > 0) {
       throw new BadRequestException(
-        `Asset ${dto.assetId} does not belong to client ${dto.clientId}`,
+        `Asset ${foreign.join(', ')} does not belong to client ${dto.clientId}`,
       );
     }
 
@@ -148,7 +167,8 @@ export class DeploymentService {
       const order = await tx.deploymentOrder.create({
         data: {
           clientId: dto.clientId,
-          assetId: dto.assetId,
+          assetId: assetIds[0],
+          items: { create: assetIds.map((assetId) => ({ assetId })) },
           endUserId: dto.endUserId ?? null,
           bundleType,
           deliveryAddress: dto.deliveryAddress as object,
@@ -163,46 +183,14 @@ export class DeploymentService {
           createdByUserId,
           status: 'pending',
         },
-        include: { asset: true, endUser: true },
+        include: ORDER_INCLUDE,
       });
 
-      // Mark asset as deployed and record the end user if provided
-      await tx.asset.update({
-        where: { id: dto.assetId },
-        data: {
-          currentStatus: 'deployed',
-          ...(dto.endUserId ? { currentEndUserId: dto.endUserId } : {}),
-        },
-      });
-      await this.assetStatusHistory.record(
-        {
-          assetId: dto.assetId,
-          clientId: dto.clientId,
-          fromStatus: order.asset.currentStatus,
-          toStatus: 'deployed',
-          sourceModule: 'deployment',
-        },
-        tx,
-      );
-
-      // Post bundle ledger event (FULL_PREP or PICK_PACK)
-      const bundleEvent = await this.ledger.create({
-        eventType: bundleRateCode,
-        asset: { connect: { id: dto.assetId } },
-        client: { connect: { id: dto.clientId } },
-        quantity: 1,
-        unitRatePaise: bundleUnitRate,
-        amountPaise: bundleUnitRate,
-        occurredAt,
-        createdBy: createdByUserId,
-        referenceId: order.id,
-        referenceType: 'deployment_order',
-      });
-
-      // Post courier ledger event
+      // One shipment, one courier charge. It hangs off the primary asset because
+      // every ledger row needs an asset.
       await this.ledger.create({
         eventType: courierCode,
-        asset: { connect: { id: dto.assetId } },
+        asset: { connect: { id: assetIds[0] } },
         client: { connect: { id: dto.clientId } },
         quantity: 1,
         unitRatePaise: courierUnitRate,
@@ -213,60 +201,97 @@ export class DeploymentService {
         referenceType: 'deployment_order',
       });
 
-      // Post labeling ledger event if requested
-      if (dto.requiresLabeling) {
-        await this.ledger.create({
-          eventType: 'LABELING',
-          asset: { connect: { id: dto.assetId } },
-          client: { connect: { id: dto.clientId } },
-          quantity: 1,
-          unitRatePaise: labelingUnitRate,
-          amountPaise: labelingUnitRate,
-          occurredAt,
-          createdBy: createdByUserId,
-          referenceId: order.id,
-          referenceType: 'deployment_order',
-        });
-      }
+      for (const assetId of assetIds) {
+        const previousStatus = assetById.get(assetId)?.currentStatus ?? null;
 
-      // Post repacking ledger event if requested
-      if (dto.requiresRepacking) {
-        await this.ledger.create({
-          eventType: 'REPACKING',
-          asset: { connect: { id: dto.assetId } },
-          client: { connect: { id: dto.clientId } },
-          quantity: 1,
-          unitRatePaise: repackingUnitRate,
-          amountPaise: repackingUnitRate,
-          occurredAt,
-          createdBy: createdByUserId,
-          referenceId: order.id,
-          referenceType: 'deployment_order',
-        });
-      }
-
-      // If FULL_PREP: suppress component INGEST and INSPECT ledger events for this asset
-      if (bundleType === 'full_prep') {
-        const componentEvents = await tx.eventLedger.findMany({
-          where: {
-            assetId: dto.assetId,
-            eventType: { in: ['INGEST', 'INSPECT', 'INGEST_LAPTOP', 'INGEST_PERIPHERAL'] },
+        // Mark asset as deployed and record the end user if provided
+        await tx.asset.update({
+          where: { id: assetId },
+          data: {
+            currentStatus: 'deployed',
+            ...(dto.endUserId ? { currentEndUserId: dto.endUserId } : {}),
           },
-          select: { id: true },
         });
-        for (const evt of componentEvents) {
-          await tx.eventSuppression
-            .create({
-              data: {
-                suppressedEventId: evt.id,
-                suppressedByEventId: bundleEvent.id,
-                assetId: dto.assetId,
-                clientId: dto.clientId,
-              },
-            })
-            .catch(() => {
-              // suppressedEventId is @unique — ignore if already suppressed
-            });
+        await this.assetStatusHistory.record(
+          {
+            assetId,
+            clientId: dto.clientId,
+            fromStatus: previousStatus,
+            toStatus: 'deployed',
+            sourceModule: 'deployment',
+          },
+          tx,
+        );
+
+        // Post bundle ledger event (FULL_PREP or PICK_PACK)
+        const bundleEvent = await this.ledger.create({
+          eventType: bundleRateCode,
+          asset: { connect: { id: assetId } },
+          client: { connect: { id: dto.clientId } },
+          quantity: 1,
+          unitRatePaise: bundleUnitRate,
+          amountPaise: bundleUnitRate,
+          occurredAt,
+          createdBy: createdByUserId,
+          referenceId: order.id,
+          referenceType: 'deployment_order',
+        });
+
+        // Post labeling ledger event if requested
+        if (dto.requiresLabeling) {
+          await this.ledger.create({
+            eventType: 'LABELING',
+            asset: { connect: { id: assetId } },
+            client: { connect: { id: dto.clientId } },
+            quantity: 1,
+            unitRatePaise: labelingUnitRate,
+            amountPaise: labelingUnitRate,
+            occurredAt,
+            createdBy: createdByUserId,
+            referenceId: order.id,
+            referenceType: 'deployment_order',
+          });
+        }
+
+        // Post repacking ledger event if requested
+        if (dto.requiresRepacking) {
+          await this.ledger.create({
+            eventType: 'REPACKING',
+            asset: { connect: { id: assetId } },
+            client: { connect: { id: dto.clientId } },
+            quantity: 1,
+            unitRatePaise: repackingUnitRate,
+            amountPaise: repackingUnitRate,
+            occurredAt,
+            createdBy: createdByUserId,
+            referenceId: order.id,
+            referenceType: 'deployment_order',
+          });
+        }
+
+        // If FULL_PREP: suppress component INGEST and INSPECT ledger events for this asset
+        if (bundleType === 'full_prep') {
+          const componentEvents = await tx.eventLedger.findMany({
+            where: {
+              assetId,
+              eventType: { in: ['INGEST', 'INSPECT', 'INGEST_LAPTOP', 'INGEST_PERIPHERAL'] },
+            },
+            select: { id: true },
+          });
+          for (const evt of componentEvents) {
+            await tx.eventSuppression
+              .create({
+                data: {
+                  suppressedEventId: evt.id,
+                  suppressedByEventId: bundleEvent.id,
+                  assetId,
+                  clientId: dto.clientId,
+                },
+              })
+              .catch(() => {
+                // suppressedEventId is @unique — ignore if already suppressed
+              });
+          }
         }
       }
 
@@ -275,7 +300,7 @@ export class DeploymentService {
         action: 'deployment.create',
         entity: 'DeploymentOrder',
         entityId: order.id,
-        newValue: { assetId: dto.assetId, endUserId: dto.endUserId ?? null, status: 'pending' },
+        newValue: { assetIds, endUserId: dto.endUserId ?? null, status: 'pending' },
       });
 
       return order;
@@ -293,7 +318,7 @@ export class DeploymentService {
     id: string,
     dto: UpdateDeploymentStatusDto,
     updatedByUserId: string,
-  ): Promise<Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>> {
+  ): Promise<DeploymentOrderWithRelations> {
     const order = await this.findOne(id);
 
     const DEPLOYMENT_TRANSITIONS: Record<string, string[]> = {
@@ -327,7 +352,7 @@ export class DeploymentService {
         ...(dto.notes !== undefined && { notes: dto.notes }),
         ...timestampPatch,
       },
-      include: { asset: true, endUser: true },
+      include: ORDER_INCLUDE,
     });
 
     await this.audit.log({
@@ -347,12 +372,12 @@ export class DeploymentService {
     id: string,
     courierZone: 'intra_state' | 'inter_state' | 'rural',
     updatedByUserId: string,
-  ): Promise<Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>> {
+  ): Promise<DeploymentOrderWithRelations> {
     const order = await this.findOne(id);
     const updated = await this.prisma.deploymentOrder.update({
       where: { id },
       data: { courierZone },
-      include: { asset: true, endUser: true },
+      include: ORDER_INCLUDE,
     });
     await this.audit.log({
       userId: updatedByUserId,
@@ -370,12 +395,12 @@ export class DeploymentService {
     id: string,
     trackingNumber: string,
     updatedByUserId: string,
-  ): Promise<Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>> {
+  ): Promise<DeploymentOrderWithRelations> {
     await this.findOne(id);
     const updated = await this.prisma.deploymentOrder.update({
       where: { id },
       data: { trackingNumber },
-      include: { asset: true, endUser: true },
+      include: ORDER_INCLUDE,
     });
     await this.audit.log({
       userId: updatedByUserId,
@@ -390,7 +415,7 @@ export class DeploymentService {
   async updateTickets(
     id: string,
     dto: { ivalueTicketNumber?: string; clientTicketNumber?: string },
-  ): Promise<Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>> {
+  ): Promise<DeploymentOrderWithRelations> {
     await this.findOne(id);
     return this.prisma.deploymentOrder.update({
       where: { id },
@@ -398,21 +423,17 @@ export class DeploymentService {
         ivalueTicketNumber: dto.ivalueTicketNumber,
         clientTicketNumber: dto.clientTicketNumber,
       },
-      include: { asset: true, endUser: true },
+      include: ORDER_INCLUDE,
     });
   }
 
   /**
    * Find all deployment orders for a given asset.
    */
-  findByAsset(
-    assetId: string,
-  ): Prisma.PrismaPromise<
-    Prisma.DeploymentOrderGetPayload<{ include: { asset: true; endUser: true } }>[]
-  > {
+  findByAsset(assetId: string): Prisma.PrismaPromise<DeploymentOrderWithRelations[]> {
     return this.prisma.deploymentOrder.findMany({
-      where: { assetId },
-      include: { asset: true, endUser: true },
+      where: { items: { some: { assetId } } },
+      include: ORDER_INCLUDE,
       orderBy: { requestedAt: 'desc' },
     });
   }
@@ -431,13 +452,18 @@ export class DeploymentService {
       include: {
         client: true,
         endUser: true,
-        asset: {
+        items: {
+          orderBy: { createdAt: 'asc' },
           select: {
-            serialNumber: true,
-            assetTag: true,
-            model: true,
-            category: true,
-            manufacturer: true,
+            asset: {
+              select: {
+                serialNumber: true,
+                assetTag: true,
+                model: true,
+                category: true,
+                manufacturer: true,
+              },
+            },
           },
         },
         createdByUser: { select: { fullName: true } },
@@ -517,29 +543,46 @@ export class DeploymentService {
 
     // Asset details table
     const tableTop = cursorY + 10;
-    doc.fontSize(10).font('Helvetica-Bold').text('Delivered asset', 50, tableTop);
+    const assetCount = order.items.length;
+    doc
+      .fontSize(10)
+      .font('Helvetica-Bold')
+      .text(assetCount > 1 ? `Delivered assets (${assetCount})` : 'Delivered asset', 50, tableTop);
+
+    const drawTableHeader = (y: number): void => {
+      doc.rect(50, y, 495, 20).fill('#1A2B3C');
+      doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+      doc.text('Serial number', 55, y + 6);
+      doc.text('Asset tag', 210, y + 6);
+      doc.text('Model', 320, y + 6);
+      doc.text('Category', 440, y + 6);
+      doc.fillColor('#000000');
+    };
 
     const tableStart = tableTop + 18;
-    doc.rect(50, tableStart, 495, 20).fill('#1A2B3C');
-    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
-    doc.text('Serial number', 55, tableStart + 6);
-    doc.text('Asset tag', 210, tableStart + 6);
-    doc.text('Model', 320, tableStart + 6);
-    doc.text('Category', 440, tableStart + 6);
-    doc.fillColor('#000000');
+    drawTableHeader(tableStart);
 
-    const rowY = tableStart + 20;
-    doc.rect(50, rowY, 495, 22).fill('#f8f8f8');
-    doc.fillColor('#000000').font('Helvetica').fontSize(8);
-    doc.text(order.asset.serialNumber, 55, rowY + 7, { width: 145 });
-    doc.text(order.asset.assetTag ?? '—', 210, rowY + 7, { width: 100 });
-    doc.text(`${order.asset.manufacturer} ${order.asset.model}`, 320, rowY + 7, {
-      width: 115,
+    const ROW_HEIGHT = 22;
+    const PAGE_BOTTOM = 770;
+    let rowY = tableStart + 20;
+    order.items.forEach(({ asset }, index) => {
+      // A shipment can carry many assets, so continue the table on a new page when it runs out.
+      if (rowY + ROW_HEIGHT > PAGE_BOTTOM) {
+        doc.addPage();
+        drawTableHeader(50);
+        rowY = 70;
+      }
+      doc.rect(50, rowY, 495, ROW_HEIGHT).fill(index % 2 === 0 ? '#f8f8f8' : '#ffffff');
+      doc.fillColor('#000000').font('Helvetica').fontSize(8);
+      doc.text(asset.serialNumber, 55, rowY + 7, { width: 145 });
+      doc.text(asset.assetTag ?? '—', 210, rowY + 7, { width: 100 });
+      doc.text(`${asset.manufacturer} ${asset.model}`, 320, rowY + 7, { width: 115 });
+      doc.text(asset.category, 440, rowY + 7);
+      rowY += ROW_HEIGHT;
     });
-    doc.text(order.asset.category, 440, rowY + 7);
 
     // Footer
-    const footerY = Math.max(rowY + 60, 680);
+    const footerY = Math.max(rowY + 40, 680);
     doc.moveTo(50, footerY).lineTo(545, footerY).stroke('#cccccc');
     doc
       .fontSize(8)

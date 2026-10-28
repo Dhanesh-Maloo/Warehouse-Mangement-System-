@@ -21,7 +21,7 @@ describe('DeploymentService', () => {
 
   const baseDto: CreateDeploymentOrderDto = {
     clientId: 'client-1',
-    assetId: 'asset-1',
+    assetIds: ['asset-1'],
     bundleType: 'standard',
     deliveryAddress: {
       line1: '1 Main St',
@@ -39,7 +39,7 @@ describe('DeploymentService', () => {
   beforeEach(() => {
     mockPrisma = {
       asset: {
-        findUnique: jest.fn().mockResolvedValue(baseAsset),
+        findMany: jest.fn().mockResolvedValue([baseAsset]),
         update: jest.fn().mockResolvedValue({}),
       },
       deploymentOrder: {
@@ -79,13 +79,13 @@ describe('DeploymentService', () => {
 
   describe('create', () => {
     it('throws NotFoundException if the asset does not exist', async () => {
-      mockPrisma.asset.findUnique.mockResolvedValue(null);
+      mockPrisma.asset.findMany.mockResolvedValue([]);
 
       await expect(service.create(baseDto, 'user-1')).rejects.toThrow(NotFoundException);
     });
 
     it('throws BadRequestException if the asset belongs to a different client', async () => {
-      mockPrisma.asset.findUnique.mockResolvedValue({ ...baseAsset, clientId: 'other-client' });
+      mockPrisma.asset.findMany.mockResolvedValue([{ ...baseAsset, clientId: 'other-client' }]);
 
       await expect(service.create(baseDto, 'user-1')).rejects.toThrow(BadRequestException);
     });
@@ -114,8 +114,60 @@ describe('DeploymentService', () => {
       expect(result.id).toBe('order-1');
     });
 
+    it('posts one courier charge for the shipment and bundle/labeling/repacking per asset', async () => {
+      const assets = ['asset-1', 'asset-2', 'asset-3'].map((id) => ({ ...baseAsset, id }));
+      mockPrisma.asset.findMany.mockResolvedValue(assets);
+
+      await service.create(
+        {
+          ...baseDto,
+          assetIds: assets.map((a) => a.id),
+          requiresLabeling: true,
+          requiresRepacking: true,
+        },
+        'user-1',
+      );
+
+      const types = mockLedger.create.mock.calls.map((c) => c[0].eventType as string);
+      expect(types.filter((t) => t === 'COURIER_CITY')).toHaveLength(1);
+      expect(types.filter((t) => t === 'PICK_PACK')).toHaveLength(3);
+      expect(types.filter((t) => t === 'LABELING')).toHaveLength(3);
+      expect(types.filter((t) => t === 'REPACKING')).toHaveLength(3);
+      expect(mockPrisma.asset.update).toHaveBeenCalledTimes(3);
+      expect(mockPrisma.deploymentOrder.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            assetId: 'asset-1',
+            items: {
+              create: [{ assetId: 'asset-1' }, { assetId: 'asset-2' }, { assetId: 'asset-3' }],
+            },
+          }),
+        }),
+      );
+    });
+
+    it('rejects the whole order if any one asset belongs to another client', async () => {
+      mockPrisma.asset.findMany.mockResolvedValue([
+        baseAsset,
+        { ...baseAsset, id: 'asset-2', clientId: 'other-client' },
+      ]);
+
+      await expect(
+        service.create({ ...baseDto, assetIds: ['asset-1', 'asset-2'] }, 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockPrisma.deploymentOrder.create).not.toHaveBeenCalled();
+      expect(mockLedger.create).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException if any requested asset is missing', async () => {
+      await expect(
+        service.create({ ...baseDto, assetIds: ['asset-1', 'asset-2'] }, 'user-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
     it('never reaches the asset/ledger writes when the client mismatch is caught', async () => {
-      mockPrisma.asset.findUnique.mockResolvedValue({ ...baseAsset, clientId: 'other-client' });
+      mockPrisma.asset.findMany.mockResolvedValue([{ ...baseAsset, clientId: 'other-client' }]);
 
       await expect(service.create(baseDto, 'user-1')).rejects.toThrow(BadRequestException);
 

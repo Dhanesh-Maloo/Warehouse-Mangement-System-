@@ -85,12 +85,17 @@ export class AssetsService {
             orderBy: { createdAt: 'desc' },
             take: 1,
           },
-          deploymentOrders: {
+          // Via the items table so assets that shipped as part of a multi-asset order show it too.
+          deploymentItems: {
             select: {
-              dispatchedAt: true,
-              deliveredAt: true,
-              trackingNumber: true,
-              courierName: true,
+              order: {
+                select: {
+                  dispatchedAt: true,
+                  deliveredAt: true,
+                  trackingNumber: true,
+                  courierName: true,
+                },
+              },
             },
             orderBy: { createdAt: 'desc' },
             take: 1,
@@ -103,7 +108,13 @@ export class AssetsService {
       this.prisma.asset.count({ where }),
     ]);
 
-    return { data, total };
+    return {
+      data: data.map(({ deploymentItems, ...asset }) => ({
+        ...asset,
+        deploymentOrders: deploymentItems.map((item) => item.order),
+      })),
+      total,
+    };
   }
 
   /**

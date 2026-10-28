@@ -56,14 +56,19 @@ export class InventoryService {
             take: 1,
             select: { disposalType: true, certificateS3Key: true, status: true },
           },
-          deploymentOrders: {
+          // Via the items table so assets that shipped as part of a multi-asset order show it too.
+          deploymentItems: {
             orderBy: { createdAt: 'desc' },
             take: 1,
             select: {
-              dispatchedAt: true,
-              deliveredAt: true,
-              trackingNumber: true,
-              courierName: true,
+              order: {
+                select: {
+                  dispatchedAt: true,
+                  deliveredAt: true,
+                  trackingNumber: true,
+                  courierName: true,
+                },
+              },
             },
           },
         },
@@ -74,7 +79,13 @@ export class InventoryService {
       this.prisma.asset.count({ where }),
     ]);
 
-    return { data, total };
+    return {
+      data: data.map(({ deploymentItems, ...asset }) => ({
+        ...asset,
+        deploymentOrders: deploymentItems.map((item) => item.order),
+      })),
+      total,
+    };
   }
 
   async summary(clientId?: string): Promise<Record<string, number>> {

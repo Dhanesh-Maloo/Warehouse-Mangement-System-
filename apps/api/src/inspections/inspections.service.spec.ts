@@ -374,7 +374,7 @@ describe('InspectionsService', () => {
       expect(mockDeployment.create).toHaveBeenCalledWith(
         expect.objectContaining({
           clientId: 'client-1',
-          assetId: 'asset-1',
+          assetIds: ['asset-1'],
           endUserId: 'end-user-1',
           bundleType: 'standard',
           deliveryAddress: retrievalBase.redeployDeliveryAddress,

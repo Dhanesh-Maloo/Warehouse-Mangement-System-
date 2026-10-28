@@ -151,7 +151,7 @@ export class TicketLookupService {
         }),
         this.prisma.deploymentOrder.findMany({
           where: { ...ticketMatch, ...(clientId ? { clientId } : {}) },
-          include: { asset: { select: ASSET_SELECT } },
+          include: { asset: { select: ASSET_SELECT }, _count: { select: { items: true } } },
         }),
         this.prisma.disposalRequest.findMany({
           where: { ...ticketMatch, ...(clientId ? { clientId } : {}) },
@@ -281,7 +281,7 @@ export class TicketLookupService {
         id: o.id,
         ivalueTicketNumber: o.ivalueTicketNumber,
         clientTicketNumber: o.clientTicketNumber,
-        workDescription: `Deployment — ${o.bundleType} bundle`,
+        workDescription: `Deployment — ${o.bundleType} bundle${o._count.items > 1 ? ` (${o._count.items} assets)` : ''}`,
         status: o.status,
         date: o.requestedAt,
         asset: o.asset,

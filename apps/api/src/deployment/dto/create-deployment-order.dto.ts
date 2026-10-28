@@ -1,4 +1,8 @@
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
   IsUUID,
   IsEnum,
   IsBoolean,
@@ -32,8 +36,14 @@ export class CreateDeploymentOrderDto {
   @IsUUID()
   clientId!: string;
 
-  @IsUUID()
-  assetId!: string;
+  // All assets travelling in this one shipment. Charges: courier once per
+  // order; bundle, labeling and repacking once per asset.
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  assetIds!: string[];
 
   @IsOptional()
   @IsUUID()

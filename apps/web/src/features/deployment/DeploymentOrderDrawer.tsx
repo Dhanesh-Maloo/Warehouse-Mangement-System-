@@ -59,14 +59,18 @@ export function DeploymentOrderDrawer({ order, onClose, onDownloadChallan }: Dra
         </div>
 
         <dl className="px-6 py-5 space-y-5">
-          <Field label="Asset">
-            <Link
-              to={`/inventory/${order.asset.id}`}
-              className="font-mono font-semibold text-[#E86F2C] hover:underline"
-            >
-              {order.asset.serialNumber}
-            </Link>
-            <span className="block text-gray-500">{order.asset.model}</span>
+          <Field label={order.items.length > 1 ? `Assets (${order.items.length})` : 'Asset'}>
+            {order.items.map(({ asset }) => (
+              <span key={asset.id} className="block mb-1.5 last:mb-0">
+                <Link
+                  to={`/inventory/${asset.id}`}
+                  className="font-mono font-semibold text-[#E86F2C] hover:underline"
+                >
+                  {asset.serialNumber}
+                </Link>
+                <span className="block text-gray-500">{asset.model}</span>
+              </span>
+            ))}
           </Field>
           <Field label="End user">
             {order.endUser?.name ?? <span className="text-gray-400 italic">Not assigned</span>}

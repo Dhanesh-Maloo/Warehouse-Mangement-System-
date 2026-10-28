@@ -347,9 +347,10 @@ model Asset {
   inspections     Inspection[]
   ledgerEntries   EventLedger[]
   deploymentOrders DeploymentOrder[]
+  deploymentItems  DeploymentOrderItem[]
   retrievalRequests RetrievalRequest[]
   disposalRequests  DisposalRequest[]
-  currentEndUser    EndUser?      @relation("CurrentAssets", fields: [currentEndUserId], references: [id])
+  currentEndUser   EndUser?      @relation("CurrentAssets", fields: [currentEndUserId], references: [id])
   documents         AssetDocument[] @relation("AssetDocuments")
   statusHistory     AssetStatusHistory[]
 
@@ -615,11 +616,29 @@ model DeploymentOrder {
   updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz
 
   client        Client   @relation(fields: [clientId], references: [id])
+  // Primary (first) asset of the order. Kept so single-asset readers keep working;
+  // the full set of shipped assets lives in `items`.
   asset         Asset    @relation(fields: [assetId], references: [id])
   endUser       EndUser? @relation(fields: [endUserId], references: [id])
   createdByUser User     @relation("CreatedDeployments", fields: [createdByUserId], references: [id])
+  items         DeploymentOrderItem[]
 
   @@map("deployment_orders")
+}
+
+// One row per asset in a deployment order (one shipment can carry many assets).
+model DeploymentOrderItem {
+  id        String   @id @default(uuid()) @map("item_id")
+  orderId   String   @map("order_id")
+  assetId   String   @map("asset_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  order DeploymentOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  asset Asset           @relation(fields: [assetId], references: [id])
+
+  @@unique([orderId, assetId])
+  @@index([assetId])
+  @@map("deployment_order_items")
 }
 
 model RetrievalRequest {

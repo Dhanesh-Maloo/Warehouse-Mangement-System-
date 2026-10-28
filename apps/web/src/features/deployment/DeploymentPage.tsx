@@ -47,7 +47,7 @@ const VALID_NEXT_STATUSES: Record<DeploymentOrder['status'], DeploymentOrder['st
 // ---------------------------------------------------------------------------
 
 const EMPTY_FORM = {
-  assetId: '',
+  assetIds: [] as string[],
   endUserId: '',
   bundleType: 'standard' as 'standard' | 'full_prep',
   addrLine1: '',
@@ -90,6 +90,9 @@ export function DeploymentPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
+
+  // Filter box for the multi-select asset list
+  const [assetSearch, setAssetSearch] = useState('');
 
   // End user combobox
   const [endUserInput, setEndUserInput] = useState('');
@@ -220,6 +223,7 @@ export function DeploymentPage() {
       void qc.invalidateQueries({ queryKey: ['inventory-in-storage'] });
       setShowForm(false);
       setForm(EMPTY_FORM);
+      setAssetSearch('');
       setEndUserInput('');
       setFormError('');
     },
@@ -300,8 +304,8 @@ export function DeploymentPage() {
       setFormError('Select a client first.');
       return;
     }
-    if (!form.assetId) {
-      setFormError('Select an asset.');
+    if (form.assetIds.length === 0) {
+      setFormError('Select at least one asset.');
       return;
     }
 
@@ -326,7 +330,7 @@ export function DeploymentPage() {
 
     createMutation.mutate({
       clientId: cid,
-      assetId: form.assetId,
+      assetIds: form.assetIds,
       endUserId: resolvedEndUserId,
       bundleType: form.bundleType,
       deliveryAddress: {
@@ -360,6 +364,32 @@ export function DeploymentPage() {
     });
   }
 
+  const visibleAssets = availableAssets.filter((a) =>
+    `${a.serialNumber} ${a.manufacturer} ${a.model}`
+      .toLowerCase()
+      .includes(assetSearch.trim().toLowerCase()),
+  );
+
+  function toggleAsset(id: string) {
+    setForm((p) => ({
+      ...p,
+      assetIds: p.assetIds.includes(id) ? p.assetIds.filter((x) => x !== id) : [...p.assetIds, id],
+    }));
+  }
+
+  function toggleAllVisible() {
+    const visibleIds = visibleAssets.map((a) => a.id);
+    setForm((p) => {
+      const allSelected = visibleIds.every((id) => p.assetIds.includes(id));
+      return {
+        ...p,
+        assetIds: allSelected
+          ? p.assetIds.filter((id) => !visibleIds.includes(id))
+          : [...new Set([...p.assetIds, ...visibleIds])],
+      };
+    });
+  }
+
   function f<K extends keyof typeof EMPTY_FORM>(k: K, v: (typeof EMPTY_FORM)[K]) {
     setForm((p) => ({ ...p, [k]: v }));
   }
@@ -369,13 +399,15 @@ export function DeploymentPage() {
   // ---------------------------------------------------------------------------
 
   function estimatedCost(): string {
-    let paise = 0;
-    paise += form.bundleType === 'standard' ? 12800 : 38000;
+    // Courier is charged once per shipment; bundle, labeling and repacking per asset.
+    const assetCount = Math.max(form.assetIds.length, 1);
+    let perAsset = form.bundleType === 'standard' ? 12800 : 38000;
+    if (form.requiresLabeling) perAsset += 4800;
+    if (form.requiresRepacking) perAsset += 14000;
+    let paise = perAsset * assetCount;
     if (zonePreview === 'intra_state') paise += 150000;
     else if (zonePreview === 'inter_state') paise += 250000;
     else if (zonePreview === 'rural') paise += 320000;
-    if (form.requiresLabeling) paise += 4800;
-    if (form.requiresRepacking) paise += 14000;
     const rupees = paise / 100;
     return rupees.toLocaleString('en-IN', {
       style: 'currency',
@@ -437,6 +469,7 @@ export function DeploymentPage() {
               onClick={() => {
                 setShowForm(false);
                 setForm(EMPTY_FORM);
+                setAssetSearch('');
                 setEndUserInput('');
                 setFormError('');
               }}
@@ -496,25 +529,62 @@ export function DeploymentPage() {
               </div>
             )}
 
-            {/* Asset + End User */}
+            {/* Assets (one shipment can carry several) + End User */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Asset serial or ID <span className="text-red-500">*</span>
-                </label>
-                <select
-                  required
-                  value={form.assetId}
-                  onChange={(e) => f('assetId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] bg-white"
-                >
-                  <option value="">Select asset in storage…</option>
-                  {availableAssets.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.serialNumber} - {a.manufacturer} {a.model}
-                    </option>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Assets <span className="text-red-500">*</span>
+                    <span className="text-gray-400 font-normal">
+                      {' '}
+                      ({form.assetIds.length} selected)
+                    </span>
+                  </label>
+                  {visibleAssets.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={toggleAllVisible}
+                      className="text-xs text-[#E86F2C] font-medium hover:underline"
+                    >
+                      {visibleAssets.every((a) => form.assetIds.includes(a.id))
+                        ? 'Clear shown'
+                        : 'Select all shown'}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={assetSearch}
+                  onChange={(e) => setAssetSearch(e.target.value)}
+                  placeholder="Filter by serial or model…"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-t-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+                <div className="border border-t-0 border-gray-300 rounded-b-lg max-h-48 overflow-y-auto">
+                  {visibleAssets.map((a) => (
+                    <label
+                      key={a.id}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-800 cursor-pointer hover:bg-[#E86F2C]/5"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.assetIds.includes(a.id)}
+                        onChange={() => toggleAsset(a.id)}
+                        className="w-4 h-4 rounded accent-[#E86F2C]"
+                      />
+                      <span className="font-mono text-xs">{a.serialNumber}</span>
+                      <span className="text-gray-500 text-xs truncate">
+                        {a.manufacturer} {a.model}
+                      </span>
+                    </label>
                   ))}
-                </select>
+                  {visibleAssets.length === 0 && (
+                    <p className="px-3 py-3 text-xs text-gray-400">
+                      {availableAssets.length === 0
+                        ? 'No assets in storage.'
+                        : 'No assets match the filter.'}
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -808,6 +878,7 @@ export function DeploymentPage() {
                 onClick={() => {
                   setShowForm(false);
                   setForm(EMPTY_FORM);
+                  setAssetSearch('');
                   setEndUserInput('');
                   setFormError('');
                 }}
@@ -916,6 +987,12 @@ export function DeploymentPage() {
                           </p>
                           <p className="text-xs text-gray-500">{order.asset.model}</p>
                         </Link>
+                        {order.items.length > 1 && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            +{order.items.length - 1} more asset
+                            {order.items.length - 1 !== 1 ? 's' : ''}
+                          </p>
+                        )}
                       </td>
 
                       {/* End user */}

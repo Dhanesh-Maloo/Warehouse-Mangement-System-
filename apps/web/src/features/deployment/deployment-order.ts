@@ -1,6 +1,8 @@
 export interface DeploymentOrder {
   id: string;
+  /** Primary (first) asset; `items` has every asset in the shipment. */
   asset: { id: string; serialNumber: string; model: string };
+  items: { id: string; asset: { id: string; serialNumber: string; model: string } }[];
   endUser: { name: string } | null;
   deliveryAddress: {
     line1: string;

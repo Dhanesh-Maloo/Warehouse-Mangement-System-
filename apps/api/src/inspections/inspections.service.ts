@@ -222,7 +222,7 @@ export class InspectionsService {
       await this.deployment.create(
         {
           clientId: retrieval.clientId,
-          assetId: retrieval.assetId,
+          assetIds: [retrieval.assetId],
           endUserId: retrieval.redeployEndUserId ?? undefined,
           bundleType: retrieval.requiresRedeploySetup ? 'full_prep' : 'standard',
           deliveryAddress:
