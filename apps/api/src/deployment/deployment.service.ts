@@ -13,6 +13,7 @@ import { CourierZoneService } from '../logistics/courier-zone.service';
 import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateDeploymentOrderDto } from './dto/create-deployment-order.dto';
 import type { UpdateDeploymentStatusDto } from './dto/update-deployment-status.dto';
+import type { UpdateDeploymentOrderDto } from './dto/update-deployment-order.dto';
 import {
   formatChallanAddress,
   formatChallanContact,
@@ -145,6 +146,106 @@ export class DeploymentService {
     updatedByUserId: string,
   ): Promise<DeploymentOrderView> {
     const order = await this.findOne(id);
+    await this.applyTransportCharge(order, transportChargePaise, updatedByUserId);
+    return this.findOne(id);
+  }
+
+  /**
+   * Edit anything correctable on an order in one go: end user, delivery address, contact, tickets,
+   * tracking, courier name, notes and the transport charge. Assets and bundle options stay fixed
+   * because they decide the ledger charges already posted.
+   */
+  async update(
+    id: string,
+    dto: UpdateDeploymentOrderDto,
+    updatedByUserId: string,
+  ): Promise<DeploymentOrderView> {
+    const order = await this.findOne(id);
+
+    // Checked up front so a rejected transport change cannot leave the other edits half-applied.
+    if (dto.transportChargePaise !== undefined && order.status === 'cancelled') {
+      throw new BadRequestException('Cannot change the transport charge of a cancelled order');
+    }
+    if (dto.endUserId) {
+      const endUser = await this.prisma.endUser.findUnique({ where: { id: dto.endUserId } });
+      if (!endUser || endUser.clientId !== order.clientId) {
+        throw new BadRequestException(`End user ${dto.endUserId} does not belong to this client`);
+      }
+    }
+
+    // Blank text clears an optional field rather than storing an empty string.
+    const blankToNull = (value: string): string | null => value.trim() || null;
+    const data: Prisma.DeploymentOrderUncheckedUpdateInput = {};
+    if (dto.endUserId !== undefined) data.endUserId = dto.endUserId;
+    if (dto.contactName !== undefined) data.contactName = dto.contactName.trim();
+    if (dto.contactPhone !== undefined) data.contactPhone = dto.contactPhone.trim();
+    if (dto.ivalueTicketNumber !== undefined) {
+      data.ivalueTicketNumber = blankToNull(dto.ivalueTicketNumber);
+    }
+    if (dto.clientTicketNumber !== undefined) {
+      data.clientTicketNumber = blankToNull(dto.clientTicketNumber);
+    }
+    if (dto.trackingNumber !== undefined) data.trackingNumber = blankToNull(dto.trackingNumber);
+    if (dto.courierName !== undefined) data.courierName = blankToNull(dto.courierName);
+    if (dto.notes !== undefined) data.notes = blankToNull(dto.notes);
+    if (dto.deliveryAddress) {
+      data.deliveryAddress = dto.deliveryAddress as object;
+      // The zone is only an informational label now, so an unrecognised pincode must not block
+      // the edit; keep the old zone in that case.
+      data.courierZone = await this.courierZone
+        .resolveZone(dto.deliveryAddress.pincode)
+        .catch(() => order.courierZone);
+    }
+
+    if (Object.keys(data).length > 0) {
+      const endUserChanged = dto.endUserId !== undefined && dto.endUserId !== order.endUserId;
+      await this.prisma.$transaction(async (tx) => {
+        await tx.deploymentOrder.update({ where: { id }, data });
+        // Assets still deployed under the old end user follow the change.
+        if (endUserChanged) {
+          await tx.asset.updateMany({
+            where: {
+              id: { in: order.items.map((item) => item.assetId) },
+              currentStatus: 'deployed',
+              currentEndUserId: order.endUserId,
+            },
+            data: { currentEndUserId: dto.endUserId ?? null },
+          });
+        }
+      });
+      await this.audit.log({
+        userId: updatedByUserId,
+        action: 'deployment.update',
+        entity: 'DeploymentOrder',
+        entityId: id,
+        oldValue: {
+          endUserId: order.endUserId,
+          deliveryAddress: order.deliveryAddress,
+          contactName: order.contactName,
+          contactPhone: order.contactPhone,
+          ivalueTicketNumber: order.ivalueTicketNumber,
+          clientTicketNumber: order.clientTicketNumber,
+          trackingNumber: order.trackingNumber,
+          courierName: order.courierName,
+          notes: order.notes,
+        },
+        newValue: data,
+      });
+    }
+
+    if (dto.transportChargePaise !== undefined) {
+      await this.applyTransportCharge(order, dto.transportChargePaise, updatedByUserId);
+    }
+
+    return this.findOne(id);
+  }
+
+  /** Post the ledger adjustment that brings the order's transport charge to `transportChargePaise`. */
+  private async applyTransportCharge(
+    order: DeploymentOrderView,
+    transportChargePaise: number,
+    updatedByUserId: string,
+  ): Promise<void> {
     if (order.status === 'cancelled') {
       throw new BadRequestException('Cannot change the transport charge of a cancelled order');
     }
@@ -152,7 +253,7 @@ export class DeploymentService {
     const current = order.transportChargePaise;
     const target = BigInt(transportChargePaise);
     const delta = target - current;
-    if (delta === BigInt(0)) return order;
+    if (delta === BigInt(0)) return;
 
     const rupees = (paise: bigint): string => `₹${(Number(paise) / 100).toFixed(2)}`;
     await this.ledger.create({
@@ -175,12 +276,10 @@ export class DeploymentService {
       userId: updatedByUserId,
       action: 'deployment.updateTransportCharge',
       entity: 'DeploymentOrder',
-      entityId: id,
+      entityId: order.id,
       oldValue: { transportChargePaise: current.toString() },
       newValue: { transportChargePaise: target.toString() },
     });
-
-    return this.findOne(id);
   }
 
   /**

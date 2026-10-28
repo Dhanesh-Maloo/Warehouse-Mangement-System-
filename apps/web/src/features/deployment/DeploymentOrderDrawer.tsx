@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Download, X } from 'lucide-react';
+import { Download, Pencil, X } from 'lucide-react';
 import { formatPaise } from '../../lib/money';
 import {
   type DeploymentOrder,
@@ -13,6 +13,8 @@ interface DrawerProps {
   order: DeploymentOrder;
   onClose: () => void;
   onDownloadChallan: (orderId: string) => void;
+  /** Present when the user may edit; opens the edit panel. */
+  onEdit?: (orderId: string) => void;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -26,7 +28,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const EMPTY = <span className="text-gray-400">—</span>;
 
-export function DeploymentOrderDrawer({ order, onClose, onDownloadChallan }: DrawerProps) {
+export function DeploymentOrderDrawer({ order, onClose, onDownloadChallan, onEdit }: DrawerProps) {
   return (
     <div
       className="fixed inset-0 z-40 flex justify-end"
@@ -49,14 +51,26 @@ export function DeploymentOrderDrawer({ order, onClose, onDownloadChallan }: Dra
               {STATUS_LABELS[order.status]}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-700"
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-3">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(order.id)}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-800"
+              >
+                <Pencil size={14} />
+                Edit
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-700"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <dl className="px-6 py-5 space-y-5">

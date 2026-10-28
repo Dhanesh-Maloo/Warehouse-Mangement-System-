@@ -1,5 +1,7 @@
 export interface DeploymentOrder {
   id: string;
+  clientId: string;
+  endUserId: string | null;
   /** Primary (first) asset; `items` has every asset in the shipment. */
   asset: { id: string; serialNumber: string; model: string };
   items: { id: string; asset: { id: string; serialNumber: string; model: string } }[];
@@ -19,6 +21,7 @@ export interface DeploymentOrder {
   contactName: string;
   contactPhone: string;
   trackingNumber?: string;
+  courierName?: string | null;
   /** Transport charge currently billed for the order, in paise (bigint serialised as a string). */
   transportChargePaise: string;
   ivalueTicketNumber?: string;

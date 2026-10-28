@@ -41,7 +41,9 @@ describe('DeploymentService', () => {
       asset: {
         findMany: jest.fn().mockResolvedValue([baseAsset]),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      endUser: { findUnique: jest.fn() },
       deploymentOrder: {
         findUnique: jest.fn(),
         create: jest
@@ -265,6 +267,141 @@ describe('DeploymentService', () => {
       await expect(service.updateTransportCharge('nope', 1000, 'user-1')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+  describe('update', () => {
+    const order = {
+      id: 'order-1',
+      clientId: 'client-1',
+      assetId: 'asset-1',
+      status: 'delivered',
+      endUserId: 'eu-1',
+      courierZone: 'inter_state',
+      items: [{ assetId: 'asset-1' }, { assetId: 'asset-2' }],
+    };
+
+    beforeEach(() => {
+      mockPrisma.deploymentOrder.findUnique.mockResolvedValue(order);
+      mockPrisma.deploymentOrder.update.mockResolvedValue({});
+    });
+
+    it('updates only the fields sent and blanks cleared text to null', async () => {
+      await service.update(
+        'order-1',
+        { contactName: ' Ravi ', trackingNumber: 'AWB123', notes: '   ' },
+        'user-1',
+      );
+
+      expect(mockPrisma.deploymentOrder.update).toHaveBeenCalledWith({
+        where: { id: 'order-1' },
+        data: { contactName: 'Ravi', trackingNumber: 'AWB123', notes: null },
+      });
+      expect(mockAudit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'deployment.update', entityId: 'order-1' }),
+      );
+      expect(mockLedger.create).not.toHaveBeenCalled();
+    });
+
+    it('re-resolves the zone when the delivery address changes', async () => {
+      mockCourierZone.resolveZone.mockResolvedValue('intra_state');
+
+      await service.update(
+        'order-1',
+        {
+          deliveryAddress: {
+            line1: '2 Lake Rd',
+            city: 'Pune',
+            state: 'Maharashtra',
+            pincode: '411001',
+          },
+        },
+        'user-1',
+      );
+
+      expect(mockCourierZone.resolveZone).toHaveBeenCalledWith('411001');
+      expect(mockPrisma.deploymentOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ courierZone: 'intra_state' }) }),
+      );
+    });
+
+    it('keeps the old zone if the new pincode is not recognised, instead of blocking the edit', async () => {
+      mockCourierZone.resolveZone.mockRejectedValue(new BadRequestException('unrecognised'));
+
+      await service.update(
+        'order-1',
+        { deliveryAddress: { line1: 'x', city: 'y', state: 'z', pincode: '999999' } },
+        'user-1',
+      );
+
+      expect(mockPrisma.deploymentOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ courierZone: 'inter_state' }) }),
+      );
+    });
+
+    it('moves still-deployed assets to the new end user', async () => {
+      mockPrisma.endUser.findUnique.mockResolvedValue({ id: 'eu-2', clientId: 'client-1' });
+
+      await service.update('order-1', { endUserId: 'eu-2' }, 'user-1');
+
+      expect(mockPrisma.asset.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['asset-1', 'asset-2'] },
+          currentStatus: 'deployed',
+          currentEndUserId: 'eu-1',
+        },
+        data: { currentEndUserId: 'eu-2' },
+      });
+    });
+
+    it('can clear the end user', async () => {
+      await service.update('order-1', { endUserId: null }, 'user-1');
+
+      expect(mockPrisma.deploymentOrder.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { endUserId: null } }),
+      );
+      expect(mockPrisma.asset.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { currentEndUserId: null } }),
+      );
+    });
+
+    it('rejects an end user that belongs to another client', async () => {
+      mockPrisma.endUser.findUnique.mockResolvedValue({ id: 'eu-9', clientId: 'other-client' });
+
+      await expect(service.update('order-1', { endUserId: 'eu-9' }, 'user-1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockPrisma.deploymentOrder.update).not.toHaveBeenCalled();
+    });
+
+    it('saves the transport charge in the same request', async () => {
+      await service.update(
+        'order-1',
+        { contactName: 'Ravi', transportChargePaise: 180000 },
+        'user-1',
+      );
+
+      expect(mockPrisma.deploymentOrder.update).toHaveBeenCalled();
+      expect(mockLedger.create).toHaveBeenCalledWith(
+        expect.objectContaining({ eventType: 'TRANSPORT', amountPaise: BigInt(180000) }),
+      );
+    });
+
+    it('applies nothing when a transport change is sent for a cancelled order', async () => {
+      mockPrisma.deploymentOrder.findUnique.mockResolvedValue({ ...order, status: 'cancelled' });
+
+      await expect(
+        service.update('order-1', { contactName: 'Ravi', transportChargePaise: 1000 }, 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.deploymentOrder.update).not.toHaveBeenCalled();
+      expect(mockLedger.create).not.toHaveBeenCalled();
+    });
+
+    it('still lets a cancelled order have its details corrected', async () => {
+      mockPrisma.deploymentOrder.findUnique.mockResolvedValue({ ...order, status: 'cancelled' });
+
+      await service.update('order-1', { notes: 'Cancelled by client' }, 'user-1');
+
+      expect(mockPrisma.deploymentOrder.update).toHaveBeenCalled();
     });
   });
 });
