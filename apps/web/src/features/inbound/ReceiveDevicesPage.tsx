@@ -93,6 +93,8 @@ export function ReceiveDevicesPage() {
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [submitError, setSubmitError] = useState('');
   const [scanNotice, setScanNotice] = useState('');
+  // Line the operator picked to scan against; '' leaves it to the auto-fill.
+  const [activeItemId, setActiveItemId] = useState('');
   const scanRef = useRef<HTMLInputElement>(null);
 
   const { data: delivery } = useQuery({
@@ -138,10 +140,27 @@ export function ReceiveDevicesPage() {
   const remainingFor = (item: DeliveryItem): number =>
     item.quantity - (alreadyReceived.get(item.id) ?? 0) - scannedFor(item.id);
 
-  // Adds one device per serial, each filled from the first expected line that
-  // still has devices outstanding, so scanning 10 ThinkPads then 5 monitors (or
-  // pasting 10 serials at once) needs no manual typing. Returns how many were
-  // skipped as duplicates.
+  // The line new scans are filled from: the one the operator picked, otherwise
+  // the first line with devices still outstanding.
+  const pickedItem = delivery?.items.find((i) => i.id === activeItemId);
+  const currentItemId =
+    pickedItem?.id ??
+    (
+      delivery?.items.find((i) => remainingFor(i) > 0) ??
+      (delivery?.items.length === 1 ? delivery.items[0] : undefined)
+    )?.id;
+
+  // Selecting a line keeps scanning on it until another is chosen, even past its
+  // expected quantity (shown as "extra"), so a partial count never forces a switch.
+  function selectItem(itemId: string) {
+    setActiveItemId((prev) => (prev === itemId ? '' : itemId));
+    refocusScan();
+  }
+
+  // Adds one device per serial, each filled from the picked expected line, or
+  // else the first line that still has devices outstanding, so scanning 10
+  // ThinkPads then 5 monitors (or pasting 10 serials at once) needs no manual
+  // typing. Returns how many were skipped as duplicates.
   function addSerials(rawSerials: string[]): number {
     const seen = new Set(devices.map((d) => d.serialNumber));
     const remaining = new Map<string, number>(
@@ -161,9 +180,10 @@ export function ReceiveDevicesPage() {
       seen.add(serial);
 
       const target =
-        delivery &&
-        (delivery.items.find((i) => (remaining.get(i.id) ?? 0) > 0) ??
-          (delivery.items.length === 1 ? delivery.items[0] : undefined));
+        pickedItem ??
+        (delivery &&
+          (delivery.items.find((i) => (remaining.get(i.id) ?? 0) > 0) ??
+            (delivery.items.length === 1 ? delivery.items[0] : undefined)));
       if (target) remaining.set(target.id, (remaining.get(target.id) ?? 0) - 1);
       const prefill = target ? fromItem(target) : undefined;
 
@@ -385,17 +405,41 @@ export function ReceiveDevicesPage() {
         {/* Expected items progress */}
         {delivery && delivery.items.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">Expected items</h2>
-            <div className="space-y-2">
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">
+              Expected items
+              {delivery.items.length > 1 && (
+                <span className="ml-2 font-normal text-gray-400">
+                  click a line to scan devices against it
+                </span>
+              )}
+            </h2>
+            <div className="space-y-1.5">
               {delivery.items.map((item) => {
                 const received = alreadyReceived.get(item.id) ?? 0;
                 const scanned = scannedFor(item.id);
                 const remaining = item.quantity - received - scanned;
+                const isCurrent = item.id === currentItemId;
                 return (
-                  <div key={item.id} className="flex flex-wrap items-center gap-x-3 text-sm">
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => selectItem(item.id)}
+                    aria-pressed={isCurrent}
+                    disabled={delivery.items.length === 1}
+                    className={`flex w-full flex-wrap items-center gap-x-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                      isCurrent
+                        ? 'border-[#E86F2C] bg-orange-50'
+                        : 'border-transparent hover:bg-gray-50'
+                    }`}
+                  >
                     <span className="font-medium text-gray-900">
                       {item.manufacturer} {item.model}
                     </span>
+                    {isCurrent && delivery.items.length > 1 && (
+                      <span className="rounded-full bg-[#E86F2C] px-2 py-0.5 text-xs font-semibold text-white">
+                        Scanning for this
+                      </span>
+                    )}
                     <span className="text-gray-500 capitalize">{item.category}</span>
                     <span className="ml-auto text-gray-600">
                       <span className="font-semibold text-gray-900">{received + scanned}</span> of{' '}
@@ -412,7 +456,7 @@ export function ReceiveDevicesPage() {
                             : `${-remaining} extra`}
                       </span>
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
