@@ -99,7 +99,7 @@ export class InboundBillingService {
     };
   }
 
-  /** Marks every currently pending device as billed for the given month. */
+  /** Marks the pending devices received in the given month (IST) as billed; other months stay pending. */
   async markBilled(
     clientId: string,
     billingMonth: string,
@@ -114,9 +114,9 @@ export class InboundBillingService {
     // Recomputed inside the transaction so what is stamped is exactly what is
     // charged, even if assets were added since the page loaded.
     const record = await this.prisma.$transaction(async (tx) => {
-      const totals = await this.computePending(tx, clientId);
+      const totals = await this.computePending(tx, clientId, billingMonth);
       if (totals.assetIds.length === 0) {
-        throw new BadRequestException('Nothing pending to bill for this client');
+        throw new BadRequestException('Nothing pending to bill for this client in that month');
       }
 
       const created = await tx.inboundBilling.create({
@@ -208,7 +208,17 @@ export class InboundBillingService {
     };
   }
 
-  private async computePending(db: Db, clientId: string): Promise<Totals> {
+  private async computePending(db: Db, clientId: string, month?: string): Promise<Totals> {
+    // Month boundaries are Asia/Kolkata, matching how the UI shows dates. Without a month,
+    // every pending device counts.
+    const received = month
+      ? {
+          createdAt: {
+            gte: new Date(`${month}-01T00:00:00+05:30`),
+            lt: this.nextMonthStart(month),
+          },
+        }
+      : {};
     const select = {
       id: true,
       serialNumber: true,
@@ -222,6 +232,7 @@ export class InboundBillingService {
         where: {
           clientId,
           inboundBillingId: null,
+          ...received,
           ledgerEntries: { none: { eventType: 'INGEST' } },
         },
         select,
@@ -232,6 +243,7 @@ export class InboundBillingService {
         where: {
           clientId,
           inboundBillingId: null,
+          ...received,
           ledgerEntries: { some: { eventType: 'INGEST' } },
         },
         select: {
@@ -306,6 +318,12 @@ export class InboundBillingService {
       if (amount > 0n) add(a, amount, true);
     }
     return totals;
+  }
+
+  private nextMonthStart(month: string): Date {
+    const [y, m] = month.split('-').map(Number);
+    const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+    return new Date(`${next}-01T00:00:00+05:30`);
   }
 
   private ratesFor(db: Pick<PrismaService, 'rateCardItem'>, code: string): Promise<RateVersion[]> {
