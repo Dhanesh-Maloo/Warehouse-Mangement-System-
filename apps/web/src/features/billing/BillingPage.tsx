@@ -536,14 +536,20 @@ export function BillingPage() {
 
   // Empty selection means "all categories"; otherwise only the ticked ones are listed.
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
-  const availableCats = Array.from(
-    new Set(visibleEntries.map((e) => EVENT_CATEGORY[e.eventType] ?? 'Other')),
-  ).sort();
-  const activeCats = selectedCats.filter((c) => availableCats.includes(c));
+  // Every charge type is always offered, even with nothing pending, so the list of options
+  // doesn't change shape as charges get billed.
+  const availableCats = Object.keys(CATEGORY_COLORS);
+  const catCounts = visibleEntries.reduce<Record<string, number>>((acc, e) => {
+    const c = EVENT_CATEGORY[e.eventType] ?? 'Other';
+    acc[c] = (acc[c] ?? 0) + 1;
+    return acc;
+  }, {});
+  const activeCats = selectedCats;
   const ledgerEntries =
     activeCats.length === 0
       ? visibleEntries
       : visibleEntries.filter((e) => activeCats.includes(EVENT_CATEGORY[e.eventType] ?? 'Other'));
+  const filteredAssetCount = new Set(ledgerEntries.map((e) => e.asset.id)).size;
   const filteredTotal = ledgerEntries.reduce((sum, e) => sum + paise(e.amountPaise), 0n);
   const toggleCat = (cat: string) =>
     setSelectedCats((prev) =>
@@ -1277,7 +1283,7 @@ export function BillingPage() {
             </div>
 
             {/* Charge type filter */}
-            {availableCats.length > 1 && (
+            {effectiveClientId && (
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
                 <span className="text-sm font-medium text-gray-700">Show charges:</span>
                 {availableCats.map((cat) => (
@@ -1291,26 +1297,28 @@ export function BillingPage() {
                       onChange={() => toggleCat(cat)}
                       className="w-4 h-4 rounded accent-blue-600"
                     />
-                    {cat}
+                    {cat} ({catCounts[cat] ?? 0})
                   </label>
                 ))}
                 {activeCats.length > 0 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCats([])}
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      Clear (show all)
-                    </button>
-                    <span className="ml-auto text-sm text-gray-500">
-                      {ledgerEntries.length} events ·{' '}
-                      <span className="font-semibold text-gray-900 tabular-nums">
-                        {formatINR(filteredTotal.toString())}
-                      </span>
-                    </span>
-                  </>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCats([])}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Clear (show all)
+                  </button>
                 )}
+                <span className="ml-auto text-sm text-gray-500">
+                  {activeCats.length > 0 ? 'Selected' : 'All'}:{' '}
+                  <span className="font-semibold text-gray-900 tabular-nums">
+                    {ledgerEntries.length} events · {filteredAssetCount} assets
+                  </span>{' '}
+                  ·{' '}
+                  <span className="font-semibold text-gray-900 tabular-nums">
+                    {formatINR(filteredTotal.toString())}
+                  </span>
+                </span>
               </div>
             )}
 
