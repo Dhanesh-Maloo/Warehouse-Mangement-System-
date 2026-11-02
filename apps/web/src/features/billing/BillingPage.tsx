@@ -564,10 +564,6 @@ export function BillingPage() {
   }, {});
   const periodTotal = pendingEntries.reduce((sum, e) => sum + paise(e.amountPaise), 0n);
 
-  const isUnbilledInbound = (e: LedgerEntry): boolean =>
-    e.referenceType === 'pending_inbound' ||
-    (e.eventType === 'INGEST' && unbilledLedgerAssetIds.has(e.asset.id));
-
   const pendingDeviceCount = inboundPending
     ? inboundPending.laptopCount + inboundPending.peripheralCount
     : 0;
@@ -1365,7 +1361,7 @@ export function BillingPage() {
                                   Billed
                                 </span>
                               )}
-                              {isUnbilledInbound(e) && (
+                              {!isBilledEntry(e) && (
                                 <span className="ml-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
                                   Not yet billed
                                 </span>
