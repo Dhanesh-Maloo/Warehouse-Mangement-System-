@@ -493,8 +493,14 @@ export function BillingPage() {
   const pendingDevices = inboundPending?.devices ?? [];
   // Devices received through inbound already have a ledger INGEST row; it just needs the tag.
   const unbilledLedgerAssetIds = new Set(pendingDevices.filter((d) => d.inLedger).map((d) => d.id));
+  // The ledger query is limited to the chosen dates (and 500 rows), so a device whose INGEST
+  // row falls outside that window would otherwise vanish from the list and make the pending
+  // total disagree with "Inbound Charges to Bill". Those get a virtual row too.
+  const ledgerIngestAssetIds = new Set(
+    allLedgerEntries.filter((e) => e.eventType === 'INGEST').map((e) => e.asset.id),
+  );
   const pendingInboundRows: LedgerEntry[] = pendingDevices
-    .filter((d) => !d.inLedger)
+    .filter((d) => !d.inLedger || !ledgerIngestAssetIds.has(d.id))
     .map((d) => ({
       id: `pending-${d.id}`,
       eventType: 'INGEST',
@@ -526,7 +532,23 @@ export function BillingPage() {
   };
   const pendingEntries = everyEntry.filter((e) => !isBilledEntry(e));
   const billedEntries = everyEntry.filter(isBilledEntry);
-  const ledgerEntries = showBilled ? everyEntry : pendingEntries;
+  const visibleEntries = showBilled ? everyEntry : pendingEntries;
+
+  // Empty selection means "all categories"; otherwise only the ticked ones are listed.
+  const [selectedCats, setSelectedCats] = useState<string[]>([]);
+  const availableCats = Array.from(
+    new Set(visibleEntries.map((e) => EVENT_CATEGORY[e.eventType] ?? 'Other')),
+  ).sort();
+  const activeCats = selectedCats.filter((c) => availableCats.includes(c));
+  const ledgerEntries =
+    activeCats.length === 0
+      ? visibleEntries
+      : visibleEntries.filter((e) => activeCats.includes(EVENT_CATEGORY[e.eventType] ?? 'Other'));
+  const filteredTotal = ledgerEntries.reduce((sum, e) => sum + paise(e.amountPaise), 0n);
+  const toggleCat = (cat: string) =>
+    setSelectedCats((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+    );
 
   // Totals only count what is still waiting to be billed
   const categoryTotals = pendingEntries.reduce<Record<string, bigint>>((acc, e) => {
@@ -1253,6 +1275,44 @@ export function BillingPage() {
                 </details>
               )}
             </div>
+
+            {/* Charge type filter */}
+            {availableCats.length > 1 && (
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3 flex items-center gap-x-5 gap-y-2 flex-wrap">
+                <span className="text-sm font-medium text-gray-700">Show charges:</span>
+                {availableCats.map((cat) => (
+                  <label
+                    key={cat}
+                    className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={activeCats.includes(cat)}
+                      onChange={() => toggleCat(cat)}
+                      className="w-4 h-4 rounded accent-blue-600"
+                    />
+                    {cat}
+                  </label>
+                ))}
+                {activeCats.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCats([])}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Clear (show all)
+                    </button>
+                    <span className="ml-auto text-sm text-gray-500">
+                      {ledgerEntries.length} events ·{' '}
+                      <span className="font-semibold text-gray-900 tabular-nums">
+                        {formatINR(filteredTotal.toString())}
+                      </span>
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Detail table */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
