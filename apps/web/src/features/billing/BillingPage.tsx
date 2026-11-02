@@ -247,12 +247,6 @@ function isAccrualEntry(e: LedgerEntry): boolean {
   return e.referenceType === 'storage_accrual' || e.referenceType === 'storage_accrual_reversal';
 }
 
-// Calendar month (YYYY-MM) of a timestamp in IST, so a device received late on the 31st
-// isn't counted in the next month by the browser's time zone.
-function istMonth(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }).slice(0, 7);
-}
-
 function monthLabel(ym: string): string {
   const [year, month] = ym.split('-').map(Number);
   return new Date(year, month - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
@@ -497,17 +491,6 @@ export function BillingPage() {
   // charge is shown here as a virtual "Inbound (Ingest)" row. Always shown, regardless of
   // the date filter, because an unbilled charge is owed whatever month the device arrived.
   const pendingDevices = inboundPending?.devices ?? [];
-  // Billing is per month: only devices received in the chosen month are billed (and shown as
-  // pending); devices from other months stay pending until their own month is picked.
-  const monthDevices = pendingDevices.filter((d) => istMonth(d.addedAt) === inboundMonth);
-  const monthDeviceIds = new Set(monthDevices.map((d) => d.id));
-  const monthLaptops = monthDevices.filter((d) => d.category !== 'peripheral');
-  const monthPeripherals = monthDevices.filter((d) => d.category === 'peripheral');
-  const sumPaise = (ds: PendingInboundDevice[]): bigint =>
-    ds.reduce((sum, d) => sum + paise(d.amountPaise), 0n);
-  const monthLaptopAmount = sumPaise(monthLaptops);
-  const monthPeripheralAmount = sumPaise(monthPeripherals);
-  const monthTotalAmount = monthLaptopAmount + monthPeripheralAmount;
   // Devices received through inbound already have a ledger INGEST row; it just needs the tag.
   const unbilledLedgerAssetIds = new Set(pendingDevices.filter((d) => d.inLedger).map((d) => d.id));
   // The ledger query is limited to the chosen dates (and 500 rows), so a device whose INGEST
@@ -517,7 +500,7 @@ export function BillingPage() {
     allLedgerEntries.filter((e) => e.eventType === 'INGEST').map((e) => e.asset.id),
   );
   const pendingInboundRows: LedgerEntry[] = pendingDevices
-    .filter((d) => monthDeviceIds.has(d.id) && (!d.inLedger || !ledgerIngestAssetIds.has(d.id)))
+    .filter((d) => !d.inLedger || !ledgerIngestAssetIds.has(d.id))
     .map((d) => ({
       id: `pending-${d.id}`,
       eventType: 'INGEST',
@@ -531,16 +514,7 @@ export function BillingPage() {
     }));
   const everyEntry = [
     ...pendingInboundRows,
-    ...allLedgerEntries.filter(
-      (e) =>
-        !isAccrualEntry(e) &&
-        // An unbilled inbound charge from another month waits for its own month.
-        !(
-          unbilledLedgerAssetIds.has(e.asset.id) &&
-          EVENT_CATEGORY[e.eventType] === 'Inbound' &&
-          !monthDeviceIds.has(e.asset.id)
-        ),
-    ),
+    ...allLedgerEntries.filter((e) => !isAccrualEntry(e)),
   ].sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1));
 
   // Inbound is billed through the per-device flow (an asset is stamped once billed); every other
@@ -590,7 +564,9 @@ export function BillingPage() {
   }, {});
   const periodTotal = pendingEntries.reduce((sum, e) => sum + paise(e.amountPaise), 0n);
 
-  const pendingDeviceCount = monthDevices.length;
+  const pendingDeviceCount = inboundPending
+    ? inboundPending.laptopCount + inboundPending.peripheralCount
+    : 0;
   const billingBusy = markInboundBilledMutation.isPending || markChargesBilledMutation.isPending;
 
   function canBillCategory(cat: string): boolean {
@@ -603,7 +579,7 @@ export function BillingPage() {
       if (!inboundPending || !inboundMonth) return;
       if (
         window.confirm(
-          `Mark all ${pendingDeviceCount} inbound devices received in ${monthLabel(inboundMonth)} (${formatINR(monthTotalAmount)}) as billed? They will not be charged again; devices from other months stay pending.`,
+          `Mark all ${pendingDeviceCount} inbound devices (${formatINR(inboundPending.totalAmountPaise)}) as billed for ${monthLabel(inboundMonth)}? They will not be charged again; devices added later will show as pending.`,
         )
       ) {
         markInboundBilledMutation.mutate();
@@ -629,7 +605,7 @@ export function BillingPage() {
         onClick={() => {
           if (
             window.confirm(
-              `Mark all ${pendingDeviceCount} devices received in ${monthLabel(inboundMonth)} (${formatINR(monthTotalAmount)}) as billed? They will not be charged again; devices from other months stay pending.`,
+              `Mark all ${pendingDeviceCount} devices (${formatINR(inboundPending.totalAmountPaise)}) as billed for ${monthLabel(inboundMonth)}? They will not be charged again; devices added later will show as pending.`,
             )
           ) {
             markInboundBilledMutation.mutate();
@@ -641,7 +617,7 @@ export function BillingPage() {
         <CheckCircle size={15} />
         {markInboundBilledMutation.isPending
           ? 'Billing…'
-          : `Bill ${monthLabel(inboundMonth)} inbound (${formatINR(monthTotalAmount)})`}
+          : `Billing done — bill all inbound till now (${formatINR(inboundPending.totalAmountPaise)})`}
       </button>
     ) : null;
 
@@ -948,10 +924,11 @@ export function BillingPage() {
                     <HardDrive size={14} /> Laptops / monitors
                   </div>
                   <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
-                    {monthLaptops.length}
+                    {inboundPending.laptopCount}
                   </p>
                   <p className="text-xs text-gray-400">
-                    × {formatINR(inboundPending.rates.laptopPaise)} = {formatINR(monthLaptopAmount)}
+                    × {formatINR(inboundPending.rates.laptopPaise)} ={' '}
+                    {formatINR(inboundPending.laptopAmountPaise)}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
@@ -959,11 +936,11 @@ export function BillingPage() {
                     <Package size={14} /> Peripherals
                   </div>
                   <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">
-                    {monthPeripherals.length}
+                    {inboundPending.peripheralCount}
                   </p>
                   <p className="text-xs text-gray-400">
                     × {formatINR(inboundPending.rates.peripheralPaise)} ={' '}
-                    {formatINR(monthPeripheralAmount)}
+                    {formatINR(inboundPending.peripheralAmountPaise)}
                   </p>
                 </div>
                 <div className="bg-[#E86F2C]/5 border border-[#E86F2C]/20 rounded-lg p-4">
@@ -971,12 +948,12 @@ export function BillingPage() {
                     <TrendingUp size={14} /> Amount to bill
                   </div>
                   <p className="text-2xl font-bold text-[#E86F2C] mt-1 tabular-nums">
-                    {formatINR(monthTotalAmount)}
+                    {formatINR(inboundPending.totalAmountPaise)}
                   </p>
                 </div>
               </div>
 
-              {pendingDevices.length === 0 ? (
+              {inboundPending.laptopCount + inboundPending.peripheralCount === 0 ? (
                 <div className="flex items-center gap-2 text-sm text-emerald-700">
                   <CheckCircle size={16} /> Nothing pending — all devices have been billed.
                 </div>
@@ -989,11 +966,6 @@ export function BillingPage() {
                     className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                   />
                   {billAllButton}
-                  {pendingDeviceCount === 0 && (
-                    <span className="text-sm text-gray-500">
-                      No pending devices were received in {monthLabel(inboundMonth)}.
-                    </span>
-                  )}
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">
@@ -1183,7 +1155,7 @@ export function BillingPage() {
                   {formatINR(periodTotal.toString())}
                 </span>
               </div>
-              {canMarkBilled && inboundPending && pendingDevices.length > 0 && (
+              {canMarkBilled && inboundPending && pendingDeviceCount > 0 && (
                 <div className="flex items-center gap-2 text-sm text-gray-600 flex-wrap">
                   <span>Inbound billing month</span>
                   <input
