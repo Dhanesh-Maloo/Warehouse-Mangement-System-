@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, ForbiddenException, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { JwtPayload } from '../common/types/jwt-payload.type';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('clients')
@@ -22,6 +24,20 @@ export class ClientsController {
     );
   }
 
+  /** Readable by every role, but client-scoped users only for their own client. */
+  @Get(':id/transport-pricing')
+  @Roles('admin', 'manager', 'operator', 'client_user', 'editor', 'client_admin')
+  transportPricing(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ): ReturnType<ClientsService['getTransportPricing']> {
+    const scoped = ['client_user', 'editor', 'client_admin'].includes(user.role);
+    if (scoped && user.clientId !== id) {
+      throw new ForbiddenException('Cannot read another client');
+    }
+    return this.clientsService.getTransportPricing(id);
+  }
+
   @Get(':id')
   @Roles('admin', 'manager', 'operator')
   findOne(@Param('id') id: string): ReturnType<ClientsService['findOne']> {
@@ -34,7 +50,9 @@ export class ClientsController {
     return this.clientsService.create(dto);
   }
 
+  // The Clients page edits with PATCH; PUT is kept for existing callers.
   @Put(':id')
+  @Patch(':id')
   @Roles('admin')
   update(
     @Param('id') id: string,

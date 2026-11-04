@@ -10,6 +10,11 @@ import { LedgerService } from '../ledger/ledger.service';
 import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
 import { CourierZoneService } from '../logistics/courier-zone.service';
+import {
+  computeTransportCharge,
+  describeTransportCharge,
+  pricingFromClient,
+} from '../common/transport-pricing';
 import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateRetrievalRequestDto } from './dto/create-retrieval-request.dto';
 import type { UpdateRetrievalStatusDto } from './dto/update-retrieval-status.dto';
@@ -144,7 +149,19 @@ export class RetrievalService {
     // The zone is only an informational label now; transport is billed from the
     // manual amount the operator enters, not from a zone rate.
     const courierZone = await this.courierZone.resolveZone(dto.pickupAddress.pincode);
-    const transportPaise = BigInt(dto.transportChargePaise ?? 0);
+    // The pickup transport is marked up per the client's pricing (the redeploy leg is priced the
+    // same way later, when its deployment order is created from the typed amount).
+    const transportPricing = pricingFromClient(
+      await this.prisma.client.findUnique({
+        where: { id: dto.clientId },
+        select: { transportMarkupBps: true, transportGstBps: true },
+      }),
+    );
+    const transportCharge = computeTransportCharge(
+      BigInt(dto.transportChargePaise ?? 0),
+      transportPricing,
+    );
+    const transportPaise = transportCharge.totalPaise;
 
     // Two billed wipe tiers, mirroring Disposal's non_certified/certified_blanco.
     const wipeCode =
@@ -215,6 +232,7 @@ export class RetrievalService {
           createdBy: createdByUserId,
           referenceId: retrieval.id,
           referenceType: 'retrieval',
+          notes: describeTransportCharge(transportCharge, transportPricing) || undefined,
         });
       }
 

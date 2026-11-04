@@ -40,6 +40,8 @@ export class ClientsService {
           dto.commitmentAmountPaise != null ? BigInt(dto.commitmentAmountPaise) : undefined,
         commitmentLaptopCount: dto.commitmentLaptopCount,
         commitmentPeripheralCount: dto.commitmentPeripheralCount,
+        transportMarkupBps: dto.transportMarkupBps,
+        transportGstBps: dto.transportGstBps,
         allowedEmailDomains: dto.allowedEmailDomains ?? [],
       },
     });
@@ -75,6 +77,14 @@ export class ClientsService {
       newValue: dto,
     });
     return client;
+  }
+
+  /** Transport pricing for the pricing preview in forms; null fields mean "billed as typed". */
+  async getTransportPricing(
+    id: string,
+  ): Promise<{ markupBps: number | null; gstBps: number | null }> {
+    const client = await this.findOne(id);
+    return { markupBps: client.transportMarkupBps, gstBps: client.transportGstBps };
   }
 
   /** Soft-delete: sets isActive = false. Never a hard delete — history stays intact. */

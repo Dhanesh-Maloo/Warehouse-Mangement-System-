@@ -96,7 +96,14 @@ export function DeploymentOrderDrawer({ order, onClose, onDownloadChallan, onEdi
           <Field label="Courier zone">{ZONE_LABELS[order.courierZone]}</Field>
           <Field label="Transport charge">
             {Number(order.transportChargePaise) > 0 ? (
-              formatPaise(order.transportChargePaise)
+              <>
+                {formatPaise(order.transportChargePaise)}
+                {order.transportBasePaise != null && (
+                  <span className="block text-gray-500">
+                    Entered {formatPaise(order.transportBasePaise)}, billed with markup and GST
+                  </span>
+                )}
+              </>
             ) : (
               <span className="text-gray-400">Not entered yet</span>
             )}

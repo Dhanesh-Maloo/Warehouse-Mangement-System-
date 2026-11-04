@@ -10,6 +10,12 @@ import { LedgerService } from '../ledger/ledger.service';
 import { RateCardService } from '../rate-card/rate-card.service';
 import { AuditService } from '../audit/audit.service';
 import { CourierZoneService } from '../logistics/courier-zone.service';
+import {
+  computeTransportCharge,
+  describeTransportCharge,
+  pricingFromClient,
+  type TransportPricing,
+} from '../common/transport-pricing';
 import { AssetStatusHistoryService } from '../asset-status-history/asset-status-history.service';
 import type { CreateDeploymentOrderDto } from './dto/create-deployment-order.dto';
 import type { UpdateDeploymentStatusDto } from './dto/update-deployment-status.dto';
@@ -240,7 +246,19 @@ export class DeploymentService {
     return this.findOne(id);
   }
 
-  /** Post the ledger adjustment that brings the order's transport charge to `transportChargePaise`. */
+  /** The client's transport pricing, or null when the amount is billed as typed. */
+  private async transportPricingFor(clientId: string): Promise<TransportPricing | null> {
+    const client = await this.prisma.client.findUnique({
+      where: { id: clientId },
+      select: { transportMarkupBps: true, transportGstBps: true },
+    });
+    return pricingFromClient(client);
+  }
+
+  /**
+   * Post the ledger adjustment that brings the order's billed transport charge to what
+   * `transportChargePaise` (the amount as typed) comes to under the client's pricing.
+   */
   private async applyTransportCharge(
     order: DeploymentOrderView,
     transportChargePaise: number,
@@ -250,9 +268,17 @@ export class DeploymentService {
       throw new BadRequestException('Cannot change the transport charge of a cancelled order');
     }
 
+    const pricing = await this.transportPricingFor(order.clientId);
+    const charge = computeTransportCharge(BigInt(transportChargePaise), pricing);
     const current = order.transportChargePaise;
-    const target = BigInt(transportChargePaise);
+    const target = charge.totalPaise;
     const delta = target - current;
+    if (pricing) {
+      await this.prisma.deploymentOrder.update({
+        where: { id: order.id },
+        data: { transportBasePaise: charge.basePaise },
+      });
+    }
     if (delta === BigInt(0)) return;
 
     const rupees = (paise: bigint): string => `₹${(Number(paise) / 100).toFixed(2)}`;
@@ -267,10 +293,14 @@ export class DeploymentService {
       createdBy: updatedByUserId,
       referenceId: order.id,
       referenceType: 'deployment_order',
-      notes:
+      notes: [
         current === BigInt(0)
           ? 'Transport charge added after order creation'
           : `Transport charge adjusted from ${rupees(current)} to ${rupees(target)}`,
+        describeTransportCharge(charge, pricing),
+      ]
+        .filter(Boolean)
+        .join('. '),
     });
     await this.audit.log({
       userId: updatedByUserId,
@@ -318,7 +348,12 @@ export class DeploymentService {
     // The zone is only an informational label now; transport is billed from the
     // manual amount the operator enters, not from a zone rate.
     const courierZone = await this.courierZone.resolveZone(dto.deliveryAddress.pincode);
-    const transportPaise = BigInt(dto.transportChargePaise ?? 0);
+    const transportPricing = await this.transportPricingFor(dto.clientId);
+    const transportCharge = computeTransportCharge(
+      BigInt(dto.transportChargePaise ?? 0),
+      transportPricing,
+    );
+    const transportPaise = transportCharge.totalPaise;
 
     let labelingUnitRate = BigInt(0);
     if (dto.requiresLabeling) {
@@ -350,6 +385,7 @@ export class DeploymentService {
           ivalueTicketNumber: dto.ivalueTicketNumber,
           clientTicketNumber: dto.clientTicketNumber,
           notes: dto.notes ?? null,
+          transportBasePaise: transportPricing ? transportCharge.basePaise : null,
           createdByUserId,
           status: 'pending',
         },
@@ -370,6 +406,7 @@ export class DeploymentService {
           createdBy: createdByUserId,
           referenceId: order.id,
           referenceType: 'deployment_order',
+          notes: describeTransportCharge(transportCharge, transportPricing) || undefined,
         });
       }
 

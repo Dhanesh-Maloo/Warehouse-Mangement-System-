@@ -44,6 +44,7 @@ describe('DeploymentService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       endUser: { findUnique: jest.fn() },
+      client: { findUnique: jest.fn().mockResolvedValue(null) },
       deploymentOrder: {
         findUnique: jest.fn(),
         create: jest
@@ -115,6 +116,25 @@ describe('DeploymentService', () => {
         expect.objectContaining({ action: 'deployment.create', entityId: 'order-1' }),
       );
       expect(result.id).toBe('order-1');
+    });
+
+    it('bills the typed transport amount plus 15%, then 18% GST on that sum, for a client with pricing', async () => {
+      mockPrisma.client.findUnique.mockResolvedValue({
+        transportMarkupBps: 1500,
+        transportGstBps: 1800,
+      });
+
+      await service.create({ ...baseDto, transportChargePaise: 100000 }, 'user-1');
+
+      const transport = mockLedger.create.mock.calls.find((c) => c[0].eventType === 'TRANSPORT');
+      expect(transport![0].amountPaise).toBe(BigInt(135700));
+      expect(transport![0].notes).toContain('Base');
+      // The typed amount is kept so a later edit does not mark up an already marked-up total.
+      expect(mockPrisma.deploymentOrder.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ transportBasePaise: BigInt(100000) }),
+        }),
+      );
     });
 
     it('posts one manual transport charge for the shipment and bundle/labeling/repacking per asset', async () => {

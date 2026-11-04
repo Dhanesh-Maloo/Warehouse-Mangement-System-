@@ -24,6 +24,8 @@ export interface DeploymentOrder {
   courierName?: string | null;
   /** Transport charge currently billed for the order, in paise (bigint serialised as a string). */
   transportChargePaise: string;
+  /** Amount as typed before the client's markup and GST; null when the client has no pricing. */
+  transportBasePaise: string | null;
   ivalueTicketNumber?: string;
   clientTicketNumber?: string;
   notes?: string;

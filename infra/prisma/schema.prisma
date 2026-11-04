@@ -215,6 +215,11 @@ model Client {
   commitmentAmountPaise       BigInt?      @map("commitment_amount_paise")
   commitmentLaptopCount       Int?         @map("commitment_laptop_count")
   commitmentPeripheralCount   Int?         @map("commitment_peripheral_count")
+  // Transport pricing for this client, in basis points (1500 = 15%). Both null means the
+  // manual transport amount is billed as typed. When set, billed = base + markup, then GST
+  // on that sum (see common/transport-pricing.ts).
+  transportMarkupBps          Int?         @map("transport_markup_bps")
+  transportGstBps             Int?         @map("transport_gst_bps")
   createdAt                   DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                   DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -603,6 +608,9 @@ model DeploymentOrder {
   trackingNumber         String?               @map("tracking_number")
   courierName            String?               @map("courier_name")
   actualCarrierCostPaise BigInt?               @map("actual_carrier_cost_paise")
+  // Transport amount as typed by the operator, before the client's markup and GST. Null for
+  // clients without transport pricing. The ledger holds the final billed amount.
+  transportBasePaise     BigInt?               @map("transport_base_paise")
   requiresLabeling       Boolean               @default(false) @map("requires_labeling")
   requiresRepacking      Boolean               @default(false) @map("requires_repacking")
   status                 DeploymentOrderStatus @default(pending)

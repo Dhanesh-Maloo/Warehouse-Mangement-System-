@@ -7,6 +7,7 @@ import {
   IsInt,
   IsArray,
   Min,
+  Max,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -56,6 +57,20 @@ export class CreateClientDto {
   @IsInt()
   @Min(0)
   commitmentPeripheralCount?: number;
+
+  // Transport pricing in basis points (1500 = 15%): the typed transport amount gets the markup,
+  // then GST on that sum. Leave both unset to bill the typed amount as is.
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  transportMarkupBps?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10000)
+  transportGstBps?: number;
 
   // Email domains (e.g. "esevel.com") allowed to self-register as a
   // client_user of this client via an admin-issued invite. Omit/empty to

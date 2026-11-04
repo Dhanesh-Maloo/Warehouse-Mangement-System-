@@ -6,6 +6,7 @@ import type { UpdateRetrievalStatusDto } from './dto/update-retrieval-status.dto
 
 describe('RetrievalService', () => {
   let mockPrisma: {
+    client: { findUnique: jest.Mock };
     retrievalRequest: { create: jest.Mock; update: jest.Mock; findUnique: jest.Mock };
     asset: { findUnique: jest.Mock; update: jest.Mock };
     user: { findUnique: jest.Mock };
@@ -49,6 +50,7 @@ describe('RetrievalService', () => {
 
   beforeEach(() => {
     mockPrisma = {
+      client: { findUnique: jest.fn().mockResolvedValue(null) },
       retrievalRequest: {
         create: jest.fn().mockResolvedValue({
           id: 'retrieval-1',
@@ -120,6 +122,18 @@ describe('RetrievalService', () => {
         );
       },
     );
+
+    it('bills the pickup transport plus 15%, then 18% GST on that sum, for a client with pricing', async () => {
+      mockPrisma.client.findUnique.mockResolvedValue({
+        transportMarkupBps: 1500,
+        transportGstBps: 1800,
+      });
+
+      await service.create({ ...baseDto, transportChargePaise: 100000 }, 'user-1');
+
+      const transport = mockLedger.create.mock.calls.find((c) => c[0].eventType === 'TRANSPORT');
+      expect(transport![0].amountPaise).toBe(BigInt(135700));
+    });
 
     it('posts no transport charge when no amount is entered', async () => {
       await service.create(baseDto, 'user-1');

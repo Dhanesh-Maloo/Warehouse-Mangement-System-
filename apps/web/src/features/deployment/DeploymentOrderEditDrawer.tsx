@@ -1,3 +1,4 @@
+import { useTransportPricing, TransportBreakdown } from '../../lib/transport-pricing';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
@@ -32,7 +33,10 @@ function Label({ children }: { children: React.ReactNode }) {
 export function DeploymentOrderEditDrawer({ order, onClose }: EditDrawerProps) {
   const qc = useQueryClient();
   const address = order.deliveryAddress;
-  const initialTransportPaise = Number(order.transportChargePaise);
+  const transportPricing = useTransportPricing(order.clientId);
+  // The amount as typed (before markup and GST); orders from before pricing was set up only have
+  // the billed total, which is then the best available starting point.
+  const initialTransportPaise = Number(order.transportBasePaise ?? order.transportChargePaise);
 
   const [form, setForm] = useState({
     addrLine1: address.line1,
@@ -222,9 +226,10 @@ export function DeploymentOrderEditDrawer({ order, onClose }: EditDrawerProps) {
                 {cancelled
                   ? 'Cancelled orders cannot be billed for transport.'
                   : initialTransportPaise > 0
-                    ? `Currently ${formatPaise(initialTransportPaise)}. Enter the final amount; only the difference is added to billing.`
+                    ? `Currently ${formatPaise(initialTransportPaise)}${transportPricing ? ' before markup and GST' : ''}. Enter the final amount; only the difference is added to billing.`
                     : 'Not entered yet. Once saved, it appears in Billing as a pending charge.'}
               </p>
+              <TransportBreakdown amount={form.transportCharge} pricing={transportPricing} />
             </section>
 
             <section className="space-y-3">

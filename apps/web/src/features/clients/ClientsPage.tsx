@@ -16,6 +16,8 @@ interface Client {
   commitmentAmountPaise: string | null;
   commitmentLaptopCount: number | null;
   commitmentPeripheralCount: number | null;
+  transportMarkupBps: number | null;
+  transportGstBps: number | null;
   allowedEmailDomains: string[];
   createdAt: string;
 }
@@ -32,6 +34,8 @@ const EMPTY = {
   commitmentAmountRupees: '',
   commitmentLaptopCount: '',
   commitmentPeripheralCount: '',
+  transportMarkupPercent: '',
+  transportGstPercent: '',
   allowedEmailDomains: '',
 };
 
@@ -68,6 +72,8 @@ export function ClientsPage() {
         c.commitmentAmountPaise != null ? (Number(c.commitmentAmountPaise) / 100).toString() : '',
       commitmentLaptopCount: c.commitmentLaptopCount?.toString() ?? '',
       commitmentPeripheralCount: c.commitmentPeripheralCount?.toString() ?? '',
+      transportMarkupPercent: c.transportMarkupBps != null ? String(c.transportMarkupBps / 100) : '',
+      transportGstPercent: c.transportGstBps != null ? String(c.transportGstBps / 100) : '',
       allowedEmailDomains: (c.allowedEmailDomains ?? []).join(', '),
     });
     setEditing(c);
@@ -93,7 +99,19 @@ export function ClientsPage() {
         );
       }
 
+      const pricingFields = [form.transportMarkupPercent, form.transportGstPercent];
+      const anyPricing = pricingFields.some((v) => v.trim() !== '');
+      if (anyPricing && !pricingFields.every((v) => v.trim() !== '')) {
+        throw new Error('Set the transport markup % and GST % together, or leave both blank.');
+      }
+      if (pricingFields.some((v) => v.trim() !== '' && !(Number(v) >= 0 && Number(v) <= 100))) {
+        throw new Error('Transport percentages must be between 0 and 100.');
+      }
+
       const payload = {
+        // Blank on edit clears the pricing, so the typed transport amount is billed as is again.
+        transportMarkupBps: anyPricing ? Math.round(Number(form.transportMarkupPercent) * 100) : null,
+        transportGstBps: anyPricing ? Math.round(Number(form.transportGstPercent) * 100) : null,
         name: form.name,
         slug: form.slug,
         gstin: form.gstin || undefined,
@@ -255,6 +273,44 @@ export function ClientsPage() {
                   value={form.commitmentPeripheralCount}
                   onChange={(e) => field('commitmentPeripheralCount', e.target.value)}
                   placeholder="300"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Transport pricing (optional)</p>
+              <p className="text-xs text-gray-500">
+                The transport amount typed in any module gets this markup, then GST on that sum,
+                and the result is what goes to billing. Leave both blank to bill the typed amount.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Markup (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={form.transportMarkupPercent}
+                  onChange={(e) => field('transportMarkupPercent', e.target.value)}
+                  placeholder="15"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">GST (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={form.transportGstPercent}
+                  onChange={(e) => field('transportGstPercent', e.target.value)}
+                  placeholder="18"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                 />
               </div>

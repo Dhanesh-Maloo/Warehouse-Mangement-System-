@@ -1,3 +1,4 @@
+import { useTransportPricing, TransportBreakdown, transportTotalPaise } from '../../lib/transport-pricing';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -149,6 +150,7 @@ export function DeploymentPage() {
 
   // Resolve which clientId to use for assets / end-users / deployment list
   const activeClientId = isClientScoped ? clientId : filterClientId || undefined;
+  const transportPricing = useTransportPricing(activeClientId);
 
   const { data: availableAssets = [] } = useQuery({
     queryKey: ['inventory-in-storage', activeClientId],
@@ -475,7 +477,7 @@ export function DeploymentPage() {
     if (form.requiresLabeling) perAsset += 4800;
     if (form.requiresRepacking) perAsset += 14000;
     let paise = perAsset * assetCount;
-    paise += rupeesToPaise(form.transportCharge) ?? 0;
+    paise += transportTotalPaise(rupeesToPaise(form.transportCharge) ?? 0, transportPricing);
     const rupees = paise / 100;
     return rupees.toLocaleString('en-IN', {
       style: 'currency',
@@ -1003,6 +1005,7 @@ export function DeploymentPage() {
               <p className="text-xs text-gray-400 mt-1">
                 One charge for the whole shipment. Leave empty if there is no transport charge.
               </p>
+              <TransportBreakdown amount={form.transportCharge} pricing={transportPricing} />
             </div>
 
             {/* Add-ons */}

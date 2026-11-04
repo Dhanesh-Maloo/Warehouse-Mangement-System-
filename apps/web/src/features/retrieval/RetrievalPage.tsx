@@ -1,3 +1,4 @@
+import { useTransportPricing, TransportBreakdown } from '../../lib/transport-pricing';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -213,6 +214,7 @@ export function RetrievalPage() {
 
   // Deployed assets for the relevant client
   const assetClientId = isClientScoped ? clientId : selectedClientId;
+  const transportPricing = useTransportPricing(assetClientId || undefined);
   const { data: deployedAssets = [] } = useQuery({
     queryKey: ['deployed-assets', assetClientId],
     queryFn: async () => {
@@ -724,6 +726,7 @@ export function RetrievalPage() {
               <p className="text-xs text-gray-400 mt-1">
                 Cost of bringing the device back. Leave empty if there is none.
               </p>
+              <TransportBreakdown amount={form.transportCharge} pricing={transportPricing} />
             </div>
 
             {/* Diagnostic step — now mandatory for every retrieval, both bundle types */}
@@ -1012,6 +1015,10 @@ export function RetrievalPage() {
                   <p className="text-xs text-gray-400 mt-1">
                     Billed when the redeploy order is created after a clean inspection.
                   </p>
+                  <TransportBreakdown
+                    amount={form.redeployTransportCharge}
+                    pricing={transportPricing}
+                  />
                 </div>
               </div>
             )}
