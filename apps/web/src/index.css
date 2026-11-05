@@ -87,12 +87,21 @@
   .dark .border-gray-300  { border-color: rgb(100 116 139); }    /* slate-500 */
 
   /* Inputs & form elements */
-  .dark input:not([class*="bg-"]),
-  .dark textarea:not([class*="bg-"]),
-  .dark select:not([class*="bg-"]) {
+  /* Match only a real `bg-*` utility (start of class list or after a space) —
+     a plain [class*="bg-"] also matched `disabled:bg-gray-50`, which left
+     selects like the Asset dropdown with the browser's white default. */
+  .dark input:not([class^="bg-"]):not([class*=" bg-"]),
+  .dark textarea:not([class^="bg-"]):not([class*=" bg-"]),
+  .dark select:not([class^="bg-"]):not([class*=" bg-"]) {
     background-color: rgb(30 41 59);
     color: rgb(226 232 240);
     border-color: rgb(71 85 105);
+  }
+  .dark input:disabled,
+  .dark select:disabled,
+  .dark textarea:disabled {
+    background-color: rgb(15 23 42);
+    color: rgb(100 116 139);
   }
 
   /* Orange tints — light cream backgrounds would otherwise sit behind the
