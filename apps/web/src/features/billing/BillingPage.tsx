@@ -51,20 +51,6 @@ interface StorageSummary {
   } | null;
 }
 
-interface AccrualRun {
-  id: string;
-  periodStart: string;
-  periodEnd: string;
-  laptopCount: number;
-  peripheralCount: number;
-  totalDeviceCount: number;
-  laptopAmountPaise: string;
-  peripheralAmountPaise: string;
-  totalAmountPaise: string;
-  createdAt: string;
-  client: { id: string; name: string; slug: string };
-}
-
 interface AccrualRunResult {
   totalClients: number;
   periodStart: string;
@@ -371,16 +357,6 @@ export function BillingPage() {
     refetchOnWindowFocus: true,
   });
 
-  const { data: accrualRuns = [], isLoading: runsLoading } = useQuery({
-    queryKey: ['accrual-runs', effectiveClientId],
-    queryFn: () => {
-      const p = new URLSearchParams();
-      if (effectiveClientId) p.set('clientId', effectiveClientId);
-      return api.get<AccrualRun[]>(`/storage/accrual-runs?${p.toString()}`);
-    },
-    enabled: isAdminOrManager || isEditor || isClientAdmin,
-  });
-
   const {
     data: allLedgerEntries = [],
     isLoading: ledgerLoading,
@@ -662,7 +638,7 @@ export function BillingPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Storage &amp; Billing</h1>
-          <p className="text-sm text-gray-500 mt-1">Monthly storage overview and accrual history</p>
+          <p className="text-sm text-gray-500 mt-1">Monthly storage overview and charges</p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -870,31 +846,6 @@ export function BillingPage() {
                 )}
               </div>
             </div>
-
-            {/* Last accrual run summary bar */}
-            {summary.lastAccrualRun && (
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3 flex items-center gap-3 text-sm flex-wrap">
-                <CalendarDays size={15} className="text-gray-400 flex-shrink-0" />
-                <span className="text-gray-500">Last accrual run:</span>
-                <span className="font-medium text-gray-800">
-                  {periodLabel(summary.lastAccrualRun.periodStart)}
-                </span>
-                <span className="text-gray-400">·</span>
-                <span className="font-semibold text-gray-900 tabular-nums">
-                  {formatINR(summary.lastAccrualRun.totalAmountPaise)}
-                </span>
-                <span className="ml-auto text-xs text-gray-400">
-                  {new Date(summary.lastAccrualRun.createdAt).toLocaleString('en-IN', {
-                    timeZone: 'Asia/Kolkata',
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-            )}
           </>
         )}
       </section>
@@ -1030,83 +981,6 @@ export function BillingPage() {
                   </table>
                 </div>
               )}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Section 2 — Accrual Run History */}
-      {isAdminOrManager && (
-        <section className="space-y-4">
-          <h2 className="text-base font-semibold text-gray-700">Accrual Run History</h2>
-
-          {runsLoading ? (
-            <div className="text-sm text-gray-400 py-4">Loading accrual runs…</div>
-          ) : accrualRuns.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-12 text-center text-gray-400 text-sm">
-              No accrual runs recorded yet.{' '}
-              {isAdmin && (
-                <button
-                  onClick={() => runAccrualMutation.mutate()}
-                  className="text-[#E86F2C] underline hover:no-underline"
-                >
-                  Run the first accrual
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wide">
-                      <th className="text-left px-5 py-3">Period</th>
-                      <th className="text-left px-5 py-3">Client</th>
-                      <th className="text-right px-5 py-3">Laptops</th>
-                      <th className="text-right px-5 py-3">Peripherals</th>
-                      <th className="text-right px-5 py-3">Laptop billing</th>
-                      <th className="text-right px-5 py-3">Peripheral billing</th>
-                      <th className="text-right px-5 py-3">Total billed</th>
-                      <th className="text-left px-5 py-3">Run at</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {accrualRuns.map((run) => (
-                      <tr key={run.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                        <td className="px-5 py-3 font-medium text-gray-900 whitespace-nowrap">
-                          {periodLabel(run.periodStart)}
-                        </td>
-                        <td className="px-5 py-3 text-gray-600">{run.client.name}</td>
-                        <td className="px-5 py-3 text-right tabular-nums text-gray-700">
-                          {run.laptopCount.toLocaleString('en-IN')}
-                        </td>
-                        <td className="px-5 py-3 text-right tabular-nums text-gray-700">
-                          {run.peripheralCount.toLocaleString('en-IN')}
-                        </td>
-                        <td className="px-5 py-3 text-right tabular-nums text-gray-600">
-                          {formatINR(run.laptopAmountPaise)}
-                        </td>
-                        <td className="px-5 py-3 text-right tabular-nums text-gray-600">
-                          {formatINR(run.peripheralAmountPaise)}
-                        </td>
-                        <td className="px-5 py-3 text-right font-semibold tabular-nums text-gray-900">
-                          {formatINR(run.totalAmountPaise)}
-                        </td>
-                        <td className="px-5 py-3 text-gray-500 text-xs whitespace-nowrap">
-                          {new Date(run.createdAt).toLocaleString('en-IN', {
-                            timeZone: 'Asia/Kolkata',
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             </div>
           )}
         </section>
