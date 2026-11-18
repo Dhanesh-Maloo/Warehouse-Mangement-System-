@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../lib/auth';
+import { QuickStartChecklist } from './QuickStartChecklist';
 import {
   Package,
   PackagePlus,
@@ -159,6 +160,10 @@ export function DashboardPage() {
         <div className="text-sm text-gray-400">Loading…</div>
       ) : (
         <>
+          {user && (
+            <QuickStartChecklist userId={user.id} isClientUser={!!clientId} summary={summary} />
+          )}
+
           {/* SLA alert banner */}
           {breachedCount > 0 && (
             <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-5 py-3">
