@@ -110,6 +110,7 @@ export function DisposalPage() {
   // ── Form state ────────────────────────────────────────────────────────────
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedAssetId, setSelectedAssetId] = useState('');
+  const [assetSearch, setAssetSearch] = useState('');
   const [disposalType, setDisposalType] = useState<DisposalType>('non_certified');
   const [ivalueTicketNumber, setIvalueTicketNumber] = useState('');
   const [clientTicketNumber, setClientTicketNumber] = useState('');
@@ -126,10 +127,13 @@ export function DisposalPage() {
   });
 
   const { data: assets = [] } = useQuery({
-    queryKey: ['in-storage-assets', effectiveClientId],
+    queryKey: ['in-storage-assets', effectiveClientId, assetSearch],
     queryFn: async () => {
-      const params = new URLSearchParams({ status: 'in_storage' });
+      // The API defaults to 50 rows; without an explicit take (max 200) and a
+      // search, in-storage assets beyond the first 50 could never be selected.
+      const params = new URLSearchParams({ status: 'in_storage', take: '200' });
       if (effectiveClientId) params.set('clientId', effectiveClientId);
+      if (assetSearch.trim()) params.set('search', assetSearch.trim());
       const res = await api.get<{ data: InventoryAsset[]; total: number }>(
         `/assets?${params.toString()}`,
       );
@@ -324,6 +328,14 @@ export function DisposalPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Asset <span className="text-red-500">*</span>
               </label>
+              <input
+                type="text"
+                value={assetSearch}
+                onChange={(e) => setAssetSearch(e.target.value)}
+                disabled={!effectiveClientId}
+                placeholder="Search by serial number or model…"
+                className="w-full max-w-md mb-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] disabled:bg-gray-50 disabled:text-gray-400"
+              />
               <select
                 required
                 value={selectedAssetId}
