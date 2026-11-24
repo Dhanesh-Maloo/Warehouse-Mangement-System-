@@ -111,12 +111,15 @@ export function DisposalPage() {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [assetSearch, setAssetSearch] = useState('');
+  const [assetListOpen, setAssetListOpen] = useState(false);
   const [disposalType, setDisposalType] = useState<DisposalType>('non_certified');
   const [ivalueTicketNumber, setIvalueTicketNumber] = useState('');
   const [clientTicketNumber, setClientTicketNumber] = useState('');
   const [notes, setNotes] = useState('');
 
   const effectiveClientId = isClientScoped ? (clientId ?? '') : selectedClientId;
+  // Once an asset is picked the box shows its label, which must not be sent as a search.
+  const assetSearchTerm = selectedAssetId ? '' : assetSearch;
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -127,13 +130,13 @@ export function DisposalPage() {
   });
 
   const { data: assets = [] } = useQuery({
-    queryKey: ['in-storage-assets', effectiveClientId, assetSearch],
+    queryKey: ['in-storage-assets', effectiveClientId, assetSearchTerm],
     queryFn: async () => {
       // The API defaults to 50 rows; without an explicit take (max 200) and a
       // search, in-storage assets beyond the first 50 could never be selected.
       const params = new URLSearchParams({ status: 'in_storage', take: '200' });
       if (effectiveClientId) params.set('clientId', effectiveClientId);
-      if (assetSearch.trim()) params.set('search', assetSearch.trim());
+      if (assetSearchTerm.trim()) params.set('search', assetSearchTerm.trim());
       const res = await api.get<{ data: InventoryAsset[]; total: number }>(
         `/assets?${params.toString()}`,
       );
@@ -227,6 +230,8 @@ export function DisposalPage() {
     setShowForm(false);
     setSelectedClientId('');
     setSelectedAssetId('');
+    setAssetSearch('');
+    setAssetListOpen(false);
     setDisposalType('non_certified');
     setIvalueTicketNumber('');
     setClientTicketNumber('');
@@ -235,6 +240,8 @@ export function DisposalPage() {
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    // The combobox has no native `required`; typed text alone is not a selection.
+    if (!selectedAssetId) return;
     createMutation.mutate({
       clientId: effectiveClientId,
       assetId: selectedAssetId,
@@ -310,6 +317,7 @@ export function DisposalPage() {
                   onChange={(e) => {
                     setSelectedClientId(e.target.value);
                     setSelectedAssetId('');
+                    setAssetSearch('');
                   }}
                   className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C]"
                 >
@@ -328,34 +336,60 @@ export function DisposalPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Asset <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                value={assetSearch}
-                onChange={(e) => setAssetSearch(e.target.value)}
-                disabled={!effectiveClientId}
-                placeholder="Search by serial number or model…"
-                className="w-full max-w-md mb-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] disabled:bg-gray-50 disabled:text-gray-400"
-              />
-              <select
-                required
-                value={selectedAssetId}
-                onChange={(e) => setSelectedAssetId(e.target.value)}
-                disabled={!effectiveClientId}
-                className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] disabled:bg-gray-50 disabled:text-gray-400"
-              >
-                <option value="">
-                  {effectiveClientId
-                    ? assets.length === 0
-                      ? 'No in-storage assets'
-                      : 'Select an asset…'
-                    : 'Select a client first'}
-                </option>
-                {assets.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.serialNumber} - {a.manufacturer} {a.model}
-                  </option>
-                ))}
-              </select>
+              <div className="relative w-full max-w-md">
+                <input
+                  type="text"
+                  role="combobox"
+                  aria-expanded={assetListOpen}
+                  aria-controls="disposal-asset-listbox"
+                  autoComplete="off"
+                  value={assetSearch}
+                  onChange={(e) => {
+                    setAssetSearch(e.target.value);
+                    // Editing the text invalidates any earlier pick.
+                    setSelectedAssetId('');
+                    setAssetListOpen(true);
+                  }}
+                  onFocus={() => setAssetListOpen(true)}
+                  onBlur={() => setAssetListOpen(false)}
+                  disabled={!effectiveClientId}
+                  placeholder={
+                    effectiveClientId
+                      ? 'Type serial number or model to search in-house assets…'
+                      : 'Select a client first'
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E86F2C] disabled:bg-gray-50 disabled:text-gray-400"
+                />
+                {assetListOpen && effectiveClientId && (
+                  <ul
+                    id="disposal-asset-listbox"
+                    role="listbox"
+                    className="absolute z-20 mt-1 w-full max-h-64 overflow-auto rounded-lg border border-gray-300 bg-white shadow-lg text-sm"
+                  >
+                    {assets.length === 0 ? (
+                      <li className="px-3 py-2 text-gray-500">No matching in-house assets</li>
+                    ) : (
+                      assets.map((a) => (
+                        <li
+                          key={a.id}
+                          role="option"
+                          aria-selected={a.id === selectedAssetId}
+                          // mousedown (not click) so it fires before the input's blur closes the list.
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setSelectedAssetId(a.id);
+                            setAssetSearch(`${a.serialNumber} - ${a.manufacturer} ${a.model}`);
+                            setAssetListOpen(false);
+                          }}
+                          className="cursor-pointer px-3 py-2 text-gray-900 hover:bg-orange-50"
+                        >
+                          {a.serialNumber} - {a.manufacturer} {a.model}
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+              </div>
             </div>
 
             {/* Disposal type radio group */}
