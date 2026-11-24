@@ -47,18 +47,31 @@ export class AssetsService {
       ...(filter.conditionGrade ? { conditionGrade: filter.conditionGrade } : {}),
       ...(filter.assetCondition ? { assetCondition: filter.assetCondition } : {}),
       ...(filter.currentLocationId ? { currentLocationId: filter.currentLocationId } : {}),
-      ...(filter.search
-        ? {
-            OR: [
-              { serialNumber: { contains: filter.search, mode: 'insensitive' as const } },
-              { assetTag: { contains: filter.search, mode: 'insensitive' as const } },
-              { referenceName: { contains: filter.search, mode: 'insensitive' as const } },
-              { description: { contains: filter.search, mode: 'insensitive' as const } },
-              { vendorName: { contains: filter.search, mode: 'insensitive' as const } },
-              { model: { contains: filter.search, mode: 'insensitive' as const } },
-            ],
-          }
-        : {}),
+      ...this.buildSearchWhere(filter.search),
+    };
+  }
+
+  /**
+   * Every whitespace-separated word must match at least one searchable field.
+   * The UI shows "{manufacturer} {model}" as one label, so a phrase like
+   * "Lenovo ThinkPad T14" spans two columns and can never match a single
+   * field with a whole-phrase `contains`.
+   */
+  private buildSearchWhere(search?: string): Prisma.AssetWhereInput {
+    const terms = (search ?? '').split(/\s+/).filter((t) => t.length > 0);
+    if (terms.length === 0) return {};
+    return {
+      AND: terms.map((term) => ({
+        OR: [
+          { serialNumber: { contains: term, mode: 'insensitive' as const } },
+          { assetTag: { contains: term, mode: 'insensitive' as const } },
+          { referenceName: { contains: term, mode: 'insensitive' as const } },
+          { description: { contains: term, mode: 'insensitive' as const } },
+          { vendorName: { contains: term, mode: 'insensitive' as const } },
+          { model: { contains: term, mode: 'insensitive' as const } },
+          { manufacturer: { contains: term, mode: 'insensitive' as const } },
+        ],
+      })),
     };
   }
 

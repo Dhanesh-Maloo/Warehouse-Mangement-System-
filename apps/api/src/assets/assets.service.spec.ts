@@ -37,6 +37,32 @@ describe('AssetsService', () => {
     });
   });
 
+  describe('findAll search', () => {
+    it('requires every word to match some field, including manufacturer', async () => {
+      await service.findAll({ search: 'Lenovo  ThinkPad' });
+      const { where } = mockPrisma.asset.findMany.mock.calls[0][0] as {
+        where: { AND: { OR: Record<string, unknown>[] }[] };
+      };
+      expect(where.AND).toHaveLength(2);
+      expect(where.AND[0].OR).toEqual(
+        expect.arrayContaining([
+          { manufacturer: { contains: 'Lenovo', mode: 'insensitive' } },
+          { model: { contains: 'Lenovo', mode: 'insensitive' } },
+        ]),
+      );
+      expect(where.AND[1].OR).toEqual(
+        expect.arrayContaining([{ model: { contains: 'ThinkPad', mode: 'insensitive' } }]),
+      );
+    });
+
+    it('adds no search clause for a blank search', async () => {
+      await service.findAll({ search: '   ' });
+      expect(mockPrisma.asset.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.not.objectContaining({ AND: expect.anything() }) }),
+      );
+    });
+  });
+
   describe('updateStatus', () => {
     it('sets Date added from a date-only value, keeping the existing time of day in IST', async () => {
       const update = jest.fn().mockResolvedValue({});
